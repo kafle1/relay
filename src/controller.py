@@ -12,8 +12,9 @@ Run `python src/controller.py` for a self-check that asserts the core invariants
 from dataclasses import dataclass, field
 
 # passenger-car-unit weights (Kathmandu mix — motorcycle far below a car)
-PCU = {"car": 1.0, "motorcycle": 0.3, "bus": 2.5, "truck": 2.5, "ambulance": 2.0, "bicycle": 0.2}
-EMERGENCY_CLASSES = {"ambulance"}
+# single source of truth: perception.py imports this rather than keeping its own copy.
+PCU = {"car": 1.0, "motorcycle": 0.3, "bus": 2.5, "truck": 2.5, "ambulance": 2.0, "bicycle": 0.2,
+       "autorickshaw": 0.8}
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Timings:
     gap_time: float = 2.5        # end green early if served lanes stay empty this long
     max_wait: float = 90.0       # hard anti-starvation: force-serve past this
     max_preempt: float = 60.0    # cap on holding green for an emergency (D38: never freeze the junction)
+    emergency_hold: float = 2.5  # a detection latches "emergency present" for this long — survives a dropped frame
     w_wait: float = 0.4          # aging weight (fairness)
     hysteresis: float = 1.0      # challenger must beat incumbent by this to switch (anti-thrash)
     emergency_boost: float = 1e6 # emergency dominates the score
@@ -61,6 +63,11 @@ def junction_from_dirs(dirs):
         phases["NS" if len(ns) == 2 else ns[0]] = ns
     if ew:
         phases["EW" if len(ew) == 2 else ew[0]] = ew
+    if not phases:
+        raise ValueError(
+            f"junction_from_dirs: no usable approaches in {sorted(dirs) or ['(empty)']} "
+            f"— accepted keys are N, S, E, W"
+        )
     return Junction(sorted(dirs), phases)
 
 
@@ -77,6 +84,7 @@ class Controller:
         self.gap_timer = 0.0
         self.preempt_timer = 0.0
         self.wait = {a: 0.0 for a in junction.approaches}   # time since approach was last green
+        self.em_hold = {a: 0.0 for a in junction.approaches}  # debounce: survives a dropped detection frame
 
     # ── helpers ────────────────────────────────────────────────
     def _served(self, phase):
@@ -107,11 +115,11 @@ class Controller:
                 return name
         return None
 
-    def _phase_for_starved(self, counts):
-        # a lane that has REAL vehicles waiting past max_wait → force-serve it.
+    def _phase_for_starved(self, counts, factor=1.0):
+        # a lane that has REAL vehicles waiting past max_wait (x factor) → force-serve it.
         # an empty lane can't starve, so it never triggers this (no green for an empty lane, ever).
         starved = [a for a in self.j.approaches
-                   if self.wait[a] >= self.t.max_wait and self._pcu(a, counts) > 0]
+                   if self.wait[a] >= self.t.max_wait * factor and self._pcu(a, counts) > 0]
         if not starved:
             return None
         worst = max(starved, key=lambda a: self.wait[a])
@@ -128,9 +136,14 @@ class Controller:
 
     # ── main tick ──────────────────────────────────────────────
     def tick(self, counts, emergencies, dt):
-        """counts: {approach: {class:n} | number}; emergencies: iterable of approaches with an emergency.
+        """counts: {approach: {class:n} | number}; emergencies: iterable of approaches with an emergency
+        detected THIS frame. A hit latches that approach's hold for emergency_hold seconds, decaying by dt
+        each tick — a single dropped detection mid-hold can't make the controller abandon the preempt.
         Returns the signal state dict {approach: 'green'|'yellow'|'red'} plus phase/stage."""
-        emergencies = set(emergencies or ())
+        seen = set(emergencies or ())
+        for a in self.j.approaches:
+            self.em_hold[a] = self.t.emergency_hold if a in seen else max(0.0, self.em_hold[a] - dt)
+        emergencies = {a for a in self.j.approaches if self.em_hold[a] > 0}
         served_now = self._served(self.phase) if self.stage == self.GREEN else set()
 
         # accrue waiting time; a served (green) approach's wait resets
@@ -182,6 +195,11 @@ class Controller:
             self._begin_switch(em_phase); return
         if em_phase == self.phase:
             self.preempt_timer += dt                      # holding for an emergency on our own phase
+            # anti-starvation is bounded, not suspended: a lane waiting 2x max_wait forces service
+            # even over an active ambulance hold. Below that bound, ambulance priority wins outright.
+            hard_starved = self._phase_for_starved(counts, factor=2.0)
+            if hard_starved and hard_starved != self.phase and self.elapsed >= t.min_green:
+                self._begin_switch(hard_starved); return
             if self.preempt_timer < t.max_preempt:
                 return
         else:
@@ -309,12 +327,31 @@ def demo():
             served_n = True; break
     assert served_n, "VIOLATION: ambulance not served promptly"
 
+    # EMERGENCY DEBOUNCE — ambulance detected every tick except every 10th (dropout) → hold must not
+    # be abandoned mid-preempt just because one frame missed the detection.
+    c = Controller(four_way(), T)
+    def feed_amb_flicker(_):
+        return {"N": {"ambulance": 1}, "S": {}, "E": {"car": 6}, "W": {"car": 6}}
+    def emerg_flicker(i):
+        return () if i % 10 == 9 else {"N"}
+    # first get N to green under the emergency
+    for i in range(30):
+        c.tick(feed_amb_flicker(0), emerg_flicker(i), 0.5)
+    assert c.signals()["signals"]["N"] == "green", "setup: N should be green under sustained emergency"
+    abandoned = False
+    for i in range(30, 90):                      # continue with a flickering detection
+        s = c.tick(feed_amb_flicker(0), emerg_flicker(i), 0.5)
+        if s["signals"]["N"] != "green":
+            abandoned = True; break
+    assert not abandoned, "VIOLATION: a single dropped detection frame abandoned the emergency preempt"
+
     print("controller self-check PASSED:")
     print("  ✓ no green->green without yellow+all-red clearance")
     print("  ✓ empty-phase skip (no green wasted on an empty lane while another waits)")
     print(f"  ✓ no starvation (max N wait {max_n_wait:.1f}s <= {T.max_wait}s + slack)")
     print(f"  ✓ min-green honored (all green runs >= {T.min_green}s: {[round(d,1) for d in green_durations[:6]]}...)")
     print("  ✓ emergency preemption serves the ambulance")
+    print("  ✓ emergency debounce survives a single dropped detection frame (flickering ambulance)")
 
 
 if __name__ == "__main__":

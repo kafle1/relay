@@ -134,3 +134,9 @@
 - also the vehichles are striking with each other in the junction make junction bigger better also they must not ever touch or strike wth
 
 - how the fuck are the vehicles moving and turning, fix it to be like real life real physics human real environmment
+
+- check this you have access to everything
+
+- make 3d of balkhu point from kalanki road to sanepa there are junctions in dakshinkali road then above the balkhu bridge on side going vayodha hospita and kuleshwor road then sanepa and all so deep research and make 3d of it and we simulate our system there
+
+- do deep research list out every single problems and issues one by one make 100s of todos and make it one by one in god mode super speed

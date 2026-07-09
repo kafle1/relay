@@ -83,11 +83,15 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
         green_f = fixed.tick({d: qf[d] for d in J.approaches}, (), dt)
 
         for d in J.approaches:               # discharge served approaches
-            if d in green_a:
+            if qa[d] == 0:
+                da[d] = 0.0                  # no queue → no banked capacity (else a burst releases on arrival)
+            elif d in green_a:
                 da[d] += SAT * dt
                 while da[d] >= 1 and qa[d] > 0:
                     qa[d] -= 1; da[d] -= 1
-            if d in green_f:
+            if qf[d] == 0:
+                df[d] = 0.0
+            elif d in green_f:
                 df[d] += SAT * dt
                 while df[d] >= 1 and qf[d] > 0:
                     qf[d] -= 1; df[d] -= 1
@@ -101,6 +105,8 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
 
 def summary(seconds=240, seed=0):
     ts, wa, wf = simulate(seconds=seconds, seed=seed)
+    if not wa or not wf:                     # seconds < dt → no steps ran, nothing to report
+        return {"adaptive_wait": 0, "fixed_wait": 0, "reduction_pct": 0}
     a, f = wa[-1], wf[-1]
     return {"adaptive_wait": a, "fixed_wait": f, "reduction_pct": round((f - a) / f * 100, 1) if f else 0}
 

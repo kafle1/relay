@@ -68,7 +68,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 | Setting | Result | Nature |
 |---|---|---|
-| **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~46–86% less waiting, avg ≈ 59% | reproducible offline benchmark, not the live demo |
+| **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~10–73% less waiting, avg ≈ 36% | reproducible offline benchmark, not the live demo; discharge bounded to physical saturation flow |
 | **Live interactive demo** — toggle R.E.L.A.Y. ON/OFF and measure on screen | typically 10–35% fewer queued (varies with the traffic you spawn) | measured live from the scene you're watching |
 | **Detector, synthetic held-out frames** | mAP@50 ≈ 0.88, precision 0.96 | synthetic-domain only |
 | **Detector, real footage** | cars: strong; dense two-wheeler swarms: undercounts (improves at `--imgsz 960`) | known limitation — regional fine-tune is the fix, documented below |

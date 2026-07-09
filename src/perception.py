@@ -7,9 +7,8 @@ assignment, ~1s temporal smoothing, corrupt-frame tolerance, and a staleness fla
 """
 import time
 
-# vehicle taxonomy: name -> PCU weight (Kathmandu mix — a bus is not a motorcycle)
-PCU = {"car": 1.0, "motorcycle": 0.3, "bus": 2.5, "truck": 2.5, "ambulance": 2.0,
-       "bicycle": 0.2, "autorickshaw": 0.8}
+from controller import PCU  # single source of truth for PCU weights (controller.py owns it)
+
 # COCO ids -> our names (stock models); fine-tuned models already emit our names
 COCO = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 # per-class confidence: lower for two-wheelers (small, easily missed — edge case A2)
