@@ -471,7 +471,8 @@ function connectWS() {
     }
     if (m.metrics) {
       const rate = modeT > 3 ? (modeWait / modeT).toFixed(1) : '…';
-      mstat.textContent = `${queuedNow()} queued · ${rate} veh waiting/s`;
+      const tel = m.telemetry ? `  ·  ${m.telemetry.infer_ms}ms/frame` : '';
+      mstat.textContent = `${queuedNow()} queued · ${rate} veh waiting/s${tel}`;
       waHist.push(m.metrics.adaptive); wfHist.push(m.metrics.fixed);
       if (waHist.length > 224) { waHist.shift(); wfHist.shift(); }
       drawSpark();

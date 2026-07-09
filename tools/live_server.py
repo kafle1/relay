@@ -141,7 +141,9 @@ async def ws(sock: WebSocket):
             except Exception:
                 continue
             h, w = img.shape[:2]
+            _t0 = time.monotonic()
             res = model.predict(img, conf=0.35, device=DEVICE, verbose=False)[0]
+            infer_ms = round((time.monotonic() - _t0) * 1000)
 
             boxes = []
             counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
@@ -170,6 +172,7 @@ async def ws(sock: WebSocket):
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
                 "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),
+                "telemetry": {"infer_ms": infer_ms, "model": os.path.basename(MODEL_PATH)},
                 "metrics": {"adaptive": wa, "fixed": wf,
                             "reduction": round((wf - wa) / wf * 100, 1) if wf > 5 else 0},
             })

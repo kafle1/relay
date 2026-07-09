@@ -48,3 +48,7 @@ capture: setup stop
 ## make train — fine-tune the detector on the captured dataset (mixed run name)
 train: setup
 	$(PY) tools/train.py 25 640 mps ft_mixed
+
+## make webcam — R.E.L.A.Y. on the Mac camera (no extra hardware): point it at traffic footage on a phone
+webcam: setup
+	$(PY) tools/camera_demo.py 0
