@@ -46,3 +46,18 @@ Founder asleep; directive: generate → fix → test → judge-as-hackathon-judg
 - LOW  ?lanes=abc → NaN geometry → finite guard
 - LOW  unknown ?topo → roadless ghost arms → normalize to '4'
 APPLY AFTER UI agent releases main.js, then re-verify + commit.
+
+## Queued behind UI agent (main.js locked):
+1. apply_bugfixes.py (deadlock, CCTV guards, kerb, leaks, param guards)
+2. REAL TURNING ARCS: replace 2-segment L path with tangent quarter-circle.
+   Math (verified by hand, (perp, along) space; o1=laneOff(dir,lane), o2=exitPerp):
+   - rRight = max(2.4, 0.55*R); rLeft = R + LANE_W/2 + 0.6
+   - uA = o2/a.sign - r  (arc start); arcLen = r*PI/2
+   - ex = exit heading sign on exit axis (ARM[exit].out); ez = -a.sign; rotSign = sign(ex*ez)
+   - C = (o1 + r*ex, o2 + r*ez); v(th) = (-ex*r*cos th, rotSign*(-ex*r)*sin th); pos = C + v
+   - mesh.rotation.y = APPROACH[dir].rotY - rotSign*th; after arc: pos=(o1+ex*r + ex*(u-uEnd), o2), rotY=exit
+   - world map: axis 'z' → (perp→x, along→z) else swapped (same as placeCar)
+3. SMOOTH ACCEL: per-car c.vel, accel ~7 m/s^2 toward c.speed; brake = clamp to desired delta.
+   Replaces instant start/stop (user: "L turn is robotic, must move like real life").
+4. Pedestrians + ped signals.
+5. Then: recapture+retrain (visuals changed), judge loop, battery, README, push.
