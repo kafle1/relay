@@ -38,9 +38,10 @@ check: setup
 	$(PY) src/controller.py
 	$(PY) src/microsim.py
 
-## make pipeline CLIP=footage/x.mp4 — run the core system on any footage
+## make pipeline CLIP=path/to/clip.mp4 — run the core system on any footage
 pipeline: setup
-	$(PY) src/pipeline.py $(or $(CLIP),footage/GENERATED_sim_junction.mp4)
+	@test -n "$(CLIP)" || { echo "usage: make pipeline CLIP=path/to/clip.mp4  (no footage in repo — live sim is the test surface: make dev)"; exit 1; }
+	$(PY) src/pipeline.py $(CLIP)
 
 ## make compare — open the split-screen fixed-vs-adaptive demo
 compare:
