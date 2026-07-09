@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""GatiChowk adaptive signal controller — weighted max-pressure with the safety + fairness rules.
+"""R.E.L.A.Y. adaptive signal controller — weighted max-pressure with the safety + fairness rules.
 
 One score, three weights:  score(phase) = PCU-demand + w_wait*oldest_wait + emergency_boost
 Guards: empty-phase skip · gap-out · min/max-green · max-wait force-serve · yellow+all-red clearance.

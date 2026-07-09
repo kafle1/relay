@@ -1,4 +1,4 @@
-// GatiChowk junction sim — Three.js, realistic pass.
+// R.E.L.A.Y. junction sim — Three.js, realistic pass.
 // Real GLB vehicles + image-based lighting + filmic post-processing ("CCTV footage" look).
 // v1 topology = 4-way straight-through; config-driven multi-topology comes next.
 import * as THREE from 'three';

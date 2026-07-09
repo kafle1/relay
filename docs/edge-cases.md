@@ -1,4 +1,4 @@
-# GatiChowk — Edge-Case Register
+# R.E.L.A.Y. — Edge-Case Register
 
 *Every case the system must survive. No tests are written for this project, so each case is handled **in the code logic**. This is a hard checklist for the spec + implementation.*
 *Legend: 🔴 = safety-critical (a bug here causes a crash or wrong signal) · 🟠 = correctness · 🟡 = demo/robustness.*

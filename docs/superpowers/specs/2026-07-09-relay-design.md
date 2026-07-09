@@ -1,7 +1,7 @@
-# GatiChowk — Design Spec
+# R.E.L.A.Y. — Design Spec
 
 *Adaptive, camera-based traffic-signal control for Kathmandu-style mixed traffic.*
-*Status: draft for review · 2026-07-09 · supersedes nothing. Companion docs: [research](../../research/2026-07-09-gatichowk-research.md), [edge-cases](../../edge-cases.md).*
+*Status: draft for review · 2026-07-09 · supersedes nothing. Companion docs: [research](../../research/2026-07-09-relay-research.md), [edge-cases](../../edge-cases.md).*
 
 ---
 
@@ -9,7 +9,7 @@
 
 Kathmandu junctions run **fixed-timer** signals. Fixed timers are **blind** — they give green on a clock, not on demand. Result: an approach sits red ~200 seconds holding 2 motorcycles while an **empty** approach gets a full green. Green wasted on an empty road, paid for by everyone else waiting.
 
-**GatiChowk is an AI that sees each approach and never wastes a green on an empty lane.**
+**R.E.L.A.Y. is an AI that sees each approach and never wastes a green on an empty lane.**
 
 ## 2. Value proposition
 
@@ -103,7 +103,7 @@ Two baselines run as **shadow controllers on the identical arrival stream**:
 - **FixedNaive** — equal green per phase, round-robin. The "dumb timer" villain (the 200s-empty-lane scenario).
 - **Webster** (optional) — smart fixed cycle; the best a fixed plan can do.
 
-**Where the number comes from:** you can't counterfactually re-time *real* cars, so the rigorous **"X% less wait"** is measured in the **sim**, where GatiChowk, FixedNaive, and Webster all run on the **same spawned arrivals**. Real footage proves *perception + live decisions*; the sim is the **measurement rig** (a scientific control), not eye candy. This is a credibility pillar, not a shortcut.
+**Where the number comes from:** you can't counterfactually re-time *real* cars, so the rigorous **"X% less wait"** is measured in the **sim**, where R.E.L.A.Y., FixedNaive, and Webster all run on the **same spawned arrivals**. Real footage proves *perception + live decisions*; the sim is the **measurement rig** (a scientific control), not eye candy. This is a credibility pillar, not a shortcut.
 
 ## 9. Two eyes
 

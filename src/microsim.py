@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Headless queue microsimulation: adaptive (GatiChowk) vs a fixed timer, on IDENTICAL arrivals.
+"""Headless queue microsimulation: adaptive (R.E.L.A.Y.) vs a fixed timer, on IDENTICAL arrivals.
 
 This is the honest, apples-to-apples benefit measurement — you can't counterfactually re-time real
 cars, so we feed the *same* arrival stream through both signal policies and compare total waiting.

@@ -1,9 +1,9 @@
-# GatiChowk
+# R.E.L.A.Y.
 
 **Adaptive traffic-signal control that never wastes a green on an empty lane.**
 
 Kathmandu's junctions run on fixed timers — blind to real traffic. A green stays on for an empty
-approach while a packed one waits (up to ~200 seconds for two motorcycles). GatiChowk watches each
+approach while a packed one waits (up to ~200 seconds for two motorcycles). R.E.L.A.Y. watches each
 junction through ordinary cameras, counts vehicles per approach with a single YOLO model, and
 retimes the lights on demand: no green for an empty lane, more green where the queue is, nobody
 starves, and an ambulance clears its own path.
