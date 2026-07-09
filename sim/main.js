@@ -919,6 +919,7 @@ const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truc
 function drawOverlay() {
   const W = overlay.width, H = overlay.height;
   octx.clearRect(0, 0, W, H);
+  if (liveBoxes.at && performance.now() - liveBoxes.at > 700) return;   // feed stalled — no ghost boxes
   octx.lineWidth = (EMBED ? 1.25 : 2) * PR;
   octx.font = `600 ${11 * PR}px ui-monospace, monospace`;
   for (const b of liveBoxes) {
@@ -993,6 +994,7 @@ function connectWS() {
     liveSignals = m.signals;
     livePhase = `${m.phase} ${m.stage}`;
     liveBoxes = m.boxes || [];
+    liveBoxes.at = performance.now();      // stamp: stale boxes must vanish, not float over moved traffic
     liveCounts = m.counts;
     const emg = m.emergencies || [];
     banner.style.display = emg.length ? 'block' : 'none';
@@ -1116,7 +1118,7 @@ function tick() {
       if (qSampleAcc >= 0.75) { qSampleAcc = 0; qHist.push({ v: queuedNow(), on: systemOn }); if (qHist.length > 120) qHist.shift(); drawChart(); }
     }
     sendAcc += dt;
-    if (sendAcc >= 0.25 && ready) { sendAcc = 0; streamFrame(); }
+    if (sendAcc >= 0.15 && ready) { sendAcc = 0; streamFrame(); }   // ~6.7Hz: boxes track motion instead of trailing it
   }
   if (CAP && ready) captureTick(dt);
 

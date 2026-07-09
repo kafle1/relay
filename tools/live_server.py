@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 from controller import Controller, four_way, Timings, PCU, junction_from_dirs  # noqa: E402
 from microsim import FixedTimer, poisson                                       # noqa: E402
+from perception import CONF                                                    # noqa: E402  per-class confidence gates
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
 DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
@@ -144,7 +145,12 @@ async def ws(sock: WebSocket):
                 continue
             h, w = img.shape[:2]
             _t0 = time.monotonic()
-            res = model.predict(img, conf=0.35, device=DEVICE, verbose=False)[0]
+            # low floor + per-class gates (CONF), like perception.py: a flat 0.35 drops the small
+            # far-away two-wheelers that ARE the Kathmandu story (edge case A2).
+            # agnostic NMS: a distant queue otherwise grows stacked car+truck+moto boxes per vehicle.
+            # 960px: sharpens the small far-queue objects (same lever that fixed real-footage bikes).
+            res = model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
+                                device=DEVICE, verbose=False)[0]
             infer_ms = round((time.monotonic() - _t0) * 1000)
 
             boxes = []
@@ -155,6 +161,8 @@ async def ws(sock: WebSocket):
                 # not be counted (let alone as a car) and inflate that approach's demand.
                 cls = NAMES.get(int(b.cls), "")
                 if cls not in PCU:
+                    continue
+                if float(b.conf) < CONF.get(cls, CONF["default"]):
                     continue
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
                 cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h
