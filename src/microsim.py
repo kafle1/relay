@@ -17,6 +17,8 @@ def poisson(mean):
     """Knuth — small means, so this is cheap."""
     if mean <= 0:
         return 0
+    if mean > 500:                       # exp(-mean) underflows to 0.0 and the loop never terminates
+        return max(0, round(random.gauss(mean, mean ** 0.5)))
     L, k, p = math.exp(-mean), 0, 1.0
     while True:
         k += 1

@@ -441,16 +441,20 @@ const cars = [];
 window.__relay = { cars };                       // console/debug handle (read-only use)
 // route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
 function planRoute(dir, lane) {
-  const options = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
+  const arms = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
+  // lane discipline: right turns from the kerb lane, left turns from the inner lane — a turn from
+  // any other lane sweeps across its neighbours' straight paths. On an approach with no straight
+  // exit (T stem) every lane must turn, so the non-kerb lanes all go left: a lane with no legal
+  // move would fall back to a null route and drive straight off the map.
+  const hasStraight = arms.some(([m]) => m === 'straight');
+  const options = arms.filter(([m]) => m === 'straight' || LANES === 1
+    || (m === 'right' ? lane === LANES - 1 : hasStraight ? lane === 0 : lane < LANES - 1));
   if (!options.length) return null;
   const weights = { straight: 0.55, right: 0.2, left: 0.25 };
   let r0 = Math.random() * options.reduce((s, [m]) => s + weights[m], 0);
   let move = options[0][0], arm = options[0][1];
   for (const [m, a] of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; arm = a; break; } }
   if (move === 'straight') return null;
-  // lane discipline: right turns only from the kerb lane, left turns only from the inner lane —
-  // a turn from any other lane sweeps across its neighbours' straight paths
-  if (lane !== (move === 'right' ? LANES - 1 : 0)) return null;
 
   // tangent quarter-circle between the entry lane line and the exit lane line
   const a = APPROACH[dir], exit = ARM[arm];
@@ -523,29 +527,44 @@ function addCar(dir, u, forcedType) {
   cars.push(c);
 }
 
-// hard separation: every vehicle is three discs along its heading; two bodies may NEVER overlap.
-const SEP = 0.35;                                         // minimum bumper daylight (m)
-const discRad = c => c.type === 'motorcycle' ? 0.55 : Math.max(0.9, c.len / 6);
-function discs(x, z, ry, len) {
-  const hx = -Math.sin(ry), hz = -Math.cos(ry), s = len / 3;
-  return [[x - hx * s, z - hz * s], [x, z], [x + hx * s, z + hz * s]];
+// hard separation: every vehicle is a capsule (spine segment + half-WIDTH); two bodies may NEVER
+// overlap. Radius must model width, not length: the old three-disc max(0.9, len/6) made a bus
+// 3.5m "wide" — parked heavies phantom-blocked the whole adjacent lane (3m apart), freezing exits.
+const SEP = 0.35;                                         // minimum body daylight (m)
+const halfW = c => c.type === 'motorcycle' ? 0.5 : c.len >= 6 ? 1.25 : 0.95;
+function spineOf(x, z, ry, len, r) {
+  const hx = -Math.sin(ry), hz = -Math.cos(ry), h = Math.max(0.1, len / 2 - r);
+  return [x - hx * h, z - hz * h, x + hx * h, z + hz * h];
+}
+function pointSegDist(px, pz, s) {
+  const dx = s[2] - s[0], dz = s[3] - s[1], L2 = dx * dx + dz * dz;
+  const t = L2 ? Math.max(0, Math.min(1, ((px - s[0]) * dx + (pz - s[1]) * dz) / L2)) : 0;
+  return Math.hypot(px - (s[0] + t * dx), pz - (s[1] + t * dz));
+}
+function segDist(A, B) {
+  const rx = A[2] - A[0], rz = A[3] - A[1], qx = B[2] - B[0], qz = B[3] - B[1];
+  const d = rx * qz - rz * qx, wx = B[0] - A[0], wz = B[1] - A[1];
+  if (d) {                                                // segments cross → zero distance
+    const s = (wx * qz - wz * qx) / d, t = (wx * rz - wz * rx) / d;
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1) return 0;
+  }
+  return Math.min(pointSegDist(A[0], A[1], B), pointSegDist(A[2], A[3], B),
+                  pointSegDist(B[0], B[1], A), pointSegDist(B[2], B[3], A));
 }
 // smallest surface-to-surface gap the car would have at position u (vs all cars + people on zebras)
 function minGapAt(c, u, walkers) {
-  const p = poseOf(c, u), mine = discs(p.x, p.z, p.ry, c.len), rc = discRad(c);
+  const p = poseOf(c, u), rc = halfW(c), mine = spineOf(p.x, p.z, p.ry, c.len, rc);
   let gap = Infinity;
   for (const o of cars) {
     if (o === c) continue;
     const q = o.mesh.position, dx = q.x - p.x, dz = q.z - p.z;
     const reach = (c.len + o.len) * 0.7 + 2;
     if (dx * dx + dz * dz > reach * reach) continue;      // coarse cull
-    const theirs = discs(q.x, q.z, o.mesh.rotation.y, o.len), ro = discRad(o);
-    for (const [ax, az] of mine) for (const [bx, bz] of theirs)
-      gap = Math.min(gap, Math.hypot(ax - bx, az - bz) - rc - ro);
+    const ro = halfW(o);
+    gap = Math.min(gap, segDist(mine, spineOf(q.x, q.z, o.mesh.rotation.y, o.len, ro)) - rc - ro);
   }
   for (const w of walkers)
-    for (const [ax, az] of mine)
-      gap = Math.min(gap, Math.hypot(ax - w.x, az - w.z) - rc - 0.45);
+    gap = Math.min(gap, pointSegDist(w.x, w.z, mine) - rc - 0.45);
   return gap;
 }
 
@@ -574,7 +593,10 @@ function moveCars(dt) {
           stopDist = stopAt - c.u;
         }
         const leader = list[i + 1];
-        if (leader) {
+        // the lane wall only binds while both cars are still on the shared straight segment —
+        // once either enters its turning arc their paths diverge and u-distance means nothing
+        // (minGapAt still hard-guards any real proximity)
+        if (leader && (!c.route || c.u < c.route.uA) && (!leader.route || leader.u < leader.route.uA)) {
           const wall = leader.u - (c.len + leader.len) / 2 - GAP;
           target = Math.min(target, wall);
           stopDist = Math.min(stopDist, wall - c.u);
@@ -588,15 +610,19 @@ function moveCars(dt) {
             const oStop = -STOP - o.len / 2;
             const committed = o.u > oStop + 0.01 && o.u < ROAD_HALF + 4;    // already in/near the box
             const incoming = o.u <= oStop + 0.01 && oStop - o.u < 12 && (o.vel ?? 0) > 2;
+            // (deliberately NOT yielding to an oncoming car still parked at its line: both launch,
+            // meet mid-box, and the wedge/inch tiers squeeze the turner across — Kathmandu-style.
+            // Yielding to parked cars starves the turner's whole lane for the entire green.)
             if (committed || incoming) { target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
           }
         }
+        const wasStuck = c.stuck || 0;
         if (target > c.u && c.u > stopAt && vehicleAhead(c)) {
-          const wasStuck = c.stuck || 0;
-          // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles
-          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) { target = c.u + c.speed * 0.4 * dt; c.vel = Math.max(c.vel ?? 0, c.speed * 0.4); }
-          else target = c.u;
-          stopDist = Math.min(stopDist, target - c.u);
+          // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles.
+          // its stopDist stays the real constraint (line/leader): folding in the one-frame nudge
+          // step would collapse the envelope to a sqrt(dt) crawl (≈1 m/s at 60fps, frame-rate dependent)
+          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) target = c.u + c.speed * 0.4 * dt;
+          else { target = c.u; stopDist = 0; }
           c.stuck = wasStuck + dt;
         } else if (target > c.u) {
           c.stuck = 0;
@@ -618,13 +644,15 @@ function moveCars(dt) {
           const next = minGapAt(c, c.u + adv, walkers);
           // three tiers, all zero-contact: normal keeps SEP daylight; a stuck driver inches while not
           // worsening anyone's gap; the single longest-stuck driver squeezes past to break a knot.
-          const wedged = (c.stuck || 0) > 4 && (c.stuck || 0) >= maxStuck - 1e-6;
-          const inching = (c.stuck || 0) > 1.5;
+          // read wasStuck, not c.stuck: the reset above already zeroed it for gap-blocked cars,
+          // which would keep every knot-plug permanently in the strictest tier
+          const wedged = wasStuck > 4 && wasStuck >= maxStuck - 1e-6;
+          const inching = wasStuck > 1.5;
           if (wedged || inching) adv = Math.min(adv, c.speed * 0.25 * dt);
           const blockedNow = wedged ? next < 0.02
                            : inching ? next < 0.06 && next < now
                            : next < SEP && next < now;
-          if (blockedNow) { adv = 0; c.vel = 0; c.stuck = (c.stuck || 0) + dt; }
+          if (blockedNow) { adv = 0; c.vel = 0; c.stuck = wasStuck + dt; }   // one dt per frame, max
         }
         c.u += adv;
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
@@ -634,9 +662,12 @@ function moveCars(dt) {
   }
   for (let i = cars.length - 1; i >= 0; i--) {
     const c = cars[i];
-    // ponytail: wedged >30s in the box → towed away (real knots get untangled by traffic police);
-    // guarantees gridlock always clears — upgrade path is true multi-car negotiation
-    const towed = (c.stuck || 0) > 30 && inBox(c) && !(c.accident > 0);
+    // ponytail: wedged >30s in/at the box → towed away (real knots get untangled by traffic police);
+    // guarantees gridlock always clears — upgrade path is true multi-car negotiation.
+    // u-range check too: a long vehicle can plug the box entrance while its CENTRE sits outside
+    // (a 10.5m bus at the line is untowable by the position test alone)
+    const towed = (c.stuck || 0) > 18 && !(c.accident > 0)
+      && (inBox(c) || Math.abs(c.u) < ROAD_HALF + c.len / 2 + 2);
     if (c.u > START || towed) {
       c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
       scene.remove(c.mesh);
@@ -1044,7 +1075,7 @@ function captureTick(dt) {
 // ─────────────────────────── main loop ───────────────────────────
 const clock = new THREE.Clock();
 function tick() {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), 0.05) || 1e-6;   // duplicate rAF timestamps give dt=0, which breaks the blocked flag
   simTime += dt;
   const fixedLabel = tickSignals(dt);
   moveCars(dt);

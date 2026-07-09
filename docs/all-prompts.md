@@ -121,9 +121,12 @@
 | 35 | "/goal … fix bugs or edge cases … robust not temporary … simplify, no legacy, no over-engineering" | this pass: review fleet over src/ tools/ sim/, findings fixed, cleanup applied | ✅ |
 | 36 | "vehichles are striking with each other … make junction bigger better … must not ever touch or strike" | hard 3-disc separation (cars + pedestrians, never overlap); junction box widened with shoulder margin | ✅ |
 | 37 | "how the fuck are the vehicles moving and turning, fix it to be like real life real physics" | braking envelope v²=2ad into stops and corners, arc speed by lateral-g, per-type acceleration | ✅ |
-| 38 | "make 3d of balkhu point from kalanki road to sanepa … deep research and make 3d of it and we simulate our system there" | OSM-geometry research + corridor scene — real junctions, Bagmati river + bridge, per-junction R.E.L.A.Y. | ◐ |
+| 38 | "make 3d of balkhu point from kalanki road to sanepa … deep research and make 3d of it and we simulate our system there" | OSM-geometry research + sim/corridor.html — 3 real junctions, Bagmati river + bridge, per-junction R.E.L.A.Y. | ✅ |
 | 39 | "deep research list out every single problems … 100s of todos … god mode super speed" | 3-agent review fleet + full findings register, all confirmed issues fixed this session | ✅ |
 | 40 | "why are vehicles moving so slow" / "why are vehicles colliding … not able to do right and left turns properly" / "why are there no pedestrians" / "fix it all" | corner lateral-g raised, wedge-breaker inching (still zero-contact), pedestrians verified on-screen | ✅ |
+| 41 | "full system must be there of bikes , bus parkings and all everything so that balkhu simulation is god level super real" | Balkhu Bus Park w/ parked buses, cargo trucks on the Dakshinkali shoulder, chowk bike cluster, Sajha Petrol, hospitals, bus stops | ✅ |
+| 42 | "keep simulation btn sanepa light to kalanki balkhu light there are 3 lighs there" / "keep upto this much only see open street map" | corridor scoped to the pinned OSM extent — exactly 3 signals: Balkhu, Kuleshwor, Sanepa; landmarks from that map | ✅ |
+| 43 | "make 3d of balkhu point …" (row 38 closed) | sim/corridor.html live: 3 real junctions, decentralized max-pressure each, downstream-queue coordination, ambulance green wave to Vayodha | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
 
@@ -502,3 +505,5 @@
   This space is dense with near-identical hackathon/student clones of the same idea (YOLO count → weighted green-time formula, optionally + ambulance detection), the highest-quality reference being **mihir-m-gandhi/Adaptive-Traffic-Signal-Timer** (202★, IEEE-published). The RL/max-pressure literature is real but lives entirely in SUMO-simulation land, disconnected from vision. Nobody found combines real camera counts with max-pressure theory, pedestrian wait time, safety invariants, or synthetic-CCTV closed-loop training — all four of your claimed differentiators appear genuinely unclaimed in open source. The one idea worth deliberately stealing: CODERUDRA-X's **PCU area-weighted density table** (weight by vehicle footprint, not raw count) — directly useful for a motorcycle-heavy Kathmandu context, even though that repo's own code doesn't actually use it for control.</result>
   <usage><subagent_tokens>115720</subagent_tokens><tool_uses>25</tool_uses><duration_ms>513579</duration_ms></usage>
   </task-notification>
+
+- so you know everything and we are ready to start working to make this system flawless? take your time if you want to do more research and plan go ahead
