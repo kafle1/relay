@@ -71,3 +71,6 @@ APPLY AFTER UI agent releases main.js, then re-verify + commit.
       run src/pipeline.py on the mosaic = 4 real synced camera feeds driving our controller.
    b. Write docs/aicity-request.md: how the user requests the AI City multi-camera dataset
       (the only public source of true separate synced junction cams).
+9. CHAOS + ACCIDENT scenarios: buttons — (a) "accident": stop a vehicle mid-junction/lane for N
+   seconds (blocks a lane; system must keep serving others; alert banner); (b) "Kathmandu chaos":
+   spawn-rate x3 all approaches + more bikes; system holds. Super-realistic stress demo.
