@@ -86,3 +86,26 @@ Battery green: controller invariants, microsim 58.9%, make targets, zero console
 Known documented limits: rain-poncho two-wheeler swarms undercount (regional fine-tune next);
 CCTV wall is a view (live detection runs the overview feed); compare panels are independent traffic
 (controlled benchmark labeled as such).
+
+## Jul 9 (evening) — recheck-everything pass + Balkhu corridor
+Founder asks: drop remaining footage, audit requirements register, recheck whole codebase, research
+how other countries + Lalitpur do it, real physics + never-touch vehicles, bigger junction, Balkhu
+corridor in 3D, log every prompt to docs/all-prompts.md (hook now does this automatically).
+- footage/ deleted (live sim is the only test surface); make pipeline requires CLIP=.
+- requirements.md → all-prompts.md; UserPromptSubmit hook auto-appends every founder message.
+- 3-agent review fleet over src/ sim/ tools/: all confirmed findings fixed. Big ones: hardcoded
+  label map mislabeled stock-model detections into PCU counts; one dropped detection frame
+  abandoned ambulance preemption mid-hold (2.5s latch now); microsim discharge accumulator banked
+  impossible green capacity and inflated the benchmark — honest number is now 36% avg (10–73%
+  across seeds), README updated, never quote 59% again.
+- Sim physics rebuilt: v²=2ad braking toward constraints, corner speed by lateral-g, per-type
+  accel; hard 3-disc no-touch separation (cars + pedestrians) with tight box admission and a
+  longest-stuck squeeze-through so knots break with zero contact; junction box widened; riders
+  were frustum-culled by skinned bind-pose bounds (fixed); pedestrians hold traffic on zebras.
+- Research: docs/research/2026-07-09-global-landscape.md (SCATS/SCOOT/Surtrac/City Brain/ATCS
+  costs + results, mixed-traffic detection literature, Lalitpur Dec-2024 AI lights post-mortem,
+  KTM's 90%-dead signal history, what beats them) + 2026-07-09-balkhu-corridor.md (OSM geometry:
+  Balkhu Chowk + Kuleshwor bridgehead + Ekantakuna, 2+2 bridge pinch, zero signal nodes — all
+  police-managed today).
+- In flight: sim/corridor.html — Balkhu corridor with per-junction decentralized max-pressure
+  controllers and downstream-queue coordination.
