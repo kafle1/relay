@@ -287,7 +287,8 @@ function updateCars(dt) {
       const c = list[i];
       let target = c.u + c.speed * dt;
       const stopTarget = -STOP - c.len / 2;
-      if (mustStop && c.u < stopTarget) target = Math.min(target, stopTarget);
+      // <= + epsilon: a car parked exactly AT the line must stay held (strict < released it → red-running)
+      if (mustStop && c.u <= stopTarget + 0.01) target = Math.min(target, stopTarget);
       const leader = list[i + 1];
       if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
       c.u = Math.max(c.u, target);

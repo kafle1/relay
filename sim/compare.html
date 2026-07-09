@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R.E.L.A.Y. — Fixed vs Adaptive</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    #app { width: 100vw; height: 100vh; display: block; }
+    .tag { position: fixed; top: 14px; z-index: 10; padding: 8px 14px; border-radius: 8px;
+           font-weight: 700; font-size: 15px; letter-spacing: .05em; color: #fff;
+           background: rgba(12,14,18,.7); border: 1px solid rgba(255,255,255,.12); }
+    #tagL { left: 25%; transform: translateX(-50%); color: #ff6b62; }
+    #tagR { left: 75%; transform: translateX(-50%); color: #86efac; }
+    .stats { position: fixed; bottom: 14px; z-index: 10; padding: 10px 14px; border-radius: 8px;
+             font-size: 13px; line-height: 1.6; color: #e8eaed;
+             background: rgba(12,14,18,.7); border: 1px solid rgba(255,255,255,.12); min-width: 210px; }
+    #statL { left: 25%; transform: translateX(-50%); }
+    #statR { left: 75%; transform: translateX(-50%); }
+    .stats .big { font-size: 20px; font-weight: 700; }
+    #statL .big { color: #ff6b62; } #statR .big { color: #86efac; }
+    #divider { position: fixed; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.25); z-index: 9; }
+    #verdict { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 11;
+               padding: 9px 16px; border-radius: 8px; font-weight: 700; font-size: 16px; color: #86efac;
+               background: rgba(12,14,18,.85); border: 1px solid rgba(134,239,172,.35); }
+    #ctrls { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 11; display: flex; gap: 6px; }
+    #ctrls button { font: 12px ui-monospace, monospace; color: #e8eaed; background: rgba(20,24,30,.85);
+                    border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+    .k { color: #9aa0a6; }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="divider"></div>
+  <div id="tagL" class="tag">FIXED TIMER (today)</div>
+  <div id="tagR" class="tag">R.E.L.A.Y. (adaptive)</div>
+  <div id="verdict">same traffic · —</div>
+  <div id="statL" class="stats"><span class="k">queued now</span> <span id="qL">0</span><br>
+    <span class="k">total wait</span> <span class="big" id="wL">0</span> <span class="k">veh·s</span></div>
+  <div id="statR" class="stats"><span class="k">queued now</span> <span id="qR">0</span><br>
+    <span class="k">total wait</span> <span class="big" id="wR">0</span> <span class="k">veh·s</span></div>
+  <div id="ctrls">
+    <button id="b-amb">🚑 ambulance (both)</button>
+    <button id="b-surge">surge N (both)</button>
+    <button id="b-reset">reset</button>
+  </div>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module" src="./compare.js"></script>
+</body>
+</html>
