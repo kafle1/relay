@@ -19,6 +19,8 @@ if not imgs:
 random.seed(0); random.shuffle(imgs)
 k = max(1, int(len(imgs) * 0.15))
 val, train = imgs[:k], imgs[k:]
+if not train:
+    sys.exit(f"only {len(imgs)} image(s) in dataset/images — need at least 2 to split train/val")
 open(os.path.join(DS, "train.txt"), "w").write("\n".join(train))
 open(os.path.join(DS, "val.txt"), "w").write("\n".join(val))
 

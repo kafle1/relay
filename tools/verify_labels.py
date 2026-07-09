@@ -4,12 +4,16 @@ Usage: .venv/bin/python tools/verify_labels.py dataset/images/frame_00020.jpg [o
 """
 import os, sys, cv2
 
+if len(sys.argv) < 2:
+    sys.exit("usage: verify_labels.py <image> [out.jpg]")
 img_path = sys.argv[1]
 lbl_path = img_path.replace("/images/", "/labels/").rsplit(".", 1)[0] + ".txt"
 names = ["car", "moto", "bus", "truck", "amb"]
 colors = [(0, 200, 0), (0, 150, 255), (255, 60, 60), (60, 60, 255), (255, 255, 255)]
 
 im = cv2.imread(img_path)
+if im is None:
+    sys.exit(f"could not read image: {img_path}")
 h, w = im.shape[:2]
 n = 0
 if os.path.exists(lbl_path):

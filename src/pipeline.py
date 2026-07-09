@@ -53,31 +53,46 @@ def main():
                                     # pass --model dataset/runs/ft_mixed/weights/best.pt for the synthetic feed.
     zones = json.load(open(args.zones)) if args.zones else QUADRANTS
     zones = {k: [tuple(p) for p in v] for k, v in zones.items()}
+    # refuse garbage zones up front (edge case 63): [] disables an approach, anything else
+    # must be a real polygon in normalized coords — a silent never-matching zone is worse than an error.
+    for k, poly in zones.items():
+        if poly and (len(poly) < 3 or any(len(p) != 2 or not (0 <= p[0] <= 1 and 0 <= p[1] <= 1) for p in poly)):
+            sys.exit(f"bad zone {k!r}: need >= 3 points with normalized 0..1 coords (or [] to disable)")
 
     model = YOLO(args.model)
-    if not any(name in EMERGENCY for name in model.names.values()):
+    percep = Perception(model, zones)
+    if not any(name in EMERGENCY for name in percep.names.values()):
         print(f"WARNING: {os.path.basename(args.model)} has no emergency-vehicle class {sorted(EMERGENCY)} "
               f"— ambulance preemption is inactive with this model.")
-    percep = Perception(model, zones)
     ctrl = Controller(junction_from_dirs(zones.keys()),
                       Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60, w_wait=0.4))
 
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
         sys.exit(f"cannot open {args.video}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not 1 <= fps <= 120:                      # 0/NaN/negative/90000 — broken metadata, assume 25
+        fps = 25
     out_path = args.out or os.path.splitext(args.video)[0] + "_relay_system.mp4"
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    out = None                                   # created from the first real frame — stream headers lie about size
 
-    decisions, switches, n = [], 0, 0
+    decisions, switches, n, fails = [], 0, 0, 0
     prev_phase = None
     t0 = time.monotonic()
     try:
         while n < int(args.max_seconds * fps):
             ok, frame = cap.read()
-            if not ok:
-                break
+            if not ok or frame is None:
+                fails += 1                       # transient drop (RTSP) → skip; persistent → end of input
+                if fails > 25:
+                    break
+                continue
+            fails = 0
+            if out is None:
+                h, w = frame.shape[:2]
+                out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+                if not out.isOpened():
+                    sys.exit(f"cannot write {out_path} (codec or directory problem)")
             counts, emergencies, boxes = percep.read(frame, device=args.device, imgsz=args.imgsz)
             stale = percep.stale()
             # camera stale (C30): don't trust it — feed the controller empty counts so aging +
@@ -115,7 +130,11 @@ def main():
             out.write(frame)
             n += 1
     finally:
-        cap.release(); out.release()             # always release, even on Ctrl-C or a mid-loop exception
+        cap.release()                            # always release, even on Ctrl-C or a mid-loop exception
+        if out is not None:
+            out.release()
+    if n == 0:
+        sys.exit(f"no frames read from {args.video}")
     wall = time.monotonic() - t0
     print(f"processed {n} frames ({n / fps:.0f}s of video) in {wall:.0f}s wall "
           f"({n / max(wall, 1e-9):.1f} fps) | model={os.path.basename(args.model)}")

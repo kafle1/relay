@@ -15,14 +15,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
 COCO2OURS = {2: 0, 3: 1, 5: 2, 7: 3}   # car, motorcycle, bus, truck  (bicycle/person skipped)
 
+if len(sys.argv) < 2:
+    sys.exit("usage: pseudo_label.py <frames_dir> [conf]")
 frames_dir = sys.argv[1]
 conf = float(sys.argv[2]) if len(sys.argv) > 2 else 0.45
+
+frames = sorted(glob.glob(os.path.join(frames_dir, "*.jpg")))
+if not frames:
+    sys.exit(f"no .jpg frames found in {frames_dir}")
 
 os.makedirs(os.path.join(DS, "images"), exist_ok=True)
 os.makedirs(os.path.join(DS, "labels"), exist_ok=True)
 
 model = YOLO("yolo11s.pt")
-frames = sorted(glob.glob(os.path.join(frames_dir, "*.jpg")))
 kept = boxes_total = 0
 for f in frames:
     res = model(f, conf=conf, verbose=False)[0]

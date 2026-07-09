@@ -9,8 +9,6 @@ import time
 
 from controller import PCU  # single source of truth for PCU weights (controller.py owns it)
 
-# COCO ids -> our names (stock models); fine-tuned models already emit our names
-COCO = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 # per-class confidence: lower for two-wheelers (small, easily missed — edge case A2)
 CONF = {"motorcycle": 0.24, "bicycle": 0.24, "default": 0.38}
 EMERGENCY = {"ambulance"}
@@ -31,6 +29,9 @@ class Perception:
 
     def __init__(self, model, zones, smooth_alpha=0.35):
         self.model = model
+        # ultralytics returns names as a dict, but hub/exported checkpoints can give a list
+        names = getattr(model, "names", {}) or {}
+        self.names = names if isinstance(names, dict) else dict(enumerate(names))
         self.zones = zones
         self.alpha = smooth_alpha                      # EMA ≈ 1s at ~3 detections/s
         self.smoothed = {a: {} for a in zones}
@@ -43,13 +44,14 @@ class Perception:
         except Exception:
             return self.counts(), set(), []            # reuse last smoothed counts
         h, w = frame.shape[:2]
+        if not h or not w:
+            return self.counts(), set(), []            # degenerate frame — keep last counts
         raw = {a: {} for a in self.zones}
         boxes, emergencies = [], set()
         for b in (res.boxes or []):
-            cls_id = int(b.cls)
-            name = self.model.names.get(cls_id, "")
-            if name not in PCU:
-                name = COCO.get(cls_id, "")
+            # only classes with a PCU weight count — anything else (person, dog, ...) is ignored,
+            # never relabeled. Stock COCO and our fine-tune both emit PCU names directly.
+            name = self.names.get(int(b.cls), "")
             if name not in PCU:
                 continue
             conf = float(b.conf)

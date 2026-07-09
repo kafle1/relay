@@ -9,6 +9,8 @@ from ultralytics import YOLO
 # vehicle class NAMES (works for both COCO models and our fine-tuned taxonomy)
 VEHICLE_NAMES = {"bicycle", "car", "motorcycle", "bus", "truck", "ambulance", "autorickshaw"}
 
+if len(sys.argv) < 2:
+    sys.exit("usage: detect.py <image> [model] [conf]")
 img = sys.argv[1]
 model_name = sys.argv[2] if len(sys.argv) > 2 else "yolo11s.pt"
 conf = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25

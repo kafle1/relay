@@ -34,6 +34,8 @@ MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), "yolo11s.pt")
 
 print(f"loading detector: {MODEL_PATH}")
 model = YOLO(MODEL_PATH)
+# ultralytics returns names as a dict, but hub/exported checkpoints can give a list
+NAMES = model.names if isinstance(model.names, dict) else dict(enumerate(model.names))
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 
 
@@ -66,7 +68,6 @@ class LiveCompare:
             self.step(0.2)
 
     def step(self, dt):
-        import random
         for d in self.J.approaches:
             n = poisson(self.lam[d] * dt)
             self.qa[d] += n; self.qf[d] += n
@@ -105,7 +106,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/metrics")
-def metrics():
+async def metrics():          # async → runs on the event loop, never races stepper() mid-update
     wf = cmp.wf
     return {"adaptive": round(cmp.wa, 1), "fixed": round(wf, 1),
             "reduction": round((wf - cmp.wa) / wf * 100, 1) if wf > 5 else 0}
@@ -121,9 +122,13 @@ async def ws(sock: WebSocket):
         while True:
             msg = await sock.receive_json()
             if msg.get("type") == "zones":
-                zones = {k: v for k, v in msg["zones"].items()}
-                ctrl = Controller(junction_from_dirs(zones.keys()),
-                                  Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
+                zs = msg.get("zones") or {}
+                try:
+                    ctrl = Controller(junction_from_dirs(zs.keys()),
+                                      Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
+                    zones = zs
+                except ValueError as e:          # garbage zones must not kill the socket — keep the old ones
+                    print("bad zones ignored:", e)
                 continue
             if msg.get("type") != "frame":
                 continue
@@ -144,7 +149,11 @@ async def ws(sock: WebSocket):
             counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
             emergencies = set(msg.get("emergencies") or [])   # transponder-style announce (+ YOLO ambulance below)
             for b in (res.boxes or []):
-                cls = res.names.get(int(b.cls), "car")
+                # PCU classes only — with the stock 80-class model a pedestrian on the zebra must
+                # not be counted (let alone as a car) and inflate that approach's demand.
+                cls = NAMES.get(int(b.cls), "")
+                if cls not in PCU:
+                    continue
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
                 cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h
                 appr = None
@@ -181,8 +190,10 @@ async def save(req: Request):
     data = await req.json()
     os.makedirs(IMG, exist_ok=True)                 # survive a dataset wipe mid-run
     os.makedirs(LBL, exist_ok=True)
-    name = os.path.basename(data["name"])            # no path traversal
-    img_b64 = data["image"].split(",", 1)[1]         # strip data:image/jpeg;base64,
+    name = os.path.basename(data.get("name") or "")  # no path traversal
+    img_b64 = (data.get("image") or "").split(",", 1)[-1]   # data-URI prefix optional
+    if not name or not img_b64:
+        return {"ok": False, "error": "need name and image"}
     with open(os.path.join(IMG, name + ".jpg"), "wb") as f:
         f.write(base64.b64decode(img_b64))
     with open(os.path.join(LBL, name + ".txt"), "w") as f:

@@ -41,7 +41,7 @@ check: setup
 ## make pipeline CLIP=path/to/clip.mp4 — run the core system on any footage
 pipeline: setup
 	@test -n "$(CLIP)" || { echo "usage: make pipeline CLIP=path/to/clip.mp4  (no footage in repo — live sim is the test surface: make dev)"; exit 1; }
-	$(PY) src/pipeline.py $(CLIP)
+	$(PY) src/pipeline.py "$(CLIP)"
 
 ## make compare — open the split-screen fixed-vs-adaptive demo
 compare:
