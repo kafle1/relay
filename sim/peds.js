@@ -20,13 +20,13 @@ export async function initPeds(ctx) {
     const man = await loadGLB('assets/models/polypizza_pedestrian_man.glb');
     const bb = new THREE.Box3().setFromObject(man), size = new THREE.Vector3();
     bb.getSize(size);
-    man.scale.setScalar(1.7 / size.y);
+    man.scale.setScalar(1.7 / Math.max(size.y, 0.01));
     const ctr = new THREE.Vector3();
     bb.getCenter(ctr);
     man.position.set(-ctr.x * man.scale.x, 0, -ctr.z * man.scale.z);
     template = man;
   } catch {
-    return () => {};              // no model, no pedestrians — sim stays fine
+    return { tick: () => {}, crossers: () => [] };   // no model, no pedestrians — sim stays fine
   }
 
   // one crossing per approach arm: pedestrians cross that arm's road over its zebra.
@@ -82,7 +82,7 @@ export async function initPeds(ctx) {
   }
 
   let spawnAcc = 0;
-  return function tick(dt) {
+  function tick(dt) {
     spawnAcc += dt;
     if (spawnAcc > 2.2) { spawnAcc = 0; spawn(); }
 
@@ -109,11 +109,20 @@ export async function initPeds(ctx) {
         const arrived = p.dirSign > 0 ? p.perp >= p.c.to : p.perp <= p.c.from;
         if (arrived) p.state = 'done';
       } else {
-        // stroll away along the sidewalk, then leave
-        p.perp += p.dirSign * WALK * dt * 0.001;          // linger briefly
+        // stroll off the kerb and away, then leave
+        p.perp += p.dirSign * WALK * dt;
+        const [x, z] = p.c.at(p.perp);
+        p.mesh.position.set(x, 0.26, z);
         p.ttl = (p.ttl ?? 3) - dt;
         if (p.ttl <= 0) { scene.remove(p.mesh); peds.splice(i, 1); }
       }
     }
+  }
+
+  return {
+    tick,
+    // people currently ON the road — vehicles treat them as hard obstacles
+    crossers: () => peds.filter(p => p.state === 'crossing')
+      .map(p => { const [x, z] = p.c.at(p.perp); return { dir: p.c.dir, x, z }; }),
   };
 }

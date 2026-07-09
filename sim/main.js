@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js';
+import { initPeds } from './peds.js?v=2';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -26,7 +26,7 @@ const EMBED = P.has('embed');       // rendered inside compare.html — parent o
 const LOCKFIX = P.has('lockfixed'); // pin the dumb fixed timer + the imbalanced live demand pattern
 
 const LANE_W = 3;
-const ROAD_HALF = LANES * LANE_W + 0.4;          // half road width = junction box half-size
+const ROAD_HALF = LANES * LANE_W + 1.9;          // lanes + shoulder: junction box gets real turning room
 const ZEBRA = { from: ROAD_HALF + 0.7, to: ROAD_HALF + 3.3 };
 const STOP = ZEBRA.to + 0.9;                     // stop line sits BEHIND the crossing
 const START = 78 + ROAD_HALF;                    // spawn / despawn distance from the centre
@@ -401,7 +401,7 @@ function normalize(root, targetLen, rot = Math.PI) {
   root.position.set(-ctr.x, -bb.min.y, -ctr.z);          // centre on origin, sit on the ground
   const pivot = new THREE.Group();
   pivot.add(root);
-  pivot.scale.setScalar(targetLen / Math.max(size.x, size.z));
+  pivot.scale.setScalar(targetLen / Math.max(size.x, size.z, 0.01)); // floor: degenerate bbox must not scale to Infinity
   pivot.rotation.y = rot;                                // most models face -Z; bikes already face +Z
   return pivot;
 }
@@ -421,7 +421,7 @@ async function loadModels() {
     const man = await load('assets/models/polypizza_pedestrian_man.glb');
     const bb = new THREE.Box3().setFromObject(man), size = new THREE.Vector3();
     bb.getSize(size);
-    man.scale.setScalar(1.55 / size.y);                  // seated-human height
+    man.scale.setScalar(1.55 / Math.max(size.y, 0.01));  // seated-human height
     const ctr = new THREE.Vector3();
     bb.getCenter(ctr);
     man.position.set(-ctr.x * man.scale.x, 0, -ctr.z * man.scale.z);
@@ -437,7 +437,6 @@ function pickType() {
 }
 
 const cars = [];
-let carSeq = 0;                                  // monotonic id: yield priority, breaks mutual-yield deadlocks
 // route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
 function planRoute(dir, lane) {
   const options = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
@@ -464,25 +463,30 @@ function planRoute(dir, lane) {
     entryRotY: a.rotY, exitRotY: ARM[arm].rotY,
   };
 }
-function placeCar(c) {
+function poseOf(c, u) {                                   // pure pose: movement can test a position before taking it
   const a = APPROACH[c.dir];
-  const world = (perp, along) => a.axis === 'z' ? c.mesh.position.set(perp, 0, along) : c.mesh.position.set(along, 0, perp);
+  const world = (perp, along) => a.axis === 'z' ? [perp, along] : [along, perp];
   const r = c.route;
-  if (r && c.u >= r.uA + r.arcLen) {                      // past the arc: straight out the exit arm
-    world(r.exitStartPerp + r.ex * (c.u - r.uA - r.arcLen), r.o2);
-    c.mesh.rotation.y = r.exitRotY;
-    return;
+  if (r && u >= r.uA + r.arcLen) {                        // past the arc: straight out the exit arm
+    const [x, z] = world(r.exitStartPerp + r.ex * (u - r.uA - r.arcLen), r.o2);
+    return { x, z, ry: r.exitRotY };
   }
-  if (r && c.u >= r.uA) {                                 // on the arc
-    const th = (c.u - r.uA) / r.r;
-    world(r.Cperp - r.ex * r.r * Math.cos(th), r.Calong + r.rotSign * -r.ex * r.r * Math.sin(th));
-    c.mesh.rotation.y = r.entryRotY - r.rotSign * th;
-    return;
+  if (r && u >= r.uA) {                                   // on the arc
+    const th = (u - r.uA) / r.r;
+    const [x, z] = world(r.Cperp - r.ex * r.r * Math.cos(th), r.Calong + r.rotSign * -r.ex * r.r * Math.sin(th));
+    return { x, z, ry: r.entryRotY - r.rotSign * th };
   }
-  world(laneOff(c.dir, c.lane), a.sign * c.u);            // straight approach
+  const [x, z] = world(laneOff(c.dir, c.lane), a.sign * u); // straight approach
+  return { x, z, ry: a.rotY };
+}
+function placeCar(c) {
+  const p = poseOf(c, c.u);
+  c.mesh.position.set(p.x, 0, p.z);
+  c.mesh.rotation.y = p.ry;
 }
 function addCar(dir, u, forcedType) {
-  if (!ready || (cars.length >= MAX_CARS && !forcedType)) return;
+  // forced spawns (ambulance / surge buttons) get slack over the cap, but never unbounded
+  if (!ready || cars.length >= MAX_CARS + 10 || (cars.length >= MAX_CARS && !forcedType)) return;
   const type = forcedType || pickType();
   const pool = pools[type];
   if (!pool || !pool.length) return;
@@ -500,21 +504,49 @@ function addCar(dir, u, forcedType) {
   blob.position.y = 0.02;
   mesh.add(blob);
   mesh.rotation.y = APPROACH[dir].rotY;
-  const c = { dir, u, lane, mesh, id: carSeq++, len: T.len, type, route: planRoute(dir, lane),
+  const c = { dir, u, lane, mesh, len: T.len, type, route: planRoute(dir, lane),
               speed: SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3) };
   placeCar(c);
   scene.add(mesh);
   cars.push(c);
 }
 
+// hard separation: every vehicle is three discs along its heading; two bodies may NEVER overlap.
+const SEP = 0.35;                                         // minimum bumper daylight (m)
+const discRad = c => c.type === 'motorcycle' ? 0.55 : Math.max(0.9, c.len / 6);
+function discs(x, z, ry, len) {
+  const hx = -Math.sin(ry), hz = -Math.cos(ry), s = len / 3;
+  return [[x - hx * s, z - hz * s], [x, z], [x + hx * s, z + hz * s]];
+}
+// smallest surface-to-surface gap the car would have at position u (vs all cars + people on zebras)
+function minGapAt(c, u, walkers) {
+  const p = poseOf(c, u), mine = discs(p.x, p.z, p.ry, c.len), rc = discRad(c);
+  let gap = Infinity;
+  for (const o of cars) {
+    if (o === c) continue;
+    const q = o.mesh.position, dx = q.x - p.x, dz = q.z - p.z;
+    const reach = (c.len + o.len) * 0.7 + 2;
+    if (dx * dx + dz * dz > reach * reach) continue;      // coarse cull
+    const theirs = discs(q.x, q.z, o.mesh.rotation.y, o.len), ro = discRad(o);
+    for (const [ax, az] of mine) for (const [bx, bz] of theirs)
+      gap = Math.min(gap, Math.hypot(ax - bx, az - bz) - rc - ro);
+  }
+  for (const w of walkers)
+    for (const [ax, az] of mine)
+      gap = Math.min(gap, Math.hypot(ax - w.x, az - w.z) - rc - 0.45);
+  return gap;
+}
+
 function moveCars(dt) {
   const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
   const boxCount = cars.filter(inBox).length;
   const maxStuck = Math.max(0, ...cars.map(c => c.stuck || 0));
+  const walkers = peds.crossers();                        // people on a zebra are hard obstacles
+  const pedArm = new Set(walkers.map(w => w.dir));
   const byLane = {};
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
-    const held = signalOf(dir) !== 'green';
+    const held = signalOf(dir) !== 'green' || pedArm.has(dir);        // red light, or someone on our zebra
     for (let lane = 0; lane < LANES; lane++) {
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
       for (let i = 0; i < list.length; i++) {
@@ -537,11 +569,22 @@ function moveCars(dt) {
         } else if (target > c.u) {
           c.stuck = 0;
         }
-        // ease toward the allowance: accelerate up, brake down — like a real driver
-        c.vel = Math.min(c.speed, (c.vel ?? 0) + 7 * dt);
+        // real driving envelope: v² = 2·a·d braking, slow into corners, accelerate out
         const allowed = Math.max(0, target - c.u);
-        const adv = Math.min(allowed, c.vel * dt);
-        if (adv < c.vel * dt) c.vel = Math.max(0, adv / dt);
+        let vMax = Math.min(c.speed, Math.sqrt(2 * 5.5 * allowed));   // never outrun the stopping distance
+        const rt = c.route;
+        if (rt && c.u < rt.uA + rt.arcLen) {
+          const vArc = Math.sqrt(2.2 * rt.r);                         // comfortable lateral g through the arc
+          vMax = Math.min(vMax, c.u >= rt.uA ? vArc : Math.sqrt(vArc * vArc + 11 * (rt.uA - c.u)));
+        }
+        const acc = c.type === 'bus' || c.type === 'truck' ? 3.5 : 6.5;
+        c.vel = (c.vel ?? 0) < vMax ? Math.min(vMax, (c.vel ?? 0) + acc * dt) : Math.max(vMax, c.vel - 8 * dt);
+        let adv = Math.min(allowed, c.vel * dt);
+        if (adv > 1e-4) {
+          const next = minGapAt(c, c.u + adv, walkers);
+          // would close in on someone below the safety gap → hold (still free to slide APART)
+          if (next < SEP && next < minGapAt(c, c.u, walkers)) { adv = 0; c.vel = 0; }
+        }
         c.u += adv;
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
         placeCar(c);
@@ -864,7 +907,8 @@ let ws = null, wsOpen = false, sendAcc = 0, sending = false;
 function connectWS() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: computeZones() })); };
-  ws.onclose = () => { wsOpen = false; setTimeout(connectWS, 800); };
+  // stale live control must not keep steering the lights: drop to the safe fixed cycle while reconnecting
+  ws.onclose = () => { wsOpen = false; liveSignals = null; livePhase = 'no signal — reconnecting…'; setTimeout(connectWS, 800); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     liveSignals = m.signals;
@@ -958,7 +1002,7 @@ function tick() {
   simTime += dt;
   const fixedLabel = tickSignals(dt);
   moveCars(dt);
-  pedsTick(dt);
+  peds.tick(dt);
   spawnTick();
   if (LIVE || LOCKFIX) { modeWait += queuedNow() * dt; modeT += dt; }   // veh·seconds queued under the current mode
 
@@ -1056,10 +1100,10 @@ function startEmbedBridge() {
   });
 }
 
-let pedsTick = () => {};
+let peds = { tick: () => {}, crossers: () => [] };
 loadModels().then(async () => {
   const loadGLB = url => new Promise((res, rej) => loader.load(url, g => res(g.scene), undefined, rej));
-  pedsTick = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned });
+  peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned });
 }).then(() => {
   injectStyles();
   for (let i = 0; i < 28; i++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 6));
