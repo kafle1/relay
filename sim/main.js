@@ -416,11 +416,38 @@ function button(label, onClick, id) {
 }
 function scenarioPanel() {
   const p = document.createElement('div');
-  Object.assign(p.style, { position: 'fixed', top: '12px', right: '12px', zIndex: 11, display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '250px', justifyContent: 'flex-end' });
+  Object.assign(p.style, { position: 'fixed', top: '12px', right: '12px', zIndex: 11, display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '260px', justifyContent: 'flex-end' });
   for (const d of DIRS) p.appendChild(button('🚑 ' + d, () => addCar(d, -START, 'ambulance'), 'amb-' + d));
   const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => addCar(d, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
   p.appendChild(button('surge N', () => surge('N')));
   if (DIRS.includes('E')) p.appendChild(button('surge E', () => surge('E')));
+  document.body.appendChild(p);
+  junctionPanel();
+}
+
+// live junction switcher: any shape × any lane count, rebuilt on the spot
+function junctionPanel() {
+  const p = document.createElement('div');
+  Object.assign(p.style, { position: 'fixed', top: '196px', left: '12px', zIndex: 11, display: 'flex', gap: '5px', flexDirection: 'column',
+    font: '12px ui-monospace, monospace', color: '#9aa0a6', background: 'rgba(12,14,18,.55)', padding: '8px 10px', borderRadius: '8px' });
+  const rebuild = (topo, lanes) => {
+    const q = new URLSearchParams(location.search);
+    q.set('topo', topo); q.set('lanes', lanes);
+    location.search = q.toString();                 // clean rebuild with the new geometry
+  };
+  const row = (label, items, active, onPick) => {
+    const r = document.createElement('div');
+    r.style.display = 'flex'; r.style.gap = '5px'; r.style.alignItems = 'center';
+    const l = document.createElement('span'); l.textContent = label; l.style.width = '46px'; r.appendChild(l);
+    for (const [text, value] of items) {
+      const b = button(text, () => onPick(value));
+      if (String(value) === String(active)) { b.style.background = '#7dd3fc'; b.style.color = '#0b0d10'; }
+      r.appendChild(b);
+    }
+    return r;
+  };
+  p.appendChild(row('shape', [['4-way', '4'], ['T', 'T'], ['2-arm', '2']], TOPO, v => rebuild(v, LANES)));
+  p.appendChild(row('lanes', [['1', 1], ['2', 2], ['3', 3]], LANES, v => rebuild(TOPO, v)));
   document.body.appendChild(p);
 }
 
