@@ -10,7 +10,7 @@ live wait-time comparison chart (honest, apples-to-apples).
 
 Run:  .venv/bin/python tools/live_server.py   →  open http://127.0.0.1:8000/?live=1
 """
-import base64, os, sys, time
+import asyncio, base64, os, sys, time
 import numpy as np
 import cv2
 from fastapi import FastAPI, WebSocket
@@ -59,6 +59,8 @@ class LiveCompare:
         self.wa = self.wf = 0.0
         self.lam = {"N": 0.14, "S": 0.12, "E": 0.03, "W": 0.03}   # imbalanced (busy NS, quiet EW)
         self.sat = 0.55
+        for _ in range(700):     # warm to steady state so the displayed benefit is stable, not a startup transient
+            self.step(0.2)
 
     def step(self, dt):
         import random
@@ -79,11 +81,30 @@ class LiveCompare:
         return round(self.wa, 1), round(self.wf, 1)
 
 
+# one shared comparison, stepped on a real wall-clock timer (independent of browser frame rate)
+cmp = LiveCompare()
+
+
+@app.on_event("startup")
+async def _start_stepper():
+    async def stepper():
+        while True:
+            await asyncio.sleep(0.2)
+            cmp.step(0.2)
+    asyncio.create_task(stepper())
+
+
+@app.get("/metrics")
+def metrics():
+    wf = cmp.wf
+    return {"adaptive": round(cmp.wa, 1), "fixed": round(wf, 1),
+            "reduction": round((wf - cmp.wa) / wf * 100, 1) if wf > 5 else 0}
+
+
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
     await sock.accept()
     ctrl = Controller(four_way(), Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
-    cmp = LiveCompare()
     zones = None
     last = time.monotonic()
     try:
@@ -125,7 +146,7 @@ async def ws(sock: WebSocket):
             now = time.monotonic()
             dt = min(now - last, 0.5); last = now
             state = ctrl.tick(counts, emergencies, dt)
-            wa, wf = cmp.step(dt)
+            wa, wf = round(cmp.wa, 1), round(cmp.wf, 1)
             n_counts = {d: sum(counts[d].values()) for d in counts}
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
