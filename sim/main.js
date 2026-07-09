@@ -440,7 +440,20 @@ async function loadModels() {
     man.position.set(-ctr.x * man.scale.x, 0, -ctr.z * man.scale.z);
     riderTemplate = man;
   } catch { console.warn('rider model missing — bikes ride themselves'); }
-  ready = Object.values(pools).some(p => p.length);
+  // any type whose GLBs all failed still spawns as a plain box of the right footprint — the sim
+  // keeps moving and tracking every vehicle with zero model files on disk
+  const tint = { taxi: 0xd9b23a, ambulance: 0xf2f4f6, bus: 0x2f6f4f };
+  for (const [type, cfg] of Object.entries(TYPES)) {
+    if (pools[type].length) continue;
+    const w = type === 'motorcycle' ? 0.7 : cfg.len >= 6 ? 2.3 : 1.75;
+    const h = type === 'motorcycle' ? 1.3 : Math.min(3.2, cfg.len * 0.3 + 0.9);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, cfg.len),
+      new THREE.MeshStandardMaterial({ color: tint[type] ?? 0x8a939c, roughness: 0.7 }));
+    box.position.y = h / 2;
+    const g = new THREE.Group(); g.add(box);
+    pools[type].push(g);
+  }
+  ready = true;
 }
 
 function pickType() {
