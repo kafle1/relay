@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.prompt) | \"\\n- \" + (.prompt | gsub(\"\\r\";\"\") | gsub(\"\\n\"; \"\\n  \"))' >> \"$CLAUDE_PROJECT_DIR/docs/all-prompts.md\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

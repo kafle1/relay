@@ -68,6 +68,13 @@
 66. "clean clearly nothing broken"
 67. "make dev is not working" / "why did it close" / "i dont get it … make dev is also not working"
 68. "feed every message i sent you here every raw requirement prompt to requirements.md"
+69. "non of the footages thats there is perfect for us to test so remove that"
+70. "also check the requirements md file everything that i said from the beginning is there"
+71. "recheck whole codebase and make working mvp"
+72. "also how other countries are doiing this how its working how lanes are separated, how connection between junctions are working, also lalitpur mentropolitan city was doing that what happened to that and whats going on how can we make our better than that cheap efficient solving all problems and make it fullly working in real world"
+73. "also every time i say anything in the conversation send to requirements md"
+74. "and rename it as all prompts md file"
+75. "/goal … Identify and fix bugs or edge cases … understand, plan, fix, test, cleanup … rather than fixing and ptaching things later do not let that thing happen in the first place … YOU ARE NOT STOPPING AT ANY COST UNTIL EVERYTHING IS DONE COMPLETELY … your fixes must not be temporary patches, it must be robust solution … think from your brain too what are the edge cases and what other bugs can be there and fix it … in the name of fixing dont overcomplicate things it must be simplified … do all and do not stop until all done idc 50k line is changed … make max use of subagents … if you feel stuck then do more deep dive research on the internet … relist every single requirement i said … make sure every single thing is done one by one looking at everything in eevry single code in whole codebase … all must be consistent … remove all the unnecessary code do no keep ambiguty, conflicting and duplicate code … i dont need backward compatability, do not keep a single line of legacy things … every line must be written by senior human developer … no runtime and build issues at the end … cleanup all unncesary old scripts and everything and reduce complexity in everything over enginnering things"
 
 ---
 
@@ -107,5 +114,15 @@
 | 28 | "proper sidewalks proper zebracrossing … regenerate from scratch" | scene rebuilt: curbed sidewalks, real zebra bands, stop lines behind crossings, box-junction hatching | ✅ |
 | 29 | "remove all the unnecessary code … no ambiguty, conflicting and duplicate code … no legacy" | cleanup: real_demo.py + capture_server.py + live_zones.py removed, /save + junction helper consolidated, deprecated FastAPI hooks migrated | ✅ |
 | 30 | "no runtime and build issues at the end" | final verification battery (all checks + browser modes + make dev) | ✅ |
+| 31 | "non of the footages thats there is perfect for us to test so remove that" | `footage/` deleted; live sim is the only test surface; `make pipeline` now requires explicit `CLIP=` | ✅ |
+| 32 | "recheck whole codebase and make working mvp" | full recheck pass: `make check` invariants + multi-agent code review + server boot + browser verification | ✅ |
+| 33 | "how other countries are doiing this … lalitpur … make our better than that cheap efficient … fullly working in real world" | docs/research/global-landscape.md — SCATS/SCOOT/Surtrac/ATCS + Lalitpur post-mortem + our edge | ✅ |
+| 34 | "every time i say anything in the conversation send to requirements md" / "rename it as all prompts md file" | file renamed `docs/all-prompts.md`; UserPromptSubmit hook auto-appends every prompt to the live log below | ✅ |
+| 35 | "/goal … fix bugs or edge cases … robust not temporary … simplify, no legacy, no over-engineering" | this pass: review fleet over src/ tools/ sim/, findings fixed, cleanup applied | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
+
+---
+
+# Live prompt log (auto-appended by hook — every message, verbatim)
+
