@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R.E.L.A.Y. — Balkhu Corridor, Kathmandu</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --panel:rgba(16,19,24,.72); --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
+      --txt:#e8eaed; --muted:#9aa0a6; --cy:#7dd3fc; --grn:#86efac; --red:#ff6b62; --amb:#ffcc00;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    #app { width: 100vw; height: 100vh; display: block; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      z-index: 20; background: #0b0d10; color: #7dd3fc; font: 600 14px ui-monospace, monospace;
+      letter-spacing: .08em; text-align: center; padding: 0 24px; }
+  </style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="loading">● loading R.E.L.A.Y. — Balkhu corridor…</div>
+
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module" src="./corridor.js"></script>
+</body>
+</html>
