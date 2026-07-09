@@ -1071,6 +1071,10 @@ loadModels().then(async () => {
   document.getElementById('loading')?.remove();
   clock.start();
   tick();
+}).catch(e => {                                    // surface startup failures instead of hanging on "loading"
+  console.error('startup failed:', e);
+  const el = document.getElementById('loading');
+  if (el) el.textContent = '✗ startup error: ' + (e && e.message || e);
 });
 
 addEventListener('resize', () => {

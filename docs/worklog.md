@@ -74,3 +74,15 @@ APPLY AFTER UI agent releases main.js, then re-verify + commit.
 9. CHAOS + ACCIDENT scenarios: buttons — (a) "accident": stop a vehicle mid-junction/lane for N
    seconds (blocks a lane; system must keep serving others; alert banner); (b) "Kathmandu chaos":
    spawn-rate x3 all approaches + more bikes; system holds. Super-realistic stress demo.
+
+
+## CLOSED — overnight loop exit summary
+All queue items landed: bug-hunt fixes, anti-gridlock (verified), arcs+accel, peds+walk signals,
+per-lane gantries, CCTV wall (labels+props), chaos/accident, two-panel compare, judge pass applied
+(scene-measured live headline, reconciled compare metrics, honest banner/labels, 960px real-footage
+inference, README honesty table, loading state + startup trap), detector retrained on final look
+(P .958 / mAP@50 .877), 4-camera real-footage control proven (hanoi_4cam), AI City request doc.
+Battery green: controller invariants, microsim 58.9%, make targets, zero console errors all modes.
+Known documented limits: rain-poncho two-wheeler swarms undercount (regional fine-tune next);
+CCTV wall is a view (live detection runs the overview feed); compare panels are independent traffic
+(controlled benchmark labeled as such).
