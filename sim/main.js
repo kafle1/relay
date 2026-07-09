@@ -736,6 +736,7 @@ function cctvLabels(show) {
 
 // ─────────────────────────── HUD + scenario controls ───────────────────────────
 const hud = Object.fromEntries(['phase', 'N', 'S', 'E', 'W', 'total'].map(k => [k, document.getElementById('h-' + k)]));
+if (EMBED) document.getElementById('hud').style.display = 'none';   // compare.html draws its own labels/strips — two HUDs is clutter
 
 function button(label, onClick, id) {
   const b = document.createElement('button');
@@ -918,12 +919,14 @@ const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truc
 function drawOverlay() {
   const W = overlay.width, H = overlay.height;
   octx.clearRect(0, 0, W, H);
-  octx.lineWidth = 2 * PR;
-  octx.font = `600 ${12 * PR}px ui-monospace, monospace`;
+  octx.lineWidth = (EMBED ? 1.25 : 2) * PR;
+  octx.font = `600 ${11 * PR}px ui-monospace, monospace`;
   for (const b of liveBoxes) {
     const col = BOX_COLORS[b.cls] || '#34c759';
     octx.strokeStyle = col;
     octx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+    // in the small compare embeds the boxes alone carry the "camera is read" story — text is noise.
+    if (EMBED) continue;
     octx.fillStyle = col;
     octx.fillText(`${b.cls} ${b.conf}`, b.x * W, Math.max(12 * PR, b.y * H - 3 * PR));
   }

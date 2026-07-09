@@ -77,7 +77,9 @@
     .legend{ display:flex; gap:16px; font-size:11.5px; color:var(--muted); align-items:center; }
     .legend i{ width:11px; height:11px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
     .legend .lf{ background:var(--red); } .legend .lr{ background:var(--grn); }
-    #chart{ flex:1; width:100%; display:block; }
+    /* flex-basis 0 + min-height:0: the canvas BITMAP height must never feed back into its own
+       flex size (content-based basis spirals the canvas past the footer row and clips the plot) */
+    #chart{ flex:1 1 0; min-height:0; width:100%; display:block; }
   </style>
 </head>
 <body>
@@ -136,7 +138,12 @@
       if (!d || typeof d.who !== 'string') return;
       const p = d.who.includes('lockfixed') ? S.L : d.who.includes('live') ? S.R : null;
       if (!p) return;
-      if (typeof d.queued === 'number') { p.q = d.queued; p.hist.push({ t: performance.now(), q: d.queued }); }
+      if (typeof d.queued === 'number') {
+        p.q = d.queued;
+        // light EMA at ingest: the plotted line stays calm while the raw value feeds the strips
+        const s = p.hist.length ? p.hist[p.hist.length - 1].s * 0.72 + d.queued * 0.28 : d.queued;
+        p.hist.push({ t: performance.now(), q: d.queued, s });
+      }
       if (typeof d.waitPerSec === 'number') p.w = d.waitPerSec;
       const cut = performance.now() - WINDOW - 1000;
       while (p.hist.length && p.hist[0].t < cut) p.hist.shift();
@@ -188,21 +195,37 @@
       const w = chart.clientWidth, h = chart.clientHeight;
       chart.width = Math.round(w * dpr); chart.height = Math.round(h * dpr);
     }
+    // y-axis climbs in human steps (1/2/5/10…) so labels read "0 5 10 15", never "0 13 26 38"
+    function niceStep(raw) {
+      const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-9))));
+      for (const m of [1, 2, 5, 10]) if (m * p >= raw) return m * p;
+      return 10 * p;
+    }
     function draw() {
       const CW = chart.clientWidth, CH = chart.clientHeight;
+      if (chart.width !== Math.round(CW * dpr) || chart.height !== Math.round(CH * dpr)) sizeCanvas();
       cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       cctx.clearRect(0, 0, CW, CH);
-      const x0 = 34, x1 = CW - 12, y0 = 8, y1 = CH - 20;
+      const x0 = 38, x1 = CW - 14, y0 = 10, y1 = CH - 20;
       const now = performance.now();
-      const mx = Math.max(6, ...S.L.hist.map(p => p.q), ...S.R.hist.map(p => p.q));
 
+      const inWin = h => h.filter(p => now - p.t <= WINDOW + 500);
+      const L = inWin(S.L.hist), R = inWin(S.R.hist);
       cctx.font = '10px ui-monospace, monospace';
+      if (L.length + R.length < 4) {
+        cctx.fillStyle = '#6b7178'; cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
+        cctx.fillText('collecting traffic…', CW / 2, (y0 + y1) / 2);
+        return;
+      }
+      const step = niceStep(Math.max(4, ...L.map(p => p.s), ...R.map(p => p.s)) / 4);
+      const top = 4 * step;
+
       cctx.strokeStyle = 'rgba(255,255,255,.07)'; cctx.lineWidth = 1;
       cctx.fillStyle = '#6b7178'; cctx.textBaseline = 'middle'; cctx.textAlign = 'right';
-      for (const f of [0, 0.25, 0.5, 0.75, 1]) {
-        const y = y1 - f * (y1 - y0);
+      for (let g = 0; g <= 4; g++) {
+        const y = y1 - (g / 4) * (y1 - y0);
         cctx.beginPath(); cctx.moveTo(x0, y); cctx.lineTo(x1, y); cctx.stroke();
-        cctx.fillText(Math.round(f * mx), x0 - 6, y);
+        cctx.fillText(g * step, x0 - 6, y);
       }
       cctx.textBaseline = 'top'; cctx.textAlign = 'center';
       for (const s of [120, 90, 60, 30, 0]) {
@@ -210,23 +233,25 @@
         cctx.fillText(s ? '-' + s + 's' : 'now', x, y1 + 5);
       }
 
-      const plot = (hist, col) => {
-        const pts = hist.filter(p => now - p.t <= WINDOW + 500);
+      const px = p => x1 - ((now - p.t) / WINDOW) * (x1 - x0);
+      const py = p => y1 - (p.s / top) * (y1 - y0);
+      const plot = (pts, col) => {
         if (pts.length < 2) return;
+        const path = () => {
+          cctx.beginPath();
+          pts.forEach((p, i) => i ? cctx.lineTo(px(p), py(p)) : cctx.moveTo(px(p), py(p)));
+        };
+        path();                                          // soft fill grounds the line without shouting
+        cctx.lineTo(px(pts[pts.length - 1]), y1); cctx.lineTo(px(pts[0]), y1); cctx.closePath();
+        cctx.globalAlpha = 0.09; cctx.fillStyle = col; cctx.fill(); cctx.globalAlpha = 1;
+        path();
         cctx.strokeStyle = col; cctx.lineWidth = 2; cctx.lineJoin = 'round'; cctx.lineCap = 'round';
-        cctx.beginPath();
-        pts.forEach((p, i) => {
-          const x = x1 - ((now - p.t) / WINDOW) * (x1 - x0);
-          const y = y1 - (p.q / mx) * (y1 - y0);
-          i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
-        });
         cctx.stroke();
         const last = pts[pts.length - 1];
-        const lx = x1 - ((now - last.t) / WINDOW) * (x1 - x0), ly = y1 - (last.q / mx) * (y1 - y0);
-        cctx.fillStyle = col; cctx.beginPath(); cctx.arc(lx, ly, 3, 0, Math.PI * 2); cctx.fill();
+        cctx.fillStyle = col; cctx.beginPath(); cctx.arc(px(last), py(last), 3, 0, Math.PI * 2); cctx.fill();
       };
-      plot(S.L.hist, '#ff6b62');
-      plot(S.R.hist, '#86efac');
+      plot(L, '#ff6b62');
+      plot(R, '#86efac');
     }
 
     // ── scenario controls: broadcast into both sims ──
