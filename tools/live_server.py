@@ -11,6 +11,7 @@ live wait-time comparison chart (honest, apples-to-apples).
 Run:  .venv/bin/python tools/live_server.py   →  open http://127.0.0.1:8000/?live=1
 """
 import asyncio, base64, os, sys, time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import numpy as np
 import cv2
@@ -38,6 +39,10 @@ model = YOLO(MODEL_PATH)
 # ultralytics returns names as a dict, but hub/exported checkpoints can give a list
 NAMES = model.names if isinstance(model.names, dict) else dict(enumerate(model.names))
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+# one dedicated inference thread: predict() off the event loop (a sync call blocked ALL HTTP/WS for
+# ~100-300ms per frame — with several tabs open the server starved to death), single worker because
+# concurrent predict() on one model isn't thread-safe. Extra clients queue here, loop stays live.
+INFER = ThreadPoolExecutor(max_workers=1)
 
 
 def point_in_poly(x, y, poly):
@@ -149,8 +154,9 @@ async def ws(sock: WebSocket):
             # far-away two-wheelers that ARE the Kathmandu story (edge case A2).
             # agnostic NMS: a distant queue otherwise grows stacked car+truck+moto boxes per vehicle.
             # 960px: sharpens the small far-queue objects (same lever that fixed real-footage bikes).
-            res = model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
-                                device=DEVICE, verbose=False)[0]
+            res = (await asyncio.get_running_loop().run_in_executor(
+                INFER, lambda: model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
+                                             device=DEVICE, verbose=False)))[0]
             infer_ms = round((time.monotonic() - _t0) * 1000)
 
             boxes = []
