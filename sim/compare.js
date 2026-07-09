@@ -33,10 +33,8 @@ function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79
 // ─── renderer / lighting (one renderer, two scissored viewports) ───
 const canvas = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.82;
 renderer.setScissorTest(true);
@@ -60,7 +58,6 @@ const BULB = { red: 0xff3b30, yellow: 0xffcc00, green: 0x34c759, off: 0x181b20 }
 const loader = new GLTFLoader();
 const pools = {};
 function normalize(root, targetLen) {
-  root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   let bb = new THREE.Box3().setFromObject(root), size = new THREE.Vector3(); bb.getSize(size);
   if (size.x > size.z) root.rotation.y = Math.PI / 2;
   bb = new THREE.Box3().setFromObject(root); bb.getSize(size);
@@ -174,11 +171,7 @@ class World {
     const s = this.scene;
     s.add(new THREE.HemisphereLight(0xbcd6f0, 0x55564a, 0.3));
     const sun = new THREE.DirectionalLight(0xfff2e0, 1.5);
-    sun.position.set(48, 78, 30); sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.near = 10; sun.shadow.camera.far = 240;
-    sun.shadow.camera.left = -95; sun.shadow.camera.right = 95;
-    sun.shadow.camera.top = 95; sun.shadow.camera.bottom = -95;
+    sun.position.set(48, 78, 30);
     s.add(sun);
     const M = {
       ground: new THREE.MeshStandardMaterial({ map: noiseTex(256, [120, 122, 120], 22), roughness: 1 }),
