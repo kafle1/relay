@@ -61,3 +61,7 @@ APPLY AFTER UI agent releases main.js, then re-verify + commit.
    Replaces instant start/stop (user: "L turn is robotic, must move like real life").
 4. Pedestrians + ped signals.
 5. Then: recapture+retrain (visuals changed), judge loop, battery, README, push.
+6. CCTV polish: re-aim/frame each pole cam so its full approach (queue + stop line + signal) is
+   in frame, no dead corners; add small physical CCTV camera props on the signal poles.
+7. Exit condition (user asleep, wake-up bar): NOTHING broken — full battery green, judge-agent pass
+   with no high-severity findings, all modes screenshot-verified, all commits pushed.
