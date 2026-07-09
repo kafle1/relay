@@ -93,11 +93,14 @@ intersections of Kathmandu", IOE/SIDRA analysis, 2023.)*
 ```
 sim/                the synthetic live junction (Three.js)
   main.js           live feed · ?live=1 closed loop · ?capture=N auto-labels · ?topo=4|T|2
+  peds.js           pedestrians: spawn, wait at the zebra, cross on walk
   compare.html      split-screen fixed-vs-adaptive: live verdict + controlled server benchmark
   network.html      three signals on one arterial — coordination + ambulance green wave
   assets/models/    CC0 / CC-BY 3D vehicles
 src/
   controller.py     weighted max-pressure controller (+ invariant self-check)
+  perception.py     YOLO frame → per-approach, per-class PCU counts
+  pipeline.py       camera/clip → perception → controller, end to end
   microsim.py       adaptive-vs-fixed benchmark on identical arrivals
 tools/
   live_server.py    FastAPI + WebSocket: YOLO on streamed frames → signals back
@@ -132,5 +135,5 @@ third-party and not redistributed here.
 
 ## Credits
 
-3D models: Kenney Car Kit (CC0), Poly Pizza bus/motorcycle/scooter/bicycle (CC-BY 3.0), Quaternius
+3D models: Kenney Car Kit (CC0), Poly Pizza bus/motorcycle/scooter (CC-BY 3.0), Quaternius
 pedestrian (CC0) — see [ATTRIBUTION.md](ATTRIBUTION.md).
