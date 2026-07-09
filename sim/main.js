@@ -95,6 +95,7 @@ camera.lookAt(0, -1, 2);
 
 // view modes: single overview, or one pole-mounted CCTV per approach (how a real deployment sees)
 let camMode = (P.get('cam') === 'cctv' && !CAP && !LIVE) ? 'cctv' : 'overview';   // capture/live are calibrated to the overview camera
+const armMarkers = [];              // floating N/S/E/W sprites — hidden in CCTV (pole cams sit next to them: giant letters)
 const poleCams = {};
 function buildPoleCams() {
   for (const dir of DIRS) {
@@ -271,6 +272,7 @@ function buildWorld() {
     const d = R + 18;
     sprite.position.set(arm.axis === 'x' ? arm.out * d : 0, 10, arm.axis === 'z' ? arm.out * d : 0);
     scene.add(sprite);
+    armMarkers.push(sprite);
   }
 }
 buildWorld();
@@ -1094,7 +1096,9 @@ function tick() {
   hud.total.textContent = cars.length;
 
   if (controls) controls.update();
-  if (camMode === 'cctv' && DIRS.length > 1) {
+  const cctvNow = camMode === 'cctv' && DIRS.length > 1;
+  for (const s of armMarkers) s.visible = !cctvNow;
+  if (cctvNow) {
     renderer.setScissorTest(true);
     const W = renderer.domElement.width, H = renderer.domElement.height;
     const cw = Math.ceil(W / 2), ch = Math.ceil(H / Math.ceil(DIRS.length / 2));
