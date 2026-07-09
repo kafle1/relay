@@ -7,8 +7,11 @@
 //   → returns tick(dt); call it every frame.
 
 const WALK = 1.3;                 // m/s stroll
-const CROSS = 1.7;                // m/s crossing pace
+const CROSS = 2.2;                // m/s crossing pace — brisk urban scurry
 const MAX_PEDS = 14;
+const ENTRY_WINDOW = 3;           // s at the START of a red during which crossings admit entrants —
+                                  // real crosswalks stop admitting (flashing don't-walk) well before
+                                  // vehicles go green, or stragglers wall the whole green shut
 
 export async function initPeds(ctx) {
   const { THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned } = ctx;
@@ -87,8 +90,11 @@ export async function initPeds(ctx) {
     spawnAcc += dt;
     if (spawnAcc > 1.4) { spawnAcc = 0; spawn(); }        // lively sidewalks — people are part of the scene
 
+    for (const c of crossings) {
+      c.redT = signalOf(c.dir) === 'red' ? (c.redT || 0) + dt : 0;
+    }
     for (const { c, red, green } of walkBulbs) {
-      const walk = signalOf(c.dir) === 'red';             // vehicles held → people may cross
+      const walk = c.redT > 0 && c.redT < ENTRY_WINDOW;   // walk-man shows the ADMISSION window, not the whole red
       red.material.emissive.setHex(walk ? 0x181b20 : 0xff3b30);
       red.material.color.setHex(walk ? 0x181b20 : 0xff3b30);
       green.material.emissive.setHex(walk ? 0x34c759 : 0x181b20);
@@ -96,7 +102,7 @@ export async function initPeds(ctx) {
     }
 
     for (let i = peds.length - 1; i >= 0; i--) {
-      const p = peds[i], walk = signalOf(p.c.dir) === 'red';
+      const p = peds[i], walk = p.c.redT > 0 && p.c.redT < ENTRY_WINDOW;
       if (p.state === 'waiting') {
         if (walk) {
           p.state = 'crossing';

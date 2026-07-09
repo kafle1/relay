@@ -801,3 +801,23 @@
   </task-notification>
 
 - even though nothing is there its sowing truck box check and fix it all
+
+- such small issues lots of them are there, check all one by one and fix it all, also fixed times have issue why are vehicles stuck ther its green still its not moving also computer vision must be shown everywhere detecting vehicle and all dont simulate
+
+- h
+
+- <task-notification>
+  <task-id>af4e56041b7f6d4b0</task-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/7327c928-9419-4951-9aac-ae3313b9bd78/tasks/af4e56041b7f6d4b0.output</output-file>
+  <status>failed</status>
+  <summary>Background agent "Judge compare surface" was running when the previous Claude Code process exited and did not complete. Its in-process state was lost. Check its worktree/output for partial work before assuming the task landed.</summary>
+  </task-notification>
+
+- <task-notification>
+  <task-id>aeea7ada7a479285f</task-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/7327c928-9419-4951-9aac-ae3313b9bd78/tasks/aeea7ada7a479285f.output</output-file>
+  <status>failed</status>
+  <summary>Background agent "Judge local sim surfaces" was running when the previous Claude Code process exited and did not complete. Its in-process state was lost. Check its worktree/output for partial work before assuming the task landed.</summary>
+  </task-notification>
+
+- continue

@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js?v=4';   // versioned: module caches must not pin an old pedestrian API
+import { initPeds } from './peds.js?v=5';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -428,7 +428,7 @@ function setSignal(dir, state) {
 // The dumb fixed cycle is both the non-live default and the "system OFF" baseline.
 const CYCLE = GROUPS.flatMap(g => [{ green: g, d: 7 }, { yellow: g, d: 2 }, { allred: true, d: 1 }]);
 let cycleIdx = 0, cycleT = 0;
-let systemOn = true;                             // live mode: ON = adaptive server, OFF = fixed timer
+let systemOn = !LOCKFIX;                         // live: ON = adaptive server, OFF = fixed timer. lockfixed pins OFF — it may stream for detection boxes, but the dumb timer keeps the wheel
 let liveSignals = null, liveCounts = null, livePhase = '—', liveBoxes = [];
 
 const groupState = g => CYCLE[cycleIdx].green === g ? 'green' : CYCLE[cycleIdx].yellow === g ? 'yellow' : 'red';
@@ -698,12 +698,16 @@ function moveCars(dt) {
   const turnClaim = cars.some(c => c.len >= 6 && c.route && c.route.crossing
     && c.u >= c.route.uA && c.u < c.route.uA + c.route.arcLen && (c.stuck || 0) < 3);
   const walkers = peds.crossers();                        // people on a zebra are hard obstacles
-  const pedArm = new Set(walkers.map(w => w.dir));
+  // hold per LANE, not per arm: a crosser who has cleared your lane's slice of the zebra no longer
+  // holds you (a whole green used to sit frozen while one walker finished the far half of the road)
+  const pedPerp = {};
+  for (const w of walkers) (pedPerp[w.dir] ||= []).push(APPROACH[w.dir].axis === 'z' ? w.x : w.z);
   const byLane = {};
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
-    const held = signalOf(dir) !== 'green' || pedArm.has(dir);        // red light, or someone on our zebra
+    const redHold = signalOf(dir) !== 'green';
     for (let lane = 0; lane < LANES; lane++) {
+      const held = redHold || (pedPerp[dir] || []).some(p => Math.abs(p - laneOff(dir, lane)) < 3.0);
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
       for (let i = 0; i < list.length; i++) {
         const c = list[i], before = c.u;
@@ -1129,6 +1133,7 @@ function buildLiveUI() {
   mctx.scale(PR, PR);
   drawChart();
 
+  if (LOCKFIX) return;                           // pinned-fixed pages get no toggle — that's the point
   const toggle = button('', () => { systemOn = !systemOn; modeWait = 0; modeT = 0; paintToggle(); }, 'sys-toggle');
   const paintToggle = () => {
     toggle.textContent = systemOn ? '●  R.E.L.A.Y. ON — click for fixed timer' : '○  FIXED TIMER — click to switch R.E.L.A.Y. on';
