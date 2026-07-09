@@ -86,7 +86,7 @@ intersections of Kathmandu", IOE/SIDRA analysis, 2023.)*
 ```
 sim/                the synthetic live junction (Three.js)
   main.js           live feed · ?live=1 closed loop · ?capture=N auto-labels · ?topo=4|T|2
-  compare.html/js   split-screen fixed-vs-adaptive on identical seeded arrivals
+  compare.html      split-screen fixed-vs-adaptive: live verdict + controlled server benchmark
   assets/models/    CC0 / CC-BY 3D vehicles
 src/
   controller.py     weighted max-pressure controller (+ invariant self-check)
@@ -98,13 +98,13 @@ tools/
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
   camera_demo.py, draw_zones.py, verify_labels.py   webcam demo · zone setup · label QA
-docs/               research synthesis · design spec · 72-case edge-case register
+docs/               research synthesis · design spec · 83-case edge-case register
 ```
 
 ## Deploying on a new junction — no training required
 
 One shared detector serves every real camera (vehicles look the same everywhere; the general
-model needs zero per-site training — verified on Thailand, China, and Hanoi junctions unseen
+model needs zero per-site training — verified on Thailand and Hanoi junctions unseen
 during development). Per junction, setup is one minute:
 
 ```bash

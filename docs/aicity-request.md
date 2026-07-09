@@ -17,10 +17,10 @@ intersections, with calibration. It is request-gated — no anonymous download.
 Each intersection has several cameras with sync offsets in the metadata. Feed them to R.E.L.A.Y.:
 - Per camera: click zones once — `.venv/bin/python tools/draw_zones.py <cam.mp4> camN.json`
 - Then either run per-camera pipelines and merge counts, or tile the synced videos into one
-  mosaic (see `footage/hanoi_4cam.mp4` recipe in the worklog) and run a single pipeline with
-  quadrant zones.
+  mosaic (ffmpeg xstack recipe in the worklog) and run a single pipeline with quadrant zones.
 
 ## Meanwhile (no approval needed)
-`footage/hanoi_4cam.mp4` + `zones/hanoi_4cam.json` already give the same demo shape from real
-footage: one verified-fixed junction camera cropped into 4 per-approach feeds (perfect sync by
-construction), tiled like a CCTV wall, driving the controller live.
+The Hanoi 4-cam proof already gave the same demo shape from real footage: one verified-fixed
+junction camera cropped into 4 per-approach feeds (perfect sync by construction), tiled like a
+CCTV wall, driving the controller live. (Footage is third-party — kept local, not in the repo;
+the worklog documents the recipe end to end.)
