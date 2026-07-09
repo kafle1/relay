@@ -36,6 +36,7 @@
 | Claim | Number | What it is |
 |---|---|---|
 | Controlled benchmark | **~36% avg less waiting** (10–73% by seed) | microsim, identical arrivals, both controllers |
+| Per-vehicle waits | typical **halved** (p50 6s vs 12s) · p95 21s vs 43s · worst 38s vs 58s | same benchmark — the fairness tail |
 | Live demo | 10–35% fewer queued | measured on-screen from the scene you watch |
 | Real-world anchor | 33–49% | 2023 SIDRA re-timing study, 2 KTM junctions (Neupane & Jha) |
 | Detector (synthetic held-out) | mAP@50 ≈ 0.88, precision 0.96 | synthetic domain |
