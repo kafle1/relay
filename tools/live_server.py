@@ -14,6 +14,7 @@ import asyncio, base64, os, sys, time
 from contextlib import asynccontextmanager
 import numpy as np
 import cv2
+import torch
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.staticfiles import StaticFiles
 from ultralytics import YOLO
@@ -30,11 +31,10 @@ IMG, LBL = os.path.join(DS, "images"), os.path.join(DS, "labels")
 _CANDIDATES = [os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", n, "weights", "best.pt"))
                for n in ("ft_mixed", "ft")]
 MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), "yolo11s.pt")
-NAMES = {0: "car", 1: "motorcycle", 2: "bus", 3: "truck", 4: "ambulance", 5: "autorickshaw"}
 
 print(f"loading detector: {MODEL_PATH}")
 model = YOLO(MODEL_PATH)
-DEVICE = "mps"
+DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 
 
 def point_in_poly(x, y, poly):
@@ -144,7 +144,7 @@ async def ws(sock: WebSocket):
             counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
             emergencies = set(msg.get("emergencies") or [])   # transponder-style announce (+ YOLO ambulance below)
             for b in (res.boxes or []):
-                cls = NAMES.get(int(b.cls), "car")
+                cls = res.names.get(int(b.cls), "car")
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
                 cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h
                 appr = None

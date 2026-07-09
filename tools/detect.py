@@ -3,7 +3,7 @@
 Used to measure the synthetic-render domain gap: does the same YOLO see our sim cars?
 Usage: .venv/bin/python tools/detect.py <image> [model] [conf]
 """
-import sys
+import os, sys
 from ultralytics import YOLO
 
 # vehicle class NAMES (works for both COCO models and our fine-tuned taxonomy)
@@ -12,6 +12,9 @@ VEHICLE_NAMES = {"bicycle", "car", "motorcycle", "bus", "truck", "ambulance", "a
 img = sys.argv[1]
 model_name = sys.argv[2] if len(sys.argv) > 2 else "yolo11s.pt"
 conf = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
+
+if not os.path.exists(img):
+    sys.exit(f"no such file: {img}")
 
 model = YOLO(model_name)                      # downloads weights on first run
 res = model(img, conf=conf, verbose=False)[0]

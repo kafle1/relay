@@ -9,6 +9,7 @@ Then:  .venv/bin/python src/pipeline.py <video> --zones out.json
 """
 import json, sys
 import cv2
+import numpy as np
 
 APPROACHES = ["N", "S", "E", "W"]
 COLORS = [(80, 220, 80), (0, 210, 250), (60, 60, 255), (250, 160, 90)]
@@ -32,7 +33,7 @@ def redraw():
     img = frame.copy()
     for i, (name, poly) in enumerate(zones.items()):
         pts = [(int(x * w), int(y * h)) for x, y in poly]
-        cv2.polylines(img, [__import__("numpy").array(pts)], True, COLORS[i % 4], 2)
+        cv2.polylines(img, [np.array(pts)], True, COLORS[i % 4], 2)
         cv2.putText(img, name, pts[0], cv2.FONT_HERSHEY_SIMPLEX, 0.9, COLORS[i % 4], 2)
     for x, y in current:
         cv2.circle(img, (int(x * w), int(y * h)), 4, COLORS[idx % 4], -1)

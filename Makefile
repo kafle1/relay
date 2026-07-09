@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 PORT := 8000
 
-.PHONY: dev setup check pipeline compare capture train stop
+.PHONY: dev setup check pipeline compare capture train stop webcam
 
 ## make dev — start everything, open the demo, stay in the foreground with live logs (Ctrl-C = stop)
 dev: setup stop
@@ -16,7 +16,7 @@ dev: setup stop
 	@echo "  R.E.L.A.Y. is up:"
 	@echo "    live closed loop   →  http://127.0.0.1:$(PORT)/?live=1"
 	@echo "    T-junction live    →  http://127.0.0.1:$(PORT)/?live=1&topo=T"
-	@echo "    fixed-vs-adaptive  →  http://127.0.0.1:$(PORT)/compare.html?ff=120"
+	@echo "    fixed-vs-adaptive  →  http://127.0.0.1:$(PORT)/compare.html"
 	@echo "    free-roam sim      →  http://127.0.0.1:$(PORT)/"
 	@echo ""
 	@open "http://127.0.0.1:$(PORT)/?live=1" 2>/dev/null || true
@@ -45,7 +45,7 @@ pipeline: setup
 
 ## make compare — open the split-screen fixed-vs-adaptive demo
 compare:
-	@open "http://127.0.0.1:$(PORT)/compare.html?ff=120"
+	@open "http://127.0.0.1:$(PORT)/compare.html"
 
 ## make capture N=300 — dump N auto-labeled training frames from the sim (via the live server)
 capture: setup stop

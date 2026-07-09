@@ -52,7 +52,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python tools/live_server.py
 # → http://127.0.0.1:8000/?live=1            4-way, live detection + adaptive control
 # → http://127.0.0.1:8000/?live=1&topo=T     3-arm T junction
-# → http://127.0.0.1:8000/compare.html?ff=120  fixed-vs-adaptive split screen (ff = fast-forward s)
+# → http://127.0.0.1:8000/compare.html         fixed-vs-adaptive split screen
 
 # checks
 .venv/bin/python src/controller.py    # safety + fairness invariants
@@ -94,7 +94,8 @@ tools/
   pseudo_label.py   label real CCTV frames with stock YOLO (free real-domain labels)
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
-docs/               research synthesis · design spec · 65-case edge-case register
+  camera_demo.py, draw_zones.py, verify_labels.py   webcam demo · zone setup · label QA
+docs/               research synthesis · design spec · 72-case edge-case register
 ```
 
 ## Deploying on a new junction — no training required

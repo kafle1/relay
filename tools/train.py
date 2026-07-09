@@ -3,16 +3,19 @@
 Usage: .venv/bin/python tools/train.py [epochs] [imgsz] [device]
 """
 import glob, os, random, sys
+import torch
 from ultralytics import YOLO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
 epochs = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 imgsz = int(sys.argv[2]) if len(sys.argv) > 2 else 640
-device = sys.argv[3] if len(sys.argv) > 3 else "mps"
+device = sys.argv[3] if len(sys.argv) > 3 else ("mps" if torch.backends.mps.is_available() else "cpu")
 run_name = sys.argv[4] if len(sys.argv) > 4 else "ft"
 
 imgs = sorted(glob.glob(os.path.join(DS, "images", "*.jpg")))
+if not imgs:
+    sys.exit("no images in dataset/images — run `make capture` first")
 random.seed(0); random.shuffle(imgs)
 k = max(1, int(len(imgs) * 0.15))
 val, train = imgs[:k], imgs[k:]

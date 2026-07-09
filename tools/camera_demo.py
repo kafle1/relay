@@ -11,6 +11,8 @@ Keys: q quits.
 """
 import os, sys, time
 import cv2
+import numpy as np
+import torch
 from ultralytics import YOLO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +32,7 @@ src = sys.argv[1] if len(sys.argv) > 1 else "0"
 src = int(src) if src.isdigit() else src
 model_path = sys.argv[2] if len(sys.argv) > 2 else "yolo11s.pt"   # stock: webcam sees real objects
 
+device = "mps" if torch.backends.mps.is_available() else "cpu"
 model = YOLO(model_path)
 percep = Perception(model, ZONES)
 ctrl = Controller(junction_from_dirs(ZONES.keys()),
@@ -45,7 +48,7 @@ while True:
     if not ok:
         break
     t0 = time.monotonic()
-    counts, emergencies, boxes = percep.read(frame, device="mps")
+    counts, emergencies, boxes = percep.read(frame, device=device)
     infer_ms = (time.monotonic() - t0) * 1000
     now = time.monotonic(); dt = min(now - last, 0.5); last = now
     state = ctrl.tick(counts, emergencies, dt)
@@ -54,7 +57,7 @@ while True:
     for a, poly in ZONES.items():
         pts = [(int(x * w), int(y * h)) for x, y in poly]
         col = SIG[state["signals"].get(a, "red")]
-        cv2.polylines(frame, [__import__("numpy").array(pts)], True, col, 3)
+        cv2.polylines(frame, [np.array(pts)], True, col, 3)
         cv2.putText(frame, f"{a}  {sum(counts[a].values()):.0f} veh  [{state['signals'][a].upper()}]",
                     (pts[0][0] + 6, pts[0][1] + 26), cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2)
     for b in boxes:

@@ -1,4 +1,5 @@
 ultralytics
 opencv-python
+numpy
 fastapi
 uvicorn[standard]
