@@ -36,3 +36,13 @@ Founder asleep; directive: generate → fix → test → judge-as-hackathon-judg
 - No JS console errors in any mode; 60fps-ish in overview (measure via rAF count)
 - Capture mode still produces non-empty labels (verify_labels.py on a fresh frame)
 - Live loop: detection boxes + toggle + 🚑 preempt still work
+
+## Bug-hunt findings (JS agent, confirmed) — patch staged in scratchpad/apply_bugfixes.py
+- HIGH mutual-yield deadlock in box (symmetric vehicleAhead) → yield only to earlier car (id)
+- HIGH CCTV view corrupts capture labels + live zones (projections use overview cam) → guard mode in CAP/LIVE
+- MED  N/S signal heads on wrong kerb → negate aside on z-branch
+- MED  compare.js reset leaks scene (moot if UI agent deletes compare.js — check)
+- LOW  blob PlaneGeometry leak on despawn → dispose on remove
+- LOW  ?lanes=abc → NaN geometry → finite guard
+- LOW  unknown ?topo → roadless ghost arms → normalize to '4'
+APPLY AFTER UI agent releases main.js, then re-verify + commit.
