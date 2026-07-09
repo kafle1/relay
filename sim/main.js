@@ -574,6 +574,12 @@ function moveCars(dt) {
   const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
   const boxCount = cars.filter(inBox).length;
   const maxStuck = Math.max(0, ...cars.map(c => c.stuck || 0));
+  // a long vehicle (bus/truck) committed to a left-turn arc sweeps almost the whole box; hold the
+  // other approaches out of the box so nothing parks in its swept path and deadlocks it mid-turn.
+  // scoped to a turner still making progress (stuck<3): a wedged one drops the claim so the box can
+  // drain and the tow backstop can clear it — never a whole-junction freeze.
+  const turnClaim = cars.some(c => c.len >= 6 && c.route && c.route.crossing
+    && c.u >= c.route.uA && c.u < c.route.uA + c.route.arcLen && (c.stuck || 0) < 3);
   const walkers = peds.crossers();                        // people on a zebra are hard obstacles
   const pedArm = new Set(walkers.map(w => w.dir));
   const byLane = {};
@@ -590,7 +596,8 @@ function moveCars(dt) {
         const stopAt = -STOP - c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
         // held → red or someone on our zebra; else don't enter a packed box ("do not block the junction")
-        if (c.u <= stopAt + 0.01 && (held || boxCount >= LANES + 2)) {
+        if (c.u <= stopAt + 0.01 && (held || boxCount >= LANES + 2
+            || (turnClaim && (!c.route || c.u < c.route.uA)))) {
           target = Math.min(target, stopAt);
           stopDist = stopAt - c.u;
         }
@@ -616,6 +623,22 @@ function moveCars(dt) {
             // meet mid-box, and the wedge/inch tiers squeeze the turner across — Kathmandu-style.
             // Yielding to parked cars starves the turner's whole lane for the entire green.)
             if (committed || incoming) { target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
+          }
+        }
+        // arc-clearance: don't commit a turn if a STOPPED vehicle already sits inside the box on the
+        // swept path — it can't clear in time and the turner wedges mid-arc (bus vs parked box car).
+        // only STOPPED in-box cars count, so the moving oncoming flow never starves the turn.
+        if (c.route && c.u <= stopAt + 0.01 && target > stopAt) {
+          const rt = c.route;
+          for (let k = 1; k <= 6; k++) {
+            const us = rt.uA + (k / 6) * rt.arcLen, ps = poseOf(c, us), rcS = halfW(c);
+            const mineS = spineOf(ps.x, ps.z, ps.ry, c.len, rcS);
+            let hit = false;
+            for (const o of cars) {
+              if (o === c || (o.vel ?? 0) > 1 || !inBox(o)) continue;
+              if (segDist(mineS, spineOf(o.mesh.position.x, o.mesh.position.z, o.mesh.rotation.y, o.len, halfW(o))) - rcS - halfW(o) < SEP) { hit = true; break; }
+            }
+            if (hit) { target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
           }
         }
         const wasStuck = c.stuck || 0;
