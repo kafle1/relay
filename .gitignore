@@ -1,0 +1,24 @@
+# python env / deps
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+
+# model weights — regenerable (tools/train.py) or auto-downloaded by ultralytics
+*.pt
+
+# generated training data — regenerate via the sim capture + tools/train.py
+dataset/
+
+# real-world footage: third-party/copyrighted clips, not for redistribution
+footage/
+
+# sim debug / test frames
+sim/frames/
+
+# os / tooling
+.DS_Store
+.agent-browser/
+
+# claude tooling
+.claudeignore
