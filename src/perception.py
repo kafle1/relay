@@ -37,10 +37,6 @@ class Perception:
         self.smoothed = {a: {} for a in zones}
         self.last_update = 0.0
 
-    def class_name(self, cls_id):
-        name = self.model.names.get(cls_id, str(cls_id))
-        return COCO.get(cls_id, name) if name.isdigit() or name == "person" or cls_id in COCO and name not in PCU else name
-
     def read(self, frame, device=None):
         """One frame -> (counts, emergencies, boxes). Never raises on a bad frame (edge case A9)."""
         try:
