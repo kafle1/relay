@@ -101,12 +101,12 @@
     <section class="panel left">
       <iframe id="fL" title="fixed timer" src="/?embed=1&lockfixed=1"></iframe>
       <div class="label"><b>TODAY</b><span>fixed timer · blind 20s cycle</span></div>
-      <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg veh·s/s</span></div>
+      <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg queued · 30s</span></div>
     </section>
     <section class="panel right">
       <iframe id="fR" title="relay adaptive" src="/?embed=1&live=1"></iframe>
       <div class="label"><b>WITH R.E.L.A.Y.</b><span>adaptive · reads the camera</span></div>
-      <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg veh·s/s</span></div>
+      <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg queued · 30s</span></div>
     </section>
     <div id="divider"></div>
   </main>
@@ -170,7 +170,7 @@
       }
       // 2) otherwise stand on the controlled identical-arrivals benchmark
       if (serverRed != null && serverRed > 0) {
-        setVerdict('win', '▼ ' + Math.round(serverRed) + '%', 'less waiting · adaptive vs fixed on identical arrivals');
+        setVerdict('win', '▼ ' + Math.round(serverRed) + '%', 'controlled benchmark (identical arrivals) — panels above are independent traffic');
         return;
       }
       setVerdict('wait', '—', 'measuring… give the junctions a few seconds of traffic');
@@ -178,8 +178,8 @@
 
     function fmt(v) { return v == null ? '—' : (Number.isInteger(v) ? v : v.toFixed(1)); }
     function updateStrips() {
-      $('qL').textContent = fmt(S.L.q); $('wL').textContent = fmt(S.L.w);
-      $('qR').textContent = fmt(S.R.q); $('wR').textContent = fmt(S.R.w);
+      $('qL').textContent = fmt(S.L.q); $('wL').textContent = fmt(trailingAvg(S.L.hist, 30000));
+      $('qR').textContent = fmt(S.R.q); $('wR').textContent = fmt(trailingAvg(S.R.hist, 30000));
     }
 
     // ── real-time line chart (own canvas, two series) ──

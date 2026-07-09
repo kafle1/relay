@@ -631,8 +631,7 @@ function scenarioPanel() {
   p.className = 'relay-scenario';
   for (const d of DIRS) p.appendChild(button('🚑 ' + d, () => addCar(d, -START, 'ambulance'), 'amb-' + d));
   const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => addCar(d, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
-  p.appendChild(button('surge N', () => surge('N')));
-  if (DIRS.includes('E')) p.appendChild(button('surge E', () => surge('E')));
+  for (const d of DIRS) p.appendChild(button('surge ' + d, () => surge(d)));
   p.appendChild(button('💥 accident', () => {
     const victim = cars.find(c => c.u > -STOP - 8 && c.u < ROAD_HALF);
     if (victim) { victim.accident = 12; victim.stuck = 0; }
@@ -664,8 +663,7 @@ function junctionPanel() {
   };
   p.appendChild(row('shape', [['4-way', '4'], ['T', 'T'], ['2-arm', '2']], TOPO, v => rebuild(v, LANES)));
   p.appendChild(row('lanes', [['1', 1], ['2', 2], ['3', 3]], LANES, v => rebuild(TOPO, v)));
-  p.appendChild(row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, v => {
-    if (CAP || LIVE) return;                       // capture/live: labels+zones are projected via the overview camera
+  if (!CAP && !LIVE) p.appendChild(row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, v => {                       // capture/live: labels+zones are projected via the overview camera
     camMode = v;
     cctvLabels(v === 'cctv');
     [...p.children[2].querySelectorAll('button')].forEach(b =>
@@ -784,7 +782,7 @@ function buildLiveUI() {
   mctx.scale(PR, PR);
   drawChart();
 
-  const toggle = button('', () => { systemOn = !systemOn; modeWait = 0; modeT = 0; qHist.length = 0; paintToggle(); }, 'sys-toggle');
+  const toggle = button('', () => { systemOn = !systemOn; modeWait = 0; modeT = 0; paintToggle(); }, 'sys-toggle');
   const paintToggle = () => {
     toggle.textContent = systemOn ? '●  R.E.L.A.Y. ON — click for fixed timer' : '○  FIXED TIMER — click to switch R.E.L.A.Y. on';
     toggle.style.background = systemOn ? 'var(--grn)' : 'var(--red)';
@@ -875,13 +873,25 @@ function connectWS() {
     liveCounts = m.counts;
     const emg = m.emergencies || [];
     banner.style.display = emg.length ? 'block' : 'none';
-    if (emg.length) banner.textContent = '🚑 EMERGENCY PREEMPT — clearing ' + emg.join(', ');
+    if (emg.length) {
+      const clearing = emg.filter(d => m.signals[d] === 'green');
+      banner.textContent = clearing.length
+        ? '🚑 EMERGENCY PREEMPT — clearing ' + clearing.join(', ')
+        : '🚑 emergency detected on ' + emg.join(', ') + ' — switching…';
+    }
     if (m.metrics && statLine) {
       const load = modeT > 3 ? (modeWait / modeT).toFixed(1) : '—';
       const tel = m.telemetry ? ` · ${m.telemetry.infer_ms}ms/frame` : '';
       if (systemOn) {
         statLine.style.color = 'var(--grn)';
-        statLine.textContent = m.metrics.reduction > 0 ? `▼ ${m.metrics.reduction}% less waiting than fixed` : 'adapting to live demand…';
+        const onS = qHist.filter(x => x.on), offS = qHist.filter(x => !x.on);
+        if (onS.length > 8 && offS.length > 8) {
+          const avg = a => a.reduce((t, x) => t + x.v, 0) / a.length;
+          const gain = Math.round((1 - avg(onS) / Math.max(1, avg(offS))) * 100);
+          statLine.textContent = gain > 2 ? `▼ ${gain}% fewer queued with R.E.L.A.Y. ON (measured here)` : 'toggle OFF, then ON — watch the queues';
+        } else {
+          statLine.textContent = 'toggle the system OFF and back ON to measure the difference live';
+        }
       } else {
         statLine.style.color = 'var(--red)';
         statLine.textContent = '▲ fixed timer — not adapting';
