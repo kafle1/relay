@@ -503,7 +503,8 @@ function placeCar(c) {
 }
 function addCar(dir, u, forcedType) {
   // forced spawns (ambulance / surge buttons) get slack over the cap, but never unbounded
-  if (!ready || cars.length >= MAX_CARS + 10 || (cars.length >= MAX_CARS && !forcedType)) return;
+  const cap = carCap();
+  if (!ready || cars.length >= cap + 10 || (cars.length >= cap && !forcedType)) return;
   const type = forcedType || pickType();
   const pool = pools[type];
   if (!pool || !pool.length) return;
@@ -727,13 +728,15 @@ const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + Math.random() * 2]));
 const rate = (LIVE || LOCKFIX)                    // both A/B panels share the imbalanced demand
   ? { N: 1.7, S: 1.5, E: 0.4, W: 0.4 }             // busy NS, quiet EW — where a fixed timer bleeds green
   : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));
-let simTime = 0, chaosUntil = 0;
+let simTime = 0, chaosUntil = 0, density = 1;         // density: user traffic dial (× spawn rate AND × cap)
+const DENSITY_MIN = 0.3, DENSITY_MAX = 2.0;
+const carCap = () => Math.round(MAX_CARS * density);
 function spawnTick() {
   for (const dir of DIRS) {
     if (simTime >= nextSpawn[dir]) {
       addCar(dir, -START);
       const storm = simTime < chaosUntil ? 3 : 1;       // Kathmandu chaos mode
-      nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / ((rate[dir] || 1) * storm);
+      nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / ((rate[dir] || 1) * storm * density);
     }
   }
 }
@@ -782,6 +785,35 @@ function scenarioPanel() {
     if (victim) { victim.accident = 12; victim.stuck = 0; }
   }));
   p.appendChild(button('🌀 chaos ×3', () => { chaosUntil = simTime + 30; }));
+
+  // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
+  // (no cars vanish mid-road); increasing fills toward the higher cap.
+  const dial = document.createElement('div');
+  dial.className = 'relay-dial';
+  const readout = document.createElement('span');
+  readout.className = 'dval';
+  const showDensity = () => { readout.textContent = 'traffic ×' + density.toFixed(2).replace(/0$/, ''); };
+  const bump = step => {
+    density = Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, +(density + step).toFixed(2)));
+    showDensity();
+    // on a decrease, thin the surplus by pulling the FARTHEST-BACK cars (still out near the spawn
+    // edge, off the junction) — snappy feedback with nothing vanishing mid-scene; the rest drains.
+    if (step < 0) {
+      const far = cars.filter(c => c.u < -ROAD_HALF - 22).sort((a, b) => a.u - b.u);
+      for (const c of far) {
+        if (cars.length <= carCap()) break;
+        c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
+        scene.remove(c.mesh);
+        cars.splice(cars.indexOf(c), 1);
+      }
+    }
+  };
+  dial.appendChild(button('− traffic', () => bump(-0.25)));
+  dial.appendChild(readout);
+  dial.appendChild(button('+ traffic', () => bump(0.25)));
+  showDensity();
+  p.appendChild(dial);
+
   document.body.appendChild(p);
   junctionPanel();
 }
@@ -861,6 +893,9 @@ function injectStyles() {
   @keyframes relay-flash{ 0%,100%{box-shadow:0 6px 24px rgba(255,59,48,.55)} 50%{box-shadow:0 4px 10px rgba(255,59,48,.2)} }
   .relay-scenario{ position:fixed; top:14px; right:14px; z-index:11; display:flex; gap:6px; flex-wrap:wrap;
     max-width:264px; justify-content:flex-end; }
+  .relay-dial{ display:flex; gap:6px; align-items:center; }
+  .relay-dial .dval{ min-width:82px; text-align:center; color:var(--txt); font:600 12px ui-monospace,monospace;
+    font-variant-numeric:tabular-nums; }
   .relay-junction{ position:fixed; left:14px; top:250px; z-index:11; display:flex; flex-direction:column; gap:7px;
     padding:10px 11px; font:12px ui-monospace,monospace; color:var(--muted); }
   .relay-junction .jrow{ display:flex; gap:5px; align-items:center; }
