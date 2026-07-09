@@ -18,6 +18,11 @@ seeded arrivals, only the controller differs. The fixed side queues up; R.E.L.A.
 
 ![fixed vs adaptive](docs/img/compare.jpg)
 
+**The same system on real footage** — a real motorcycle-heavy junction (Hanoi, fixed camera), read
+live by the same pipeline: detections, per-approach demand, and the signal decision in the header:
+
+![real footage](docs/img/hanoi_system.jpg)
+
 **Any junction shape** — topology is config, not code. Same brain runs 4-way, 3-arm (T), 2-arm:
 
 ![T junction](docs/img/t_junction.jpg)
