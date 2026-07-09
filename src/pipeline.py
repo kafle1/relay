@@ -106,7 +106,6 @@ def main():
                 prev_phase = state["phase"]
 
             # draw zones tinted by their signal
-            ov = frame.copy()
             for a, poly in zones.items():
                 if not poly:
                     continue                     # empty polygon in zones.json → never matches, nothing to draw
