@@ -963,7 +963,11 @@ function drawChart() {
   if (!mctx) return;
   const cw = 256, ch = 88, x0 = 22, x1 = cw - 4, y0 = 7, y1 = ch - 13;
   mctx.clearRect(0, 0, cw, ch);
-  const mx = Math.max(4, ...qHist.map(s => s.v));
+  // y-axis climbs in human steps (1/2/5/10…): "0 10 20", never "0 13 26"
+  const raw = Math.max(4, ...qHist.map(s => s.v)) / 2;
+  const p10 = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 5, 10].map(m => m * p10).find(v => v >= raw);
+  const mx = 2 * step;
   mctx.font = '9px ui-monospace, monospace';
   mctx.strokeStyle = 'rgba(255,255,255,.09)'; mctx.lineWidth = 1;
   mctx.fillStyle = '#6b7178'; mctx.textBaseline = 'middle'; mctx.textAlign = 'right';
