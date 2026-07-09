@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js?v=2';   // versioned: module caches must not pin an old pedestrian API
+import { initPeds } from './peds.js?v=3';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -997,11 +997,12 @@ function streamFrame() {
   streamCanvas.height = h;
   streamCtx.drawImage(renderer.domElement, 0, 0, w, h);              // same-frame copy: no preserveDrawingBuffer
   const emergencies = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < ROAD_HALF).map(c => c.dir))];
+  const pedDemand = peds.waiting();                                  // push-button-style ped input per arm
   streamCanvas.toBlob(blob => {
     sending = false;
     if (!blob || !wsOpen) return;
     const fr = new FileReader();
-    fr.onload = () => { try { ws.send(JSON.stringify({ type: 'frame', image: fr.result, emergencies })); } catch {} };
+    fr.onload = () => { try { ws.send(JSON.stringify({ type: 'frame', image: fr.result, emergencies, peds: pedDemand })); } catch {} };
     fr.readAsDataURL(blob);
   }, 'image/jpeg', 0.6);
 }
@@ -1090,6 +1091,7 @@ function tick() {
     mode: LIVE ? (systemOn ? 'relay' : 'fixed') : 'sim',
     phase: hud.phase.textContent, counts: c, cars: cars.length,
     queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
+    peds: peds.waiting(),
     topo: TOPO, lanes: LANES,
   };
   requestAnimationFrame(tick);
@@ -1145,7 +1147,7 @@ function startEmbedBridge() {
   });
 }
 
-let peds = { tick: () => {}, crossers: () => [] };
+let peds = { tick: () => {}, crossers: () => [], waiting: () => ({}) };
 loadModels().then(async () => {
   const loadGLB = url => new Promise((res, rej) => loader.load(url, g => res(g.scene), undefined, rej));
   peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned });

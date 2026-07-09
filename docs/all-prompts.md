@@ -229,3 +229,38 @@
   </task-notification>
 
 - do a deep assessment where are we right now, what we planned what we needed and what to do next ? i need final mvp ready final
+
+- <task-notification>
+  <task-id>b7qi560jo</task-id>
+  <tool-use-id>toolu_01TsjpF2BQppXB54YdxeZKav</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/c6b51e12-fd00-498e-9807-f793ec3fffc8/tasks/b7qi560jo.output</output-file>
+  <status>completed</status>
+  <summary>Background command "Wait 60s for extended soak window" completed (exit code 0)</summary>
+  </task-notification>
+
+- <task-notification>
+  <task-id>a01843009889b3544</task-id>
+  <tool-use-id>toolu_01EEUSpZhAmXs9fss5gXZyni</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/c6b51e12-fd00-498e-9807-f793ec3fffc8/tasks/a01843009889b3544.output</output-file>
+  <status>completed</status>
+  <summary>Agent "Review full working diff" finished</summary>
+  <note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+  <result>PCU still defined at module scope in controller.py, unchanged, import intact.
+  
+  Full diff reviewed end to end. No defects found — all cross-file call sites (`pipeline.py`, `camera_demo.py`, `microsim.py`, `live_server.py`, `perception.py`) remain compatible with the new optional `peds` parameter and unchanged `PCU`/`Timings`/`Controller` exports. `_green_tick` computes `best` exactly once, after the emergency-preempt/cap logic reassigns `emergencies`, and every non-return code path reaches that assignment before use. `sim/main.js`'s `wasStuck` is a per-iteration `const` inside the innermost car loop — correctly scoped, not shared/stale across cars, and deliberately snapshots pre-frame `c.stuck` so the later gap-block tiers don't get clobbered by the interim `c.stuck = 0` reset.
+  
+  ```
+  No issues.
+  ```
+  
+  Files reviewed:
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/controller.py
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/microsim.py
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/sim/main.js
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/sim/peds.js
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/tools/live_server.py
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py (unchanged, checked for compatibility)
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/perception.py (unchanged, checked for compatibility)
+  - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/tools/camera_demo.py (unchanged, checked for compatibility)</result>
+  <usage><subagent_tokens>79091</subagent_tokens><tool_uses>18</tool_uses><duration_ms>299825</duration_ms></usage>
+  </task-notification>

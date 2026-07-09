@@ -115,7 +115,8 @@ async def metrics():          # async → runs on the event loop, never races st
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
     await sock.accept()
-    ctrl = Controller(four_way(), Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
+    ctrl = Controller(four_way(), Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4,
+                                          ped_max_wait=45))
     zones = None
     last = time.monotonic()
     try:
@@ -125,7 +126,8 @@ async def ws(sock: WebSocket):
                 zs = msg.get("zones") or {}
                 try:
                     ctrl = Controller(junction_from_dirs(zs.keys()),
-                                      Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
+                                      Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4,
+                                              ped_max_wait=45))
                     zones = zs
                 except ValueError as e:          # garbage zones must not kill the socket — keep the old ones
                     print("bad zones ignored:", e)
@@ -170,7 +172,8 @@ async def ws(sock: WebSocket):
 
             now = time.monotonic()
             dt = min(now - last, 0.5); last = now
-            state = ctrl.tick(counts, emergencies, dt)
+            # pedestrian demand rides along with the frame (push-button style); controller sanitizes
+            state = ctrl.tick(counts, emergencies, dt, peds=msg.get("peds"))
             wa, wf = round(cmp.wa, 1), round(cmp.wf, 1)
             n_counts = {d: sum(counts[d].values()) for d in counts}
             await sock.send_json({

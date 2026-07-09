@@ -26,7 +26,7 @@ export async function initPeds(ctx) {
     man.position.set(-ctr.x * man.scale.x, 0, -ctr.z * man.scale.z);
     template = man;
   } catch {
-    return { tick: () => {}, crossers: () => [] };   // no model, no pedestrians — sim stays fine
+    return { tick: () => {}, crossers: () => [], waiting: () => ({}) };   // no model, no pedestrians — sim stays fine
   }
 
   // one crossing per approach arm: pedestrians cross that arm's road over its zebra.
@@ -73,6 +73,7 @@ export async function initPeds(ctx) {
       perp: fromEnd ? c.from : c.to,                      // start on a kerb end of the crossing
       dirSign: fromEnd ? 1 : -1,                          // walk toward the other kerb
       state: 'waiting',                                   // waiting → crossing → done
+      waitT: 0,                                           // seconds spent waiting for a walk window
       mesh,
     };
     const [x, z] = c.at(p.perp);
@@ -101,6 +102,8 @@ export async function initPeds(ctx) {
           p.state = 'crossing';
           const [tx, tz] = p.c.at(p.perp + p.dirSign);    // face along the crossing
           p.mesh.lookAt(tx, 0.26, tz);
+        } else {
+          p.waitT += dt;
         }
       } else if (p.state === 'crossing') {
         p.perp += p.dirSign * CROSS * dt;
@@ -124,5 +127,17 @@ export async function initPeds(ctx) {
     // people currently ON the road — vehicles treat them as hard obstacles
     crossers: () => peds.filter(p => p.state === 'crossing')
       .map(p => { const [x, z] = p.c.at(p.perp); return { dir: p.c.dir, x, z }; }),
+    // per-arm pedestrian demand for the controller: waiting count, longest wait, people on the zebra.
+    // Transponder-style input (like a push button / ped detector) — sent with each live frame.
+    waiting: () => {
+      const out = {};
+      for (const p of peds) {
+        if (p.state === 'done') continue;
+        const d = p.c.dir, o = out[d] || (out[d] = { n: 0, wait: 0, crossing: 0 });
+        if (p.state === 'waiting') { o.n++; o.wait = Math.max(o.wait, +p.waitT.toFixed(1)); }
+        else o.crossing++;
+      }
+      return out;
+    },
   };
 }

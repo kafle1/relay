@@ -92,6 +92,10 @@
 70. 🟠 **Live signal feed dies mid-green** → stale signals are dropped immediately and the sim falls back to the safe fixed cycle while reconnecting — never steer on dead data.
 71. 🟠 **Corner entry speed** → braking envelope (v² = 2·a·d) caps speed into stops *and* arcs; heavy vehicles accelerate slower — no full-speed 90° turns.
 72. 🟠 **One dropped detection frame during an ambulance hold** → 2.5 s emergency latch in the controller; preemption survives detector flicker instead of abandoning the ambulance mid-clear.
+73. 🔴 **Pedestrian starvation** (busy road never yields, empty cross street never scores) → ped demand is a first-class controller input: waiting people add pressure + aging to the phases that hold their arm red, and `ped_max_wait` force-opens a walk window — below vehicle starvation and ambulances in priority, above everything else.
+74. 🔴 **Walk window cut mid-crossing** → while anyone is ON a zebra the serving phase is held against gap-out *and* score-driven switches (bounded by `max_green` — the junction can never freeze on a crossing stream).
+75. 🟠 **Garbage pedestrian payload** (wrong shape, unknown arms, NaN/negative/absurd values) → `_clean_peds` clamps or drops it; junk input can distort nothing and crash nothing.
+76. 🟡 **Single-phase junction with ped demand** (2-arm road: no conflicting phase exists to give the walk) → controller returns no walk target rather than inventing one; a dedicated ped stage is the documented upgrade path.
 
 ---
 

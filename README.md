@@ -35,6 +35,9 @@ live by the same pipeline: detections, per-approach demand, and the signal decis
   emergency-boost` — with empty-phase skip, gap-out, min/max-green, yellow + all-red clearance,
   hard anti-starvation, and emergency preemption. Every safety invariant is asserted by a runnable
   self-check (`src/controller.py`).
+- **Pedestrians are demand, not decoration:** people waiting to cross add pressure to the phase
+  that would give them a walk window, no one waits past `ped_max_wait`, and a walk is never cut
+  while someone is still on the zebra. (Lalitpur's system times vehicles only.)
 - **Two eyes, one detector:** the *same* model reads **real CCTV** and a **synthetic live feed** —
   a Three.js junction endlessly generating random Kathmandu-style traffic. The sim doubles as a
   free, perfectly-labeled dataset (it knows every vehicle's exact box), and mixing those auto-labels
