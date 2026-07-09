@@ -35,7 +35,12 @@ const APPROACH = {
   E: { axis: 'x', sign: -1, off: +LANE, group: 'EW', rotY: Math.PI / 2 },
   W: { axis: 'x', sign: +1, off: -LANE, group: 'EW', rotY: -Math.PI / 2 },
 };
+// topology is config, not hardcode: ?topo=4 (default) | T (3-arm: N,S,E) | 2 (straight road crossing)
+const TOPO = (new URLSearchParams(location.search).get('topo') || '4').toUpperCase();
+if (TOPO === 'T') { delete APPROACH.W; APPROACH.E.group = 'E'; }
+else if (TOPO === '2') { delete APPROACH.E; delete APPROACH.W; }
 const DIRS = Object.keys(APPROACH);
+const GROUPS = [...new Set(DIRS.map(d => APPROACH[d].group))];
 
 // ─── renderer ───
 const canvas = document.getElementById('app');
@@ -116,7 +121,11 @@ function box(w, h, d, mat, x, y, z) {
 // ─── ground, roads, surroundings ───
 const ground = box(600, 0.2, 600, M.ground, 0, -0.1, 0); ground.receiveShadow = true; scene.add(ground);
 const roadNS = box(ROAD_HALF * 2, 0.12, 600, M.road, 0, 0, 0); roadNS.receiveShadow = true; scene.add(roadNS);
-const roadEW = box(600, 0.12, ROAD_HALF * 2, M.road, 0, 0.001, 0); roadEW.receiveShadow = true; scene.add(roadEW);
+if (TOPO === '4') {
+  const roadEW = box(600, 0.12, ROAD_HALF * 2, M.road, 0, 0.001, 0); roadEW.receiveShadow = true; scene.add(roadEW);
+} else if (TOPO === 'T') {   // stem only on the east side
+  const roadE = box(300, 0.12, ROAD_HALF * 2, M.road, 150, 0.001, 0); roadE.receiveShadow = true; scene.add(roadE);
+}
 
 for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   const sw = box(30, 0.26, 30, M.sidewalk, sx * (ROAD_HALF + 15), 0.13, sz * (ROAD_HALF + 15));
@@ -128,10 +137,10 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   b.castShadow = true; b.receiveShadow = true; scene.add(b);
 }
 
-// markings
+// markings (centrelines only where a road exists)
 for (let d = HALF_JCT + 2; d < 260; d += 8) for (const s of [-1, 1]) {
   scene.add(box(0.3, 0.02, 3, M.mark, 0, 0.14, s * d));
-  scene.add(box(3, 0.02, 0.3, M.mark, s * d, 0.141, 0));
+  if (TOPO === '4' || (TOPO === 'T' && s === 1)) scene.add(box(3, 0.02, 0.3, M.mark, s * d, 0.141, 0));
 }
 for (const dir of DIRS) {
   const a = APPROACH[dir], coord = a.sign * (-STOP);
@@ -172,11 +181,8 @@ function setSignal(dir, state) {
   }
 }
 
-// ─── fixed-cycle controller (BASELINE) ───
-const CYCLE = [
-  { green: 'NS', d: 7 }, { yellow: 'NS', d: 2 }, { allred: true, d: 1 },
-  { green: 'EW', d: 7 }, { yellow: 'EW', d: 2 }, { allred: true, d: 1 },
-];
+// ─── fixed-cycle controller (BASELINE) — built from whatever phase groups the topology has ───
+const CYCLE = GROUPS.flatMap(g => [{ green: g, d: 7 }, { yellow: g, d: 2 }, { allred: true, d: 1 }]);
 let cycleIdx = 0, cycleT = 0;
 const groupState = g => CYCLE[cycleIdx].green === g ? 'green' : CYCLE[cycleIdx].yellow === g ? 'yellow' : 'red';
 function updateSignals(dt) {
@@ -300,7 +306,7 @@ function updateCars(dt) {
   }
 }
 function counts() {
-  const c = { N: 0, S: 0, E: 0, W: 0 };
+  const c = Object.fromEntries(DIRS.map(d => [d, 0]));
   for (const car of cars) if (car.u < HALF_JCT) c[car.dir]++;
   return c;
 }
@@ -459,7 +465,7 @@ function tick() {
   }
   const c = (LIVE && liveCounts) ? liveCounts : counts();
   hud.phase.textContent = phaseLabel;
-  hud.N.textContent = c.N; hud.S.textContent = c.S; hud.E.textContent = c.E; hud.W.textContent = c.W;
+  hud.N.textContent = c.N ?? '—'; hud.S.textContent = c.S ?? '—'; hud.E.textContent = c.E ?? '—'; hud.W.textContent = c.W ?? '—';
   hud.total.textContent = cars.length;
   if (controls) controls.update();
   (composer || renderer).render(scene, camera);

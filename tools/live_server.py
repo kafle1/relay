@@ -19,8 +19,21 @@ from ultralytics import YOLO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
-from controller import Controller, four_way, Timings, PCU          # noqa: E402
-from microsim import FixedTimer, poisson                            # noqa: E402
+from controller import Controller, Junction, four_way, Timings, PCU  # noqa: E402
+from microsim import FixedTimer, poisson                              # noqa: E402
+
+
+def junction_from_dirs(dirs):
+    """Build a conflict-free phase set from whichever approaches the sim announces (2/3/4-arm)."""
+    dirs = set(dirs)
+    phases = {}
+    ns = [d for d in ("N", "S") if d in dirs]
+    ew = [d for d in ("E", "W") if d in dirs]
+    if ns:
+        phases["NS" if len(ns) == 2 else ns[0]] = ns
+    if ew:
+        phases["EW" if len(ew) == 2 else ew[0]] = ew
+    return Junction(sorted(dirs), phases)
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
 FT = os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", "ft", "weights", "best.pt"))
@@ -112,6 +125,8 @@ async def ws(sock: WebSocket):
             msg = await sock.receive_json()
             if msg.get("type") == "zones":
                 zones = {k: v for k, v in msg["zones"].items()}
+                ctrl = Controller(junction_from_dirs(zones.keys()),
+                                  Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
                 continue
             if msg.get("type") != "frame":
                 continue
@@ -126,7 +141,8 @@ async def ws(sock: WebSocket):
             h, w = img.shape[:2]
             res = model.predict(img, conf=0.35, device=DEVICE, verbose=False)[0]
 
-            boxes, counts = [], {"N": {}, "S": {}, "E": {}, "W": {}}
+            boxes = []
+            counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
             emergencies = set(msg.get("emergencies") or [])   # transponder-style announce (+ YOLO ambulance below)
             for b in (res.boxes or []):
                 cls = NAMES.get(int(b.cls), "car")
