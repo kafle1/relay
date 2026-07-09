@@ -40,7 +40,9 @@ const DIRS = Object.keys(APPROACH);
 // ─── renderer ───
 const canvas = document.getElementById('app');
 const CAP = +(new URLSearchParams(location.search).get('capture') || 0);   // ?capture=N → dump N labeled frames
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: CAP > 0 });
+const LIVE = new URLSearchParams(location.search).has('live');             // ?live → closed loop (YOLO server drives signals)
+let liveSignals = null, liveCounts = null, livePhase = '—', liveBoxes = [], liveMetrics = null;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: CAP > 0 || LIVE });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -63,7 +65,7 @@ camera.lookAt(0, -1, 2);
 // drag to orbit / scroll to zoom / right-drag to pan. Disabled in capture mode so training
 // frames stay on the canonical pose the detector was fine-tuned for.
 let controls = null;
-if (!CAP) {
+if (!CAP && !LIVE) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
@@ -184,6 +186,11 @@ function updateSignals(dt) {
   const s = CYCLE[cycleIdx];
   return s.allred ? 'ALL-RED' : `${s.green || s.yellow} ${s.green ? 'GREEN' : 'YELLOW'}`;
 }
+// current signal for an approach: the live server's decision when in live mode, else the internal cycle
+function signalOf(dir) {
+  if (LIVE && liveSignals) return liveSignals[dir] || 'red';
+  return groupState(APPROACH[dir].group);
+}
 
 // ─── load vehicle models → pools ───
 const loader = new GLTFLoader();
@@ -252,7 +259,7 @@ function updateCars(dt) {
   for (const c of cars) byDir[c.dir].push(c);
   for (const dir of DIRS) {
     const list = byDir[dir].sort((p, q) => p.u - q.u);
-    const mustStop = groupState(APPROACH[dir].group) !== 'green';
+    const mustStop = signalOf(dir) !== 'green';
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
       let target = c.u + c.speed * dt;
@@ -325,6 +332,84 @@ function captureTick(dt) {
   if (capN >= CAP) console.log('CAPTURE DONE', CAP);
 }
 
+// ─── live closed loop: stream frames to the YOLO server, apply its signals + draw its detections ───
+let overlay = null, octx = null, mstat = null, spark = null, sctx = null;
+const waHist = [], wfHist = [];
+const PR = Math.min(devicePixelRatio, 2);
+if (LIVE) {
+  overlay = document.createElement('canvas');
+  Object.assign(overlay.style, { position: 'fixed', inset: '0', width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 5 });
+  document.body.appendChild(overlay); octx = overlay.getContext('2d');
+  const panel = document.createElement('div');
+  Object.assign(panel.style, { position: 'fixed', right: '12px', bottom: '12px', zIndex: 10,
+    font: '12px ui-monospace, Menlo, monospace', color: '#e8eaed', background: 'rgba(12,14,18,.62)',
+    padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,.08)', minWidth: '224px' });
+  panel.innerHTML = '<div style="color:#7dd3fc;letter-spacing:.06em;margin-bottom:6px">R.E.L.A.Y · live control</div>' +
+    '<div id="m-red" style="font-size:22px;color:#86efac;font-weight:700">— %</div>' +
+    '<div style="color:#9aa0a6;margin-bottom:6px">less waiting vs a fixed timer</div>' +
+    '<canvas id="spark" width="224" height="52" style="width:224px;height:52px"></canvas>' +
+    '<div style="color:#9aa0a6;margin-top:4px"><span style="color:#ff453a">■</span> fixed &nbsp; <span style="color:#86efac">■</span> R.E.L.A.Y</div>';
+  document.body.appendChild(panel);
+  mstat = panel.querySelector('#m-red'); spark = panel.querySelector('#spark'); sctx = spark.getContext('2d');
+  sizeOverlay();
+}
+function sizeOverlay() { if (overlay) { overlay.width = innerWidth * PR; overlay.height = innerHeight * PR; } }
+function drawOverlay() {
+  if (!octx) return;
+  const W = overlay.width, H = overlay.height;
+  octx.clearRect(0, 0, W, H);
+  const COL = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
+  octx.lineWidth = 2 * PR; octx.font = `600 ${12 * PR}px ui-monospace, monospace`;
+  for (const b of liveBoxes) {
+    const col = COL[b.cls] || '#34c759';
+    octx.strokeStyle = col; octx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+    octx.fillStyle = col; octx.fillText(`${b.cls} ${b.conf}`, b.x * W, Math.max(12 * PR, b.y * H - 3 * PR));
+  }
+}
+function drawSpark() {
+  if (!sctx) return;
+  const W = spark.width, H = spark.height;
+  sctx.clearRect(0, 0, W, H);
+  const mx = Math.max(1, ...waHist, ...wfHist);
+  const line = (hist, col) => {
+    sctx.strokeStyle = col; sctx.lineWidth = 2; sctx.beginPath();
+    hist.forEach((v, i) => { const x = i / Math.max(1, hist.length - 1) * W, y = H - (v / mx) * (H - 4) - 2; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); });
+    sctx.stroke();
+  };
+  line(wfHist, '#ff453a'); line(waHist, '#86efac');
+}
+const _pv = new THREE.Vector3();
+function projPt(x, y, z) { _pv.set(x, y, z).project(camera); return [_pv.x * 0.5 + 0.5, -_pv.y * 0.5 + 0.5]; }
+function computeZones() {   // 4 screen-space approach polygons (incoming lane strips) for the detector
+  const Z = {}, hw = ROAD_HALF / 2, y = 1.2, back = 45;
+  for (const dir of DIRS) {
+    const a = APPROACH[dir], near = a.sign * (-STOP), far = a.sign * (-back);
+    Z[dir] = (a.axis === 'z'
+      ? [[a.off - hw, y, near], [a.off + hw, y, near], [a.off + hw, y, far], [a.off - hw, y, far]]
+      : [[near, y, a.off - hw], [near, y, a.off + hw], [far, y, a.off + hw], [far, y, a.off - hw]]
+    ).map(c => projPt(c[0], c[1], c[2]));
+  }
+  return Z;
+}
+let ws = null, wsOpen = false, sendAcc = 0;
+function connectWS() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: computeZones() })); };
+  ws.onclose = () => { wsOpen = false; setTimeout(connectWS, 800); };
+  ws.onerror = () => {};
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    liveSignals = m.signals; livePhase = `${m.phase} ${m.stage}`; liveBoxes = m.boxes || []; liveCounts = m.counts; liveMetrics = m.metrics;
+    for (const dir of DIRS) setSignal(dir, m.signals[dir] || 'red');
+    if (m.metrics) {
+      mstat.textContent = `↓ ${m.metrics.reduction} %`;
+      waHist.push(m.metrics.adaptive); wfHist.push(m.metrics.fixed);
+      if (waHist.length > 224) { waHist.shift(); wfHist.shift(); }
+      drawSpark();
+    }
+  };
+}
+
 // ─── loop ───
 const clock = new THREE.Clock();
 let simTime = 0;
@@ -332,27 +417,36 @@ const nextSpawn = { N: 0, S: 0, E: 0, W: 0 };
 const dirRate = Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));   // some approaches busier than others
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
-  const phaseLabel = updateSignals(dt);
+  const phaseLabel = LIVE ? livePhase : updateSignals(dt);
   updateCars(dt);
   simTime += dt;                                          // organic per-approach random flow (varied rates)
   for (const dir of DIRS) if (ready && simTime >= nextSpawn[dir]) {
     spawn(dir);
     nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / dirRate[dir];
   }
-  const c = counts();
+  const c = (LIVE && liveCounts) ? liveCounts : counts();
   hud.phase.textContent = phaseLabel;
   hud.N.textContent = c.N; hud.S.textContent = c.S; hud.E.textContent = c.E; hud.W.textContent = c.W;
   hud.total.textContent = cars.length;
   if (controls) controls.update();
   (composer || renderer).render(scene, camera);
   if (CAP && ready) captureTick(dt);
+  if (LIVE) {
+    drawOverlay();
+    sendAcc += dt;
+    if (wsOpen && ready && sendAcc >= 0.18) {
+      sendAcc = 0;
+      try { ws.send(JSON.stringify({ type: 'frame', image: renderer.domElement.toDataURL('image/jpeg', 0.6) })); } catch (e) {}
+    }
+  }
   requestAnimationFrame(tick);
 }
 
-loadModels().then(() => { prefill(28); clock.start(); tick(); });
+loadModels().then(() => { prefill(28); clock.start(); if (LIVE) connectWS(); tick(); });
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   if (composer) composer.setSize(innerWidth, innerHeight);
+  sizeOverlay();
 });
