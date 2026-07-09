@@ -32,6 +32,8 @@ at short spacing). Each junction runs its own controller and subtracts its neigh
 queue from its own pressure, so a backed-up block upstream stops being fed into the jam. The
 ambulance button preempts each junction in sequence: a green wave down the corridor.
 
+![three-junction network](docs/img/network.jpg)
+
 ## How it works — one brain, two eyes, one screen
 
 - **Perception:** one YOLO model reads a fixed junction camera → per-approach, per-class vehicle
