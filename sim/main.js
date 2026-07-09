@@ -254,6 +254,29 @@ function addCar(dir, u) {                                 // one vehicle: random
 }
 function spawn(dir) { if (ready) addCar(dir, -START); }
 function prefill(n) { for (let k = 0; k < n; k++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 4)); }
+function forceSpawn(dir, type) {                         // edge-case staging: force a specific vehicle in
+  if (!ready) return;
+  const model = pickModel(type); if (!model) return;
+  const T = TYPES[type];
+  const mesh = new THREE.Group(); mesh.add(model); mesh.rotation.y = APPROACH[dir].rotY;
+  const speed = SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3);
+  const c = { dir, u: -START, mesh, len: T.len, type, speed };
+  placeCar(c); scene.add(mesh); cars.push(c);
+}
+function surge(dir, n = 9) { for (let i = 0; i < n; i++) setTimeout(() => forceSpawn(dir, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); }
+function scenarioPanel() {
+  const p = document.createElement('div');
+  Object.assign(p.style, { position: 'fixed', top: '12px', right: '12px', zIndex: 11, display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '250px', justifyContent: 'flex-end' });
+  const mk = (label, fn, id) => {
+    const b = document.createElement('button'); b.textContent = label; if (id) b.id = id;
+    Object.assign(b.style, { font: '12px ui-monospace, monospace', color: '#e8eaed', background: 'rgba(20,24,30,.85)', border: '1px solid rgba(255,255,255,.14)', borderRadius: '6px', padding: '6px 9px', cursor: 'pointer' });
+    b.onclick = fn; p.appendChild(b);
+  };
+  for (const d of DIRS) mk('🚑 ' + d, () => forceSpawn(d, 'ambulance'), 'amb-' + d);
+  mk('surge N', () => surge('N'));
+  mk('surge E', () => surge('E'));
+  document.body.appendChild(p);
+}
 function updateCars(dt) {
   const byDir = {}; DIRS.forEach(d => byDir[d] = []);
   for (const c of cars) byDir[c.dir].push(c);
@@ -333,7 +356,7 @@ function captureTick(dt) {
 }
 
 // ─── live closed loop: stream frames to the YOLO server, apply its signals + draw its detections ───
-let overlay = null, octx = null, mstat = null, spark = null, sctx = null;
+let overlay = null, octx = null, mstat = null, spark = null, sctx = null, banner = null;
 const waHist = [], wfHist = [];
 const PR = Math.min(devicePixelRatio, 2);
 if (LIVE) {
@@ -351,6 +374,10 @@ if (LIVE) {
     '<div style="color:#9aa0a6;margin-top:4px"><span style="color:#ff453a">■</span> fixed &nbsp; <span style="color:#86efac">■</span> R.E.L.A.Y</div>';
   document.body.appendChild(panel);
   mstat = panel.querySelector('#m-red'); spark = panel.querySelector('#spark'); sctx = spark.getContext('2d');
+  banner = document.createElement('div');
+  Object.assign(banner.style, { position: 'fixed', top: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 12, display: 'none',
+    font: '700 14px ui-monospace, monospace', color: '#fff', background: 'rgba(255,59,48,.92)', padding: '8px 16px', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,.45)' });
+  document.body.appendChild(banner);
   sizeOverlay();
 }
 function sizeOverlay() { if (overlay) { overlay.width = innerWidth * PR; overlay.height = innerHeight * PR; } }
@@ -401,6 +428,11 @@ function connectWS() {
     const m = JSON.parse(e.data);
     liveSignals = m.signals; livePhase = `${m.phase} ${m.stage}`; liveBoxes = m.boxes || []; liveCounts = m.counts; liveMetrics = m.metrics;
     for (const dir of DIRS) setSignal(dir, m.signals[dir] || 'red');
+    if (banner) {
+      const emg = m.emergencies || [];
+      banner.style.display = emg.length ? 'block' : 'none';
+      if (emg.length) banner.textContent = '🚑 EMERGENCY PREEMPT — clearing ' + emg.join(', ');
+    }
     if (m.metrics) {
       mstat.textContent = `↓ ${m.metrics.reduction} %`;
       waHist.push(m.metrics.adaptive); wfHist.push(m.metrics.fixed);
@@ -436,13 +468,14 @@ function tick() {
     sendAcc += dt;
     if (wsOpen && ready && sendAcc >= 0.18) {
       sendAcc = 0;
-      try { ws.send(JSON.stringify({ type: 'frame', image: renderer.domElement.toDataURL('image/jpeg', 0.6) })); } catch (e) {}
+      const emg = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < HALF_JCT).map(c => c.dir))];
+      try { ws.send(JSON.stringify({ type: 'frame', image: renderer.domElement.toDataURL('image/jpeg', 0.6), emergencies: emg })); } catch (e) {}
     }
   }
   requestAnimationFrame(tick);
 }
 
-loadModels().then(() => { prefill(28); clock.start(); if (LIVE) connectWS(); tick(); });
+loadModels().then(() => { prefill(28); scenarioPanel(); clock.start(); if (LIVE) connectWS(); tick(); });
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();

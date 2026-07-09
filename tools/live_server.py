@@ -126,7 +126,8 @@ async def ws(sock: WebSocket):
             h, w = img.shape[:2]
             res = model.predict(img, conf=0.35, device=DEVICE, verbose=False)[0]
 
-            boxes, counts, emergencies = [], {"N": {}, "S": {}, "E": {}, "W": {}}, set()
+            boxes, counts = [], {"N": {}, "S": {}, "E": {}, "W": {}}
+            emergencies = set(msg.get("emergencies") or [])   # transponder-style announce (+ YOLO ambulance below)
             for b in (res.boxes or []):
                 cls = NAMES.get(int(b.cls), "car")
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
