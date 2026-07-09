@@ -75,6 +75,15 @@
 73. "also every time i say anything in the conversation send to requirements md"
 74. "and rename it as all prompts md file"
 75. "/goal … Identify and fix bugs or edge cases … understand, plan, fix, test, cleanup … rather than fixing and ptaching things later do not let that thing happen in the first place … YOU ARE NOT STOPPING AT ANY COST UNTIL EVERYTHING IS DONE COMPLETELY … your fixes must not be temporary patches, it must be robust solution … think from your brain too what are the edge cases and what other bugs can be there and fix it … in the name of fixing dont overcomplicate things it must be simplified … do all and do not stop until all done idc 50k line is changed … make max use of subagents … if you feel stuck then do more deep dive research on the internet … relist every single requirement i said … make sure every single thing is done one by one looking at everything in eevry single code in whole codebase … all must be consistent … remove all the unnecessary code do no keep ambiguty, conflicting and duplicate code … i dont need backward compatability, do not keep a single line of legacy things … every line must be written by senior human developer … no runtime and build issues at the end … cleanup all unncesary old scripts and everything and reduce complexity in everything over enginnering things"
+76. "ok lets go where can we go from there, also see github and find and bring every code and every idea ofc i think other have also did such things"
+77. "stick with our mvp problem statement and main plan dont over do shitty things"
+78. "i should be able to increse and decrease vehicles also"
+79. "also fix ui ux too much buttons and too much info organize everything properly , also turning of vehiches still has issue its slowiing down lagging and all those things fix all" / "also each and every vehichles must be properly tracked with out model and everything smoothly full optimized way"
+80. "when everything is done make sure make dev works perfectly fully optimized"
+81. "add a flexible control in comparative view alsop"
+82. "every single requirement and prompt i said is there, all codebase is there, see line by one from every pov and make a mvp withing 2 3 hours now make max use of everything you are in god mode i need to win this hackathon at any cost" / "make insanely good that will drop their jaws see from every pov every angle and make it perfect"
+83. "use subagents for faster" / "make max use of fable do it all fast fast if needed use subagents and everywhere you can use fable, all i need is perfect working result flawless ready for presentation tomorrow"
+84. "also whole codebase has so much shits clean all and make clean simple workable system dont overcomplicate everything"
 
 ---
 
@@ -127,6 +136,14 @@
 | 41 | "full system must be there of bikes , bus parkings and all everything so that balkhu simulation is god level super real" | delivered in the Balkhu build (bus park, parked trucks, petrol pump, hospitals); retired with that scene when the corridor was generalized (row 38) | ✅ |
 | 42 | "keep simulation btn sanepa light to kalanki balkhu light there are 3 lighs there" / "keep upto this much only see open street map" | honored in the Balkhu build (exactly 3 signals from the pinned OSM extent); the generalized `network.html` keeps the exact 3-signal scope (J1·J2·J3) | ✅ |
 | 43 | "make 3d of balkhu point …" (row 38 closed) | live today as `sim/network.html`: 3 junctions, decentralized max-pressure each, downstream-queue coordination, sequential ambulance green wave | ✅ |
+| 44 | "see github and find and bring every code and every idea" | docs/research/2026-07-09-github-oss-landscape.md — ~140 repos surveyed; PCU area-weight idea adopted; our 4 differentiators confirmed unclaimed in OSS | ✅ |
+| 45 | "stick with our mvp problem statement and main plan dont over do shitty things" | scope frozen after the research sweep: no downstream-pressure/emissions/advisory add-ons built — research feeds the pitch only | ✅ |
+| 46 | "i should be able to increse and decrease vehicles also" | traffic dial ×0.3–2.0 in the solo scenarios panel: scales spawn rate AND cap, surplus drains naturally, far cars cull cleanly | ✅ |
+| 47 | "fix ui ux too much buttons … organize everything properly" / "vehichles … properly tracked with out model … full optimized way" | one "⚡ scenarios ▾" fold-out holds every control but the hero toggle (both sims); detection: per-class conf gates + agnostic NMS + 960px shared with perception.py, 700ms box expiry | ✅ |
+| 48 | "make sure make dev works perfectly fully optimized" | `make dev`: kills strays, boots server, health-polls 60s, prints all 5 surfaces, opens the demo, Ctrl-C stops everything — gated end-to-end on the final build | ✅ |
+| 49 | "add a flexible control in comparative view alsop" | the same traffic dial in the compare header, broadcast to both panels equally; reloaded embeds self-resync; Reset returns the dial to ×1 | ✅ |
+| 50 | "whole codebase has so much shits clean all … dont overcomplicate" | cruft audit applied: dead junction factories, self-check leftovers, duplicated helper, pid-file cruft, 4 unreferenced vehicle models, orphan doc — audit verdict on the rest: "unusually tight" | ✅ |
+| 51 | "see line by one from every pov … make insanely good that will drop their jaws … make it perfect" | adversarial judge fleet over all three surfaces; 4 HIGH demo-killers found+fixed+re-verified (silent 🚑/surge no-ops, organic-siren hijack, benchmark-over-losing-panel verdict, multi-tab server starvation); every screenshot re-shot; tagged v1.0-hackathon | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
 
@@ -650,3 +667,49 @@
   <note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
   <result>Now let me check RELAY state and test the ambulance scenario with a proper before/after comparison.</result>
   </task-notification>
+
+- <task-notification>
+  <task-id>b2dxyqciz</task-id>
+  <tool-use-id>toolu_01UBuohb7XXVtEhvAZgUTWcM</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/tasks/b2dxyqciz.output</output-file>
+  <status>completed</status>
+  <summary>Background command "Brief wait for judge-compare soaks" completed (exit code 0)</summary>
+  </task-notification>
+
+- /goal relist every single requirement i said (everything must be raw whatever i said not what you understood and update and modify that)
+   then expand that requirement and make sure every single thing is done one by one looking at everything in eevry single code in whole codebase, not just one place update and missing on other things
+   all must be consistent 
+   
+   recheck all the requirements that i gave in the first and check all code implementation that you made and fix all edge cases, bugs and make sure everythng is properly implemented and integrated without any issue, remove all the unnecessary code do no keep ambiguty, conflicting and duplicate code, 
+  
+  recheck all the requirement that i said before and make sure it is properly implemented and works flawlessly without any error and edge case, completely clean old and leagacy depricated things, when you update those with new ,i dont need backward compatability, do not keep a single line of legacy things
+  every line must be written by senior human developer, not by ai by just adding random lines even if its not that necessary, everything code must be easily readable, ai does over complicating things i dont need that
+  also make sure there is no runtime and build issues at the end
+  
+  also cleanup all unncesary old scripts and everything and reduce complexity in everything over enginnering things
+  
+  
+  Goal: Identify and fix bugs or edge cases.
+  
+  Rules:
+  - Understand the root cause of the bug before fixing (not just symptoms).
+  - Write minimal, targeted fixes — don’t introduce new complexity.
+  - Add/adjust tests to cover the fixed bug and edge cases.
+  - Double-check that fixes don’t break other parts of the system.
+  - this will be your flow: understand, plan, fix, test, cleanup
+  - Clean up any temporary or redundant code after fixing.
+  - rather than fixing and ptaching things later do not let that thing happen in the first place so that later patch thing is not needed and we can remove it completely
+  every line must be written by senior human developer, not by ai by just adding random lines even if its not that necessary, ai does over complicating things i dont need that
+  also make sure there is no runtime and build issues at the end
+  YOU ARE NOT STOPPING AT ANY COST UNTIL EVERYTHING IS DONE COMPLETELY 
+  you have access to litterally everything you need
+  completey fix this issue from the whole system i should never get this error, fix it permanently
+  your fixes must not be temporary patches, it must be robust solution to wider range of that issue covering all cases
+  while fixing whatever i say, think from your brain too what are the edge cases and what other bugs can be there and fix it
+  
+  in the name of fixing dont overcomplicate things it must be simplified
+  at the end recheck is 100% done from your side if not do it and do not stop until then
+  do all and do not stop until all done idc 50k line is changed
+  make max use of subagents
+  
+  if you feel stuck then do more deep dive research on the internet and everywhere possible,what are making is made by someone already what every single problem we facing is fixed by other keep research ing keep improving and keep testing until we hit rockbottom
