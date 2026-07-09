@@ -522,7 +522,7 @@ function pickType() {
 }
 
 const cars = [];
-window.__relay = { cars, camera, controls };     // console/debug handle (read-only use; matches network's __net)
+window.__relay = { cars, camera, controls, get boxes() { return liveBoxes; } };   // console/debug handle (read-only)
 // route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
 function planRoute(dir, lane, heavy = false) {
   const arms = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));

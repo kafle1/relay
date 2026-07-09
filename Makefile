@@ -31,7 +31,7 @@ setup:
 
 stop:
 	@pkill -f "[l]ive_server.py" 2>/dev/null || true
-	@lsof -ti tcp:$(PORT) | xargs kill 2>/dev/null || true
+	@lsof -ti tcp:$(PORT) -sTCP:LISTEN | xargs kill 2>/dev/null || true
 	@sleep 1
 
 ## make check — run every self-check (controller invariants + benchmark)

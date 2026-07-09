@@ -137,8 +137,10 @@ async def ws(sock: WebSocket):
                                           ped_max_wait=45))
     zones = None
     last = time.monotonic()
-    tracks, next_id = {}, 1     # per-connection identity: id -> {box, miss}
+    tracks, next_id = {}, 1     # per-connection identity: id -> {box, miss, still}
     prev_sirens = set()         # YOLO ambulance arms from the PREVIOUS frame (2-frame confirmation)
+    infer_avg = 50.0            # rolling inference-time estimate drives the adaptive input size
+    imgsz = 960                 # current input size — switched with hysteresis, never thrashed
     try:
         while True:
             msg = await sock.receive_json()
@@ -159,15 +161,22 @@ async def ws(sock: WebSocket):
             # low floor + per-class gates (CONF), like perception.py: a flat 0.35 drops the small
             # far-away two-wheelers that ARE the Kathmandu story (edge case A2).
             # agnostic NMS: a distant queue otherwise grows stacked car+truck+moto boxes per vehicle.
-            # 960px: sharpens the small far-queue objects (same lever that fixed real-footage bikes).
+            # 960px sharpens the small far-queue objects; on a thermally-throttled machine that can
+            # cost 300-400ms/frame and the boxes visibly trail moving traffic — drop to 704px.
+            # Hysteresis (up at >250ms, back only under 120ms): each size change re-warms the model,
+            # so flip-flopping around one threshold costs more than either size.
+            if imgsz == 960 and infer_avg > 250:
+                imgsz = 704
+            elif imgsz == 704 and infer_avg < 120:
+                imgsz = 960
             _t0 = time.monotonic()
 
-            def _detect(payload=msg["image"]):
+            def _detect(payload=msg["image"], size=imgsz):
                 raw = base64.b64decode(payload.split(",", 1)[1])
                 img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
                 if img is None:
                     return None, None
-                return img, model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
+                return img, model.predict(img, conf=0.2, iou=0.5, imgsz=size, agnostic_nms=True,
                                           device=DEVICE, verbose=False)[0]
             try:
                 img, res = await asyncio.get_running_loop().run_in_executor(INFER, _detect)
@@ -176,6 +185,7 @@ async def ws(sock: WebSocket):
             if img is None:
                 continue
             infer_ms = round((time.monotonic() - _t0) * 1000)
+            infer_avg = infer_avg * 0.8 + infer_ms * 0.2
             h, w = img.shape[:2]
 
             boxes = []
@@ -230,12 +240,16 @@ async def ws(sock: WebSocket):
                         if d < best_d:
                             best, best_d = tid, d
                 if best is None:
-                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0}
+                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0, "still": 0}
                     b["id"] = next_id
                     claimed.add(next_id)
                     next_id += 1
                 else:
                     t = tracks[best]
+                    # raw YOLO jitter on a static object runs a few pixels frame-to-frame — the
+                    # stillness reset needs real motion (~9px at 720w), not detector noise.
+                    moved = abs(t["box"]["x"] - b["x"]) + abs(t["box"]["y"] - b["y"])
+                    t["still"] = 0 if moved > 0.012 else t.get("still", 0) + 1
                     for k in ("x", "y", "w", "h"):
                         t["box"][k] = t["box"][k] * 0.55 + b[k] * 0.45
                         b[k] = round(t["box"][k], 4)
@@ -246,6 +260,16 @@ async def ws(sock: WebSocket):
                 tracks[tid]["miss"] += 1
                 if tracks[tid]["miss"] > 4:
                     del tracks[tid]
+
+            # frame-edge slivers: a vehicle half out of frame at the spawn/despawn boundary yields
+            # a mangled box with no zone and no meaning — crop a 2.5% margin.
+            boxes = [b for b in boxes
+                     if 0.025 < b["x"] + b["w"] / 2 < 0.975 and 0.025 < b["y"] + b["h"] / 2 < 0.975]
+            # scene-furniture hallucinations: a track that has sat pixel-still for seconds OUTSIDE
+            # every approach zone is not traffic — queued vehicles live IN zones, crossing and
+            # exiting vehicles move. (The recurring phantom "truck" on the far corner buildings.)
+            boxes = [b for b in boxes
+                     if not (b.get("appr") is None and tracks.get(b.get("id"), {}).get("still", 0) > 24)]
 
             # a YOLO siren counts only when seen on two consecutive frames — one white-van
             # false positive must never flash an emergency banner nobody triggered.
@@ -260,7 +284,7 @@ async def ws(sock: WebSocket):
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
                 "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),
-                "telemetry": {"infer_ms": infer_ms, "model": os.path.basename(MODEL_PATH)},
+                "telemetry": {"infer_ms": infer_ms, "imgsz": imgsz, "model": os.path.basename(MODEL_PATH)},
                 "metrics": True,   # client-side numbers are measured on the client; /metrics has the benchmark
             })
     except Exception as e:
