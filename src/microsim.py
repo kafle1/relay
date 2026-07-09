@@ -8,6 +8,7 @@ Run `python src/microsim.py` to print the measured wait-time reduction.
 """
 import math
 import random
+from collections import deque
 from controller import Controller, Junction, four_way, Timings
 
 SAT = 0.55   # vehicles discharged per second per approach while green (≈1.8s saturation headway)
@@ -72,14 +73,20 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
     qf = {d: 0 for d in J.approaches}        # fixed queues
     da = {d: 0.0 for d in J.approaches}      # fractional-discharge carry
     df = {d: 0.0 for d in J.approaches}
+    aq = {d: deque() for d in J.approaches}  # arrival stamps → per-vehicle waits (means hide the worst case)
+    fq = {d: deque() for d in J.approaches}
+    waits_a, waits_f = [], []
     wait_a, wait_f = 0.0, 0.0
     ts, wa_hist, wf_hist = [], [], []
 
     for i in range(int(seconds / dt)):
+        t_now = i * dt
         for d in J.approaches:               # IDENTICAL arrivals to both
             n = poisson(lam[d] * dt)
             qa[d] += n
             qf[d] += n
+            for _ in range(n):
+                aq[d].append(t_now); fq[d].append(t_now)
 
         green_a = _adaptive_green(adaptive.tick({d: qa[d] for d in J.approaches}, (), dt))
         green_f = fixed.tick({d: qf[d] for d in J.approaches}, (), dt)
@@ -91,37 +98,59 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
                 da[d] += SAT * dt
                 while da[d] >= 1 and qa[d] > 0:
                     qa[d] -= 1; da[d] -= 1
+                    waits_a.append(t_now - aq[d].popleft())
             if qf[d] == 0:
                 df[d] = 0.0
             elif d in green_f:
                 df[d] += SAT * dt
                 while df[d] >= 1 and qf[d] > 0:
                     qf[d] -= 1; df[d] -= 1
+                    waits_f.append(t_now - fq[d].popleft())
 
         wait_a += sum(qa.values()) * dt      # veh-seconds of waiting this step
         wait_f += sum(qf.values()) * dt
         ts.append(round(i * dt, 1)); wa_hist.append(round(wait_a, 1)); wf_hist.append(round(wait_f, 1))
 
-    return ts, wa_hist, wf_hist
+    # vehicles still queued at the end have waited at least this long — dropping them would
+    # flatter both policies, so they count with their wait-so-far
+    end = seconds
+    for d in J.approaches:
+        waits_a.extend(end - t for t in aq[d])
+        waits_f.extend(end - t for t in fq[d])
+
+    return ts, wa_hist, wf_hist, waits_a, waits_f
+
+
+def _pct(xs, p):
+    if not xs:
+        return 0.0
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, round(p / 100 * (len(xs) - 1)))]
 
 
 def summary(seconds=240, seed=0):
-    ts, wa, wf = simulate(seconds=seconds, seed=seed)
+    ts, wa, wf, waits_a, waits_f = simulate(seconds=seconds, seed=seed)
     if not wa or not wf:                     # seconds < dt → no steps ran, nothing to report
-        return {"adaptive_wait": 0, "fixed_wait": 0, "reduction_pct": 0}
+        return {"adaptive_wait": 0, "fixed_wait": 0, "reduction_pct": 0, "waits_a": [], "waits_f": []}
     a, f = wa[-1], wf[-1]
-    return {"adaptive_wait": a, "fixed_wait": f, "reduction_pct": round((f - a) / f * 100, 1) if f else 0}
+    return {"adaptive_wait": a, "fixed_wait": f,
+            "reduction_pct": round((f - a) / f * 100, 1) if f else 0,
+            "waits_a": waits_a, "waits_f": waits_f}
 
 
 if __name__ == "__main__":
     # average the improvement over a few seeds so the headline number is stable
-    reds = []
+    reds, pool_a, pool_f = [], [], []
     for s in range(5):
         r = summary(seconds=240, seed=s)
         reds.append(r["reduction_pct"])
+        pool_a.extend(r["waits_a"]); pool_f.extend(r["waits_f"])
         print(f"seed {s}: adaptive={r['adaptive_wait']:.0f}  fixed={r['fixed_wait']:.0f}  "
               f"veh-seconds waited  →  {r['reduction_pct']}% less waiting")
     avg = sum(reds) / len(reds)
     print(f"\naverage wait-time reduction (adaptive vs fixed, identical arrivals): {avg:.1f}%")
+    # per-vehicle percentiles — the fairness story a mean can't tell (nobody gets forgotten)
+    print(f"per-vehicle wait   adaptive: p50 {_pct(pool_a, 50):.0f}s · p95 {_pct(pool_a, 95):.0f}s · max {max(pool_a, default=0):.0f}s")
+    print(f"per-vehicle wait   fixed:    p50 {_pct(pool_f, 50):.0f}s · p95 {_pct(pool_f, 95):.0f}s · max {max(pool_f, default=0):.0f}s")
     assert avg > 0, "adaptive should reduce waiting vs a fixed timer"
     print("microsim check PASSED: adaptive beats the fixed timer on identical arrivals.")
