@@ -29,7 +29,7 @@ const MAX_CARS = 24;
 const DETECT = 45;              // queue detection zone before a stop line (m)
 
 // PCU-ish demand weights: a bike is cheap, a bus is heavy
-const PCU = { motorcycle: 0.4, car: 1, taxi: 1, truck: 2, bus: 2.5, ambulance: 1 };
+const PCU = { motorcycle: 0.4, car: 1, taxi: 1, truck: 2, bus: 2.5, ambulance: 1 };   // local demo weights — intentionally NOT controller.py's PCU table
 
 // vehicle mix — motorcycle-heavy generic city, same TYPES table as the main sim
 const TYPES = {
@@ -362,9 +362,14 @@ function makeHead(scale = 1) {
   back.position.z = -0.26 * scale; g.add(back);
   g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34 * scale, 12, 12),
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.4 * scale, 12, 12),
       new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off }));
     m.position.set(0, (1 - i) * scale, 0.32 * scale); g.add(m); bulbs[c] = m;
+    // rear repeater sharing the lens material — the aspect reads from every camera angle
+    const rep = new THREE.Mesh(new THREE.CircleGeometry(0.17 * scale, 10), m.material);
+    rep.position.set(0, (1 - i) * scale, -0.33 * scale);
+    rep.rotation.y = Math.PI;
+    g.add(rep);
   });
   return { g, bulbs };
 }
@@ -416,7 +421,7 @@ function setSignal(jid, arm, state) {
     const on = c === state;
     b[c].material.color.setHex(on ? BULB[c] : BULB.off);
     b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
-    b[c].material.emissiveIntensity = on ? 2.2 : 1;
+    b[c].material.emissiveIntensity = on ? 5 : 1;
   }
 }
 
@@ -590,7 +595,8 @@ function placeCar(c) {
   c.mesh.rotation.y = p.ry;
 }
 function addCar(routeName, { type = null, lane = null, slack = false, at = 0 } = {}) {
-  if (!ready || cars.length >= MAX_CARS + 8 || (cars.length >= MAX_CARS && !slack)) return;
+  const emerg = type === 'ambulance';   // a siren gets real slack — the 🚑 button must never die at the cap
+  if (!ready || cars.length >= MAX_CARS + (emerg ? 12 : 8) || (cars.length >= MAX_CARS && !slack && !emerg)) return;
   const variants = ROUTE_LIB[routeName];
   if (!variants || !variants.length) return;
   lane = lane != null ? Math.min(lane, variants.length - 1) : (Math.random() * variants.length) | 0;
@@ -966,10 +972,26 @@ function spawnTick() {
 function spawnAmbulance() {
   // the button must NEVER silently no-op: if the west entry is congested the default s=0 spawn is
   // rejected by the clearance check, so retry a little further along the arterial until one takes.
-  for (let at = 0; at <= 0.12; at += 0.015) {
-    const n = cars.length;
-    addCar('AMB', { type: 'ambulance', slack: true, at });
-    if (cars.length > n) return;
+  const attempt = () => {
+    for (let at = 0; at <= 0.12; at += 0.015) {
+      const n = cars.length;
+      addCar('AMB', { type: 'ambulance', slack: true, at });
+      if (cars.length > n) return true;
+    }
+    return false;
+  };
+  if (attempt()) return;
+  // entry fully plugged, no gap anywhere: rearmost queued cars near the entry yield their slot —
+  // exactly where a real siren pushes into a jam (mirrors the main sim's forceSpawn).
+  const start = poseAt(ROUTE_LIB.AMB[0], 2);
+  for (let k = 0; k < 3; k++) {
+    const rear = cars.filter(c => c.type !== 'ambulance' && c.s < 32 &&
+        Math.hypot(c.mesh.position.x - start.x, c.mesh.position.z - start.z) < 30)
+      .sort((a, b) => a.s - b.s)[0];
+    if (!rear) return;
+    scene.remove(rear.mesh);                              // blob geometry is shared — never disposed
+    cars.splice(cars.indexOf(rear), 1);
+    if (attempt()) return;
   }
 }
 
@@ -1140,13 +1162,15 @@ function buildHUD() {
   const cap = document.createElement('div');
   cap.className = 'sc-cap'; cap.textContent = 'surge +8 vehicles onto:';
   scBody.appendChild(cap);
-  // like spawnAmbulance: a surge spawn must never silently no-op — slack past the soft cap (the
-  // MAX_CARS+8 hard ceiling in addCar still bounds it) and retry down the route if the entry is
-  // congested, so the button delivers the 8 vehicles it promises.
+  // surge spawns slack past the soft cap and retry down the route; the MAX_CARS+8 hard ceiling
+  // still bounds them, so back-to-back surges at full load deliver what fits, not a pile-up.
   const surgeOne = route => {
-    for (let at = 0; at <= 0.12; at += 0.015) {
+    // stride in METERS, not route fraction — 0.015×total was ~4m, smaller than one parked car's
+    // clearance shadow, so a queued entry ate every retry.
+    const total = ROUTE_LIB[route][0].total;
+    for (let m = 0; m <= 60; m += 6) {
       const n = cars.length;
-      addCar(route, { slack: true, at });
+      addCar(route, { slack: true, at: m / total });
       if (cars.length > n) return;
     }
   };

@@ -101,6 +101,8 @@
       </span>
       <button class="btn amb" id="b-amb">🚑 Emergency</button>
       <button class="btn" id="b-surge">Surge N–S</button>
+      <button class="btn" id="b-chaos">🌀 Chaos</button>
+      <button class="btn" id="b-acc">💥 Accident</button>
       <button class="btn" id="b-reset">Reset</button>
     </div>
   </header>
@@ -109,12 +111,12 @@
     <section class="panel left">
       <iframe id="fL" title="fixed timer" src="/?embed=1&lockfixed=1"></iframe>
       <div class="label"><b>TODAY</b><span>fixed timer · blind 20s cycle</span></div>
-      <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg queued · 30s</span></div>
+      <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg queued · 30s</span> &nbsp;·&nbsp; <b id="gL">—</b> <span class="u">green to empty lanes</span></div>
     </section>
     <section class="panel right">
       <iframe id="fR" title="relay adaptive" src="/?embed=1&live=1"></iframe>
       <div class="label"><b>WITH R.E.L.A.Y.</b><span>adaptive · reads the camera</span></div>
-      <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg queued · 30s</span></div>
+      <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg queued · 30s</span> &nbsp;·&nbsp; <b id="gR">—</b> <span class="u">green to empty lanes</span></div>
     </section>
     <div id="divider"></div>
   </main>
@@ -151,6 +153,7 @@
         p.hist.push({ t: performance.now(), q: d.queued, s });
       }
       if (typeof d.waitPerSec === 'number') p.w = d.waitPerSec;
+      if (typeof d.wastedGreen === 'number') p.g = d.wastedGreen;
       const cut = performance.now() - WINDOW - 1000;
       while (p.hist.length && p.hist[0].t < cut) p.hist.shift();
       // self-heal the dial: an embed that (re)loaded starts at ×1 — resync it off its own stats ping.
@@ -202,6 +205,8 @@
     function updateStrips() {
       $('qL').textContent = fmt(S.L.q); $('wL').textContent = fmt(trailingAvg(S.L.hist, 30000));
       $('qR').textContent = fmt(S.R.q); $('wR').textContent = fmt(trailingAvg(S.R.hist, 30000));
+      $('gL').textContent = S.L.g == null ? '—' : S.L.g + 's';
+      $('gR').textContent = S.R.g == null ? '—' : S.R.g + 's';
     }
 
     // ── real-time line chart (own canvas, two series) ──
@@ -274,8 +279,10 @@
     const sendBoth = cmd => { for (const f of [fL, fR]) { try { f.contentWindow.postMessage({ cmd }, '*'); } catch {} } };
     $('b-amb').onclick   = () => sendBoth('amb');
     $('b-surge').onclick = () => sendBoth('surge');
+    $('b-chaos').onclick = () => sendBoth('chaos');
+    $('b-acc').onclick   = () => sendBoth('accident');
     $('b-reset').onclick = () => {
-      S.L = { q: null, w: null, hist: [] }; S.R = { q: null, w: null, hist: [] };
+      S.L = { q: null, w: null, g: null, hist: [] }; S.R = { q: null, w: null, g: null, hist: [] };
       sendBoth('reset');
       setDial(1);                                   // reloaded embeds restart at ×1 — keep the readout honest
     };

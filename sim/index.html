@@ -52,7 +52,7 @@
   <div id="hud">
     <h1><span class="dot"></span>R.E.L.A.Y · junction</h1>
     <div class="phaserow"><span class="k">signal phase</span><span id="h-phase" class="phase">—</span></div>
-    <div class="cap">approach queues · vehicles waiting</div>
+    <div class="cap">approach demand · vehicles on approach</div>
     <div class="queues">
       <div class="q"><span class="ql">N</span><span id="h-N" class="qv">0</span></div>
       <div class="q"><span class="ql">S</span><span id="h-S" class="qv">0</span></div>
@@ -62,6 +62,19 @@
     <div class="totalrow"><span class="k">vehicles in view</span><span id="h-total">0</span></div>
   </div>
 
+  <script>
+  // no explicit mode in the URL? if the R.E.L.A.Y. server is up, upgrade to the live closed loop —
+  // the demo must never accidentally show the offline fallback as "the system".
+  (() => {
+    const q = new URLSearchParams(location.search);
+    if (q.has('live') || q.has('embed') || q.has('capture') || q.has('lockfixed')) return;
+    const ctl = new AbortController();
+    setTimeout(() => ctl.abort(), 400);
+    fetch('/metrics', { signal: ctl.signal }).then(r => {
+      if (r.ok) { q.set('live', '1'); location.replace(location.pathname + '?' + q); }
+    }).catch(() => {});
+  })();
+  </script>
   <script type="importmap">
   { "imports": {
       "three": "./vendor/three/three.module.js",
@@ -69,6 +82,6 @@
   } }
   </script>
   <!-- three.js vendored (r160): the demo must survive a venue with no wifi — zero CDN dependency -->
-  <script type="module" src="./main.js?v=14"></script>   <!-- bump on release: browsers pin module scripts hard -->
+  <script type="module" src="./main.js?v=17"></script>   <!-- bump on release: browsers pin module scripts hard -->
 </body>
 </html>

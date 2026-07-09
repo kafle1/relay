@@ -45,6 +45,15 @@ DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 INFER = ThreadPoolExecutor(max_workers=1)
 
 
+def iou(a, b):
+    """Intersection-over-union of two {x,y,w,h} boxes (normalized coords)."""
+    ix = max(0.0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+    iy = max(0.0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+    inter = ix * iy
+    union = a["w"] * a["h"] + b["w"] * b["h"] - inter
+    return inter / union if union > 0 else 0.0
+
+
 class LiveCompare:
     """Headless adaptive-vs-fixed on identical arrivals → the live chart."""
     def __init__(self):
@@ -113,6 +122,8 @@ async def ws(sock: WebSocket):
                                           ped_max_wait=45))
     zones = None
     last = time.monotonic()
+    tracks, next_id = {}, 1     # per-connection identity: id -> {box, miss}
+    prev_sirens = set()         # YOLO ambulance arms from the PREVIOUS frame (2-frame confirmation)
     try:
         while True:
             msg = await sock.receive_json()
@@ -128,28 +139,34 @@ async def ws(sock: WebSocket):
                 continue
             if msg.get("type") != "frame":
                 continue
-            # decode frame (skip a corrupt one — edge case: never crash the loop)
-            try:
-                raw = base64.b64decode(msg["image"].split(",", 1)[1])
-                img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-                if img is None:
-                    continue
-            except Exception:
-                continue
-            h, w = img.shape[:2]
-            _t0 = time.monotonic()
+            # decode + detect together on the worker thread — neither may block the event loop.
+            # A corrupt frame skips quietly; nothing crashes the socket.
             # low floor + per-class gates (CONF), like perception.py: a flat 0.35 drops the small
             # far-away two-wheelers that ARE the Kathmandu story (edge case A2).
             # agnostic NMS: a distant queue otherwise grows stacked car+truck+moto boxes per vehicle.
             # 960px: sharpens the small far-queue objects (same lever that fixed real-footage bikes).
-            res = (await asyncio.get_running_loop().run_in_executor(
-                INFER, lambda: model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
-                                             device=DEVICE, verbose=False)))[0]
+            _t0 = time.monotonic()
+
+            def _detect(payload=msg["image"]):
+                raw = base64.b64decode(payload.split(",", 1)[1])
+                img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+                if img is None:
+                    return None, None
+                return img, model.predict(img, conf=0.2, iou=0.5, imgsz=960, agnostic_nms=True,
+                                          device=DEVICE, verbose=False)[0]
+            try:
+                img, res = await asyncio.get_running_loop().run_in_executor(INFER, _detect)
+            except Exception:
+                continue
+            if img is None:
+                continue
             infer_ms = round((time.monotonic() - _t0) * 1000)
+            h, w = img.shape[:2]
 
             boxes = []
             counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
-            emergencies = set(msg.get("emergencies") or [])   # transponder-style announce (+ YOLO ambulance below)
+            emergencies = set(msg.get("emergencies") or [])   # transponder-style announce is immediate
+            yolo_sirens = set()                               # visual detections need 2 consecutive frames
             for b in (res.boxes or []):
                 # PCU classes only — with the stock 80-class model a pedestrian on the zebra must
                 # not be counted (let alone as a car) and inflate that approach's demand.
@@ -170,20 +187,66 @@ async def ws(sock: WebSocket):
                 if appr:
                     counts[appr][cls] = counts[appr].get(cls, 0) + 1
                     if cls == "ambulance":
-                        emergencies.add(appr)
+                        yolo_sirens.add(appr)
+
+            # stable per-vehicle identity: greedy IoU association with the previous frame.
+            # Matched boxes are smoothed (no flicker) and keep their id across frames — the
+            # overlay reads as tracking because it is. Misses expire after ~0.6s (4 frames).
+            claimed = set()
+            for b in sorted(boxes, key=lambda v: -v["conf"]):
+                best, best_iou = None, 0.25
+                for tid, t in tracks.items():
+                    if tid in claimed:
+                        continue
+                    v = iou(b, t["box"])
+                    if v > best_iou:
+                        best, best_iou = tid, v
+                if best is None:
+                    # second chance for fast movers: a two-wheeler crosses its own length between
+                    # frames, so IoU misses — take the nearest unclaimed track by centre distance.
+                    gate = 1.2 * max(b["w"], b["h"])
+                    best_d = gate
+                    for tid, t in tracks.items():
+                        if tid in claimed:
+                            continue
+                        tb = t["box"]
+                        d = abs(tb["x"] + tb["w"] / 2 - b["x"] - b["w"] / 2) + \
+                            abs(tb["y"] + tb["h"] / 2 - b["y"] - b["h"] / 2)
+                        if d < best_d:
+                            best, best_d = tid, d
+                if best is None:
+                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0}
+                    b["id"] = next_id
+                    claimed.add(next_id)
+                    next_id += 1
+                else:
+                    t = tracks[best]
+                    for k in ("x", "y", "w", "h"):
+                        t["box"][k] = t["box"][k] * 0.55 + b[k] * 0.45
+                        b[k] = round(t["box"][k], 4)
+                    t["miss"] = 0
+                    b["id"] = best
+                    claimed.add(best)
+            for tid in [t for t in tracks if t not in claimed]:
+                tracks[tid]["miss"] += 1
+                if tracks[tid]["miss"] > 4:
+                    del tracks[tid]
+
+            # a YOLO siren counts only when seen on two consecutive frames — one white-van
+            # false positive must never flash an emergency banner nobody triggered.
+            emergencies |= (yolo_sirens & prev_sirens)
+            prev_sirens = yolo_sirens
 
             now = time.monotonic()
             dt = min(now - last, 0.5); last = now
             # pedestrian demand rides along with the frame (push-button style); controller sanitizes
             state = ctrl.tick(counts, emergencies, dt, peds=msg.get("peds"))
-            wa, wf = round(cmp.wa, 1), round(cmp.wf, 1)
             n_counts = {d: sum(counts[d].values()) for d in counts}
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
                 "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),
                 "telemetry": {"infer_ms": infer_ms, "model": os.path.basename(MODEL_PATH)},
-                "metrics": {"adaptive": wa, "fixed": wf,
-                            "reduction": round((wf - wa) / wf * 100, 1) if wf > 5 else 0},
+                "metrics": True,   # client-side numbers are measured on the client; /metrics has the benchmark
             })
     except Exception as e:
         print("ws closed:", type(e).__name__)

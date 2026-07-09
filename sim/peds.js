@@ -85,7 +85,7 @@ export async function initPeds(ctx) {
   let spawnAcc = 0;
   function tick(dt) {
     spawnAcc += dt;
-    if (spawnAcc > 2.2) { spawnAcc = 0; spawn(); }
+    if (spawnAcc > 1.4) { spawnAcc = 0; spawn(); }        // lively sidewalks — people are part of the scene
 
     for (const { c, red, green } of walkBulbs) {
       const walk = signalOf(c.dir) === 'red';             // vehicles held → people may cross

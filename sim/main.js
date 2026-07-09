@@ -14,14 +14,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js?v=3';   // versioned: module caches must not pin an old pedestrian API
+import { initPeds } from './peds.js?v=4';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
 const LIVE = P.has('live');
 const CAP = +(P.get('capture') || 0);
 const TOPO = ['T', '2'].includes((P.get('topo') || '').toUpperCase()) ? (P.get('topo') || '').toUpperCase() : '4';
-const LANES = Math.min(3, Math.max(1, Number.isFinite(+P.get('lanes')) && P.get('lanes') ? +P.get('lanes') : 1));
+const LANES = Math.min(3, Math.max(1, Number.isFinite(+P.get('lanes')) && P.get('lanes') ? +P.get('lanes') : 2));   // default 2 per direction — a real 4-lane junction
 const EMBED = P.has('embed');       // rendered inside compare.html — parent owns the chrome
 const LOCKFIX = P.has('lockfixed'); // pin the dumb fixed timer + the imbalanced live demand pattern
 
@@ -238,6 +238,44 @@ function buildWorld() {
   for (const s of [-1, 1]) border.push([R * 2, t, 0.18, 0, y, s * (R - 0.1)], [0.18, t, R * 2, s * (R - 0.1), y, 0]);
   mergedBoxes(border, MAT.yellow);
 
+  // painted lane-discipline arrows before each stop line — mirrors planRoute's rules exactly
+  // (kerb lane: straight+right, inner lane: straight+left, middle: straight; single lane: all)
+  const arrowGeo = (left, right) => {
+    const glyph = [];
+    const straight = new THREE.Shape();
+    straight.moveTo(-0.13, 0); straight.lineTo(-0.13, 1.9); straight.lineTo(-0.45, 1.9);
+    straight.lineTo(0, 3.0); straight.lineTo(0.45, 1.9); straight.lineTo(0.13, 1.9);
+    straight.lineTo(0.13, 0); straight.closePath();
+    glyph.push(straight);
+    const branch = sgn => {
+      const b = new THREE.Shape();
+      b.moveTo(sgn * 0.13, 0.5); b.lineTo(sgn * 1.0, 0.5); b.lineTo(sgn * 1.0, 0.2);
+      b.lineTo(sgn * 1.7, 0.75); b.lineTo(sgn * 1.0, 1.3); b.lineTo(sgn * 1.0, 1.0);
+      b.lineTo(sgn * 0.13, 1.0); b.closePath();
+      return b;
+    };
+    if (left) glyph.push(branch(1));    // shape +X = the driver's left once laid flat facing travel
+    if (right) glyph.push(branch(-1));
+    return new THREE.ShapeGeometry(glyph);
+  };
+  const paint = new THREE.MeshBasicMaterial({ color: 0xe8eaed });
+  for (const dir of DIRS) {
+    const a = APPROACH[dir];
+    for (let ln = 0; ln < LANES; ln++) {
+      const g = new THREE.Group();
+      const glyph = new THREE.Mesh(
+        arrowGeo(LANES === 1 || ln === 0, LANES === 1 || ln === LANES - 1), paint);
+      glyph.rotation.x = -Math.PI / 2;
+      glyph.position.y = 0.14;
+      g.add(glyph);
+      g.rotation.y = a.rotY;
+      const along = a.sign * -(STOP + 5.5);
+      const perp = laneOff(dir, ln);
+      g.position.set(...(a.axis === 'z' ? [perp, 0, along] : [along, 0, perp]));
+      scene.add(g);
+    }
+  }
+
   // corner buildings with lit windows + a few trees
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const h = 9 + Math.random() * 10;
@@ -290,15 +328,22 @@ function makeHead(scale = 1) {                             // housing + backplat
   g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
     const y = (1 - i) * scale;
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34 * scale, 14, 14),
-      new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off, emissiveIntensity: 1 }));
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.4 * scale, 14, 14),
+      // dark tinted lens when unlit (like real heads), hard glow when lit — readable from any zoom
+      new THREE.MeshStandardMaterial({ color: BULB[c], emissive: BULB.off, emissiveIntensity: 1 }));
     m.position.set(0, y, 0.32 * scale);
     g.add(m);
     bulbs[c] = m;
+    // rear repeater disc, sharing the lens material: the aspect reads from EVERY camera angle,
+    // not just head-on — half the heads in any view show their backs.
+    const rep = new THREE.Mesh(new THREE.CircleGeometry(0.17 * scale, 10), m.material);
+    rep.position.set(0, y, -0.33 * scale);
+    rep.rotation.y = Math.PI;
+    g.add(rep);
     // hood/visor over each lens — reads as a real traffic-light head at any distance, and shades
     // the lit lens so the active colour pops instead of washing into the housing
     const hood = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.42 * scale, 0.42 * scale, 0.34 * scale, 14, 1, true, 0, Math.PI),
+      new THREE.CylinderGeometry(0.48 * scale, 0.48 * scale, 0.34 * scale, 14, 1, true, 0, Math.PI),
       MAT.housing);
     hood.rotation.set(Math.PI / 2, 0, 0);
     hood.position.set(0, y + 0.12 * scale, 0.36 * scale);
@@ -314,7 +359,7 @@ for (const dir of DIRS) {
   const kerbPerp = a.side * (ROAD_HALF + 1.6);             // kerb on this approach's own side
   const world = (perp, y) => a.axis === 'z' ? [perp, y, along] : [along, y, perp];
 
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, LANES > 1 ? 7.2 : 6, 8), MAT.pole);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, LANES > 1 ? 7.2 : 6, 10), MAT.pole);
   pole.position.set(...world(kerbPerp, LANES > 1 ? 3.6 : 3));
   root.add(pole);
 
@@ -327,14 +372,15 @@ for (const dir of DIRS) {
   if (LANES > 1) {                                          // gantry arm from the pole across the incoming half
     const innerPerp = laneOff(dir, LANES - 1) - a.side * (LANE_W / 2);
     const armLen = Math.abs(kerbPerp - innerPerp), armMid = (kerbPerp + innerPerp) / 2;
+    // a real mast arm, thick enough to read from the far side — the heads must HANG, not float
     const arm = new THREE.Mesh(
-      a.axis === 'z' ? new THREE.BoxGeometry(armLen, 0.22, 0.22) : new THREE.BoxGeometry(0.22, 0.22, armLen),
+      a.axis === 'z' ? new THREE.BoxGeometry(armLen, 0.34, 0.34) : new THREE.BoxGeometry(0.34, 0.34, armLen),
       MAT.pole);
     arm.position.set(...world(armMid, 7.1));
     root.add(arm);
     for (let k = 0; k < LANES; k++) {
-      const laneHead = makeHead(0.7);                      // per-lane head, one over each lane centre
-      laneHead.g.position.set(...world(laneOff(dir, k), 6.4));
+      const laneHead = makeHead(0.7);                      // per-lane head, hanging from the arm over its lane
+      laneHead.g.position.set(...world(laneOff(dir, k), 5.95));
       laneHead.g.rotation.y = a.rotY;
       root.add(laneHead.g);
       bulbSets.push(laneHead.bulbs);
@@ -361,7 +407,7 @@ function setSignal(dir, state) {
       const on = c === state;
       b[c].material.color.setHex(on ? BULB[c] : BULB.off);
       b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
-      b[c].material.emissiveIntensity = on ? 3.2 : 1;     // lit lens glows hard; dark lenses stay matte
+      b[c].material.emissiveIntensity = on ? 5 : 1;       // lit lens glows hard; dark lenses stay matte
       b[c].scale.setScalar(on ? 1.18 : 1);                // active lens swells slightly — reads at distance
     }
   }
@@ -526,7 +572,7 @@ function placeCar(c) {
   c.mesh.position.set(p.x, 0, p.z);
   c.mesh.rotation.y = p.ry;
 }
-function addCar(dir, u, forcedType) {
+function addCar(dir, u, forcedType, forcedLane) {
   // forced spawns (ambulance / surge buttons) get slack over the cap, but never unbounded
   // (+14: a full 10-car surge plus an ambulance must fit even when organic traffic sits at cap)
   const cap = carCap();
@@ -534,7 +580,7 @@ function addCar(dir, u, forcedType) {
   const type = forcedType || pickType();
   const pool = pools[type];
   if (!pool || !pool.length) return;
-  const T = TYPES[type], lane = (Math.random() * LANES) | 0;
+  const T = TYPES[type], lane = forcedLane != null ? forcedLane : (Math.random() * LANES) | 0;
   if (cars.some(c => c.dir === dir && c.lane === lane && Math.abs(c.u - u) < (c.len + T.len) / 2 + GAP)) return;
   const mesh = new THREE.Group();
   mesh.add(pool[(Math.random() * pool.length) | 0].clone(true));
@@ -562,10 +608,10 @@ function addCar(dir, u, forcedType) {
 function forceSpawn(dir, type) {
   // visible gaps first, then upstream of the scene edge (the road runs to ±320, the camera
   // doesn't) — a saturated approach gets its surge as a convoy streaming IN, never a no-op.
-  const attempt = () => {
+  const attempt = lane => {
     for (const off of [0, 6, 12, 18, 24, 30, 36, 42, 48, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60]) {
       const n = cars.length;
-      addCar(dir, -START + off, type);
+      addCar(dir, -START + off, type, lane);
       if (cars.length > n) return true;
     }
     return false;
@@ -581,7 +627,7 @@ function forceSpawn(dir, type) {
     rear.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
     scene.remove(rear.mesh);
     cars.splice(cars.indexOf(rear), 1);
-    if (attempt()) return true;
+    if (attempt(rear.lane)) return true;                  // retry in the freed lane, not a random one
   }
   return false;
 }
@@ -773,7 +819,7 @@ function vehicleAhead(c) {
 
 const counts = () => {
   const c = Object.fromEntries(DIRS.map(d => [d, 0]));
-  for (const car of cars) if (car.u < ROAD_HALF) c[car.dir]++;
+  for (const car of cars) if (car.u < ROAD_HALF && car.u > -START) c[car.dir]++;   // upstream (off-scene) spawns don't count yet
   return c;
 };
 const queuedNow = () => cars.filter(c => c.u < -STOP + 0.5 && c.blocked).length;
@@ -782,9 +828,12 @@ const queuedNow = () => cars.filter(c => c.u < -STOP + 0.5 && c.blocked).length;
 // (busy NS, quiet EW — exactly the situation where a fixed timer wastes green)
 const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + Math.random() * 2]));
 const rate = (LIVE || LOCKFIX)                    // both A/B panels share the imbalanced demand
-  ? { N: 1.7, S: 1.5, E: 0.4, W: 0.4 }             // busy NS, quiet EW — where a fixed timer bleeds green
+  // busy NS, quiet EW — where a fixed timer bleeds green. Held just under NS saturation: past
+  // it BOTH controllers drown identically and the honest A/B gap compresses to nothing.
+  ? { N: 1.0, S: 0.9, E: 0.25, W: 0.25 }
   : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));
 let simTime = 0, chaosUntil = 0, density = 1;         // density: user traffic dial (× spawn rate AND × cap)
+let wastedGreen = 0;                                  // s of green served to empty arms while others waited
 const DENSITY_MIN = 0.3, DENSITY_MAX = 2.0;
 const carCap = () => Math.round(MAX_CARS * density);
 // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
@@ -796,7 +845,7 @@ function setDensity(v) {
   // on a decrease, thin the surplus by pulling the FARTHEST-BACK cars (still out near the spawn
   // edge, off the junction) — snappy feedback with nothing vanishing mid-scene; the rest drains.
   if (density < prev) {
-    const far = cars.filter(c => c.u < -ROAD_HALF - 22).sort((a, b) => a.u - b.u);
+    const far = cars.filter(c => c.u < -ROAD_HALF - 22 && c.type !== 'ambulance').sort((a, b) => a.u - b.u);   // never cull a summoned siren
     for (const c of far) {
       if (cars.length <= carCap()) break;
       c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
@@ -848,6 +897,12 @@ function button(label, onClick, id) {
   b.onclick = onClick;
   return b;
 }
+// near the box first; else the car closest to it — the click always crashes SOMEONE
+function doAccident() {
+  const victim = cars.find(c => c.u > -STOP - 8 && c.u < ROAD_HALF)
+    || cars.filter(c => c.u < ROAD_HALF).sort((a, b) => b.u - a.u)[0];
+  if (victim) { victim.accident = 12; victim.stuck = 0; }
+}
 function scenarioPanel() {
   const p = document.createElement('div');
   p.className = 'relay-scenario';
@@ -879,10 +934,7 @@ function scenarioPanel() {
   const eventsCap = document.createElement('div');
   eventsCap.className = 'sc-cap'; eventsCap.textContent = 'events:';
   scBody.appendChild(eventsCap);
-  const accidentBtn = button('💥 accident', () => {
-    const victim = cars.find(c => c.u > -STOP - 8 && c.u < ROAD_HALF);
-    if (victim) { victim.accident = 12; victim.stuck = 0; }
-  });
+  const accidentBtn = button('💥 accident', doAccident);
   accidentBtn.classList.add('half');
   scBody.appendChild(accidentBtn);
   const chaosBtn = button('🌀 chaos ×3', () => { chaosUntil = simTime + 30; });
@@ -1048,6 +1100,7 @@ function buildLiveUI() {
     '<div class="rp-title">R.E.L.A.Y · live control</div>' +
     '<div id="m-stat" class="rp-stat">warming up…</div>' +
     '<div id="m-sub" class="rp-sub">reading the camera…</div>' +
+    '<div id="m-pipe" class="rp-sub" style="color:var(--cy)"></div>' +
     '<div class="rp-cap">vehicles queued · last 90s</div>' +
     '<canvas id="mini"></canvas>' +
     '<div class="rp-legend"><span class="sw on"></span>R.E.L.A.Y. on&nbsp;&nbsp;<span class="sw off"></span>fixed timer</div>';
@@ -1087,7 +1140,7 @@ function drawOverlay() {
     // in the small compare embeds the boxes alone carry the "camera is read" story — text is noise.
     if (EMBED) continue;
     octx.fillStyle = col;
-    octx.fillText(`${b.cls} ${b.conf}`, b.x * W, Math.max(12 * PR, b.y * H - 3 * PR));
+    octx.fillText(`${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`, b.x * W, Math.max(12 * PR, b.y * H - 3 * PR));
   }
 }
 // live queued-over-time chart: one series, each segment coloured by the mode that produced it,
@@ -1184,17 +1237,27 @@ function connectWS() {
         statLine.textContent = '▲ fixed timer — not adapting';
       }
       subLine.textContent = `${queuedNow()} queued · ${load} veh·s/s${tel}`;
+      // the anti-fake receipt: the whole pipeline, live — every number here is this frame's truth
+      const pipe = document.getElementById('m-pipe');
+      if (pipe && m.counts) {
+        const cts = ['N', 'S', 'E', 'W'].filter(d => m.counts[d] != null).map(d => d + m.counts[d]).join(' ');
+        pipe.textContent = `YOLO ${m.telemetry ? m.telemetry.infer_ms + 'ms' : '…'} · ${liveBoxes.length} boxes → ${cts} → ${m.phase} ${m.stage}`;
+      }
     }
   };
 }
 function streamFrame() {
-  if (!wsOpen || sending) return;
+  // backpressure: if the socket's send buffer is backed up (slow inference, several tabs), skip
+  // this frame — the lights must react to NOW, never to a seconds-old queue of stale frames.
+  if (!wsOpen || sending || (ws && ws.bufferedAmount > 200000)) return;
   sending = true;
   const w = 720, h = Math.round(innerHeight / innerWidth * 720);
   streamCanvas.width = w;
   streamCanvas.height = h;
   streamCtx.drawImage(renderer.domElement, 0, 0, w, h);              // same-frame copy: no preserveDrawingBuffer
-  const emergencies = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < ROAD_HALF).map(c => c.dir))];
+  // announce a siren only once it is near the camera's field — announcing a spawn still 100m
+  // upstream made the "emergency detected" banner precede any visible ambulance by seconds.
+  const emergencies = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < ROAD_HALF && c.u > -(STOP + 50)).map(c => c.dir))];
   const pedDemand = peds.waiting();                                  // push-button-style ped input per arm
   streamCanvas.toBlob(blob => {
     sending = false;
@@ -1245,6 +1308,15 @@ function tick() {
   const dt = Math.min(clock.getDelta(), 0.05) || 1e-6;   // duplicate rAF timestamps give dt=0, which breaks the blocked flag
   simTime += dt;
   const fixedLabel = tickSignals(dt);
+  // the pitch, measured live: green seconds served to EMPTY arms while someone waits on red,
+  // counted per arm (an NS green with N busy and S dead wastes half its capacity). The fixed
+  // timer bleeds these on the quiet road; R.E.L.A.Y.'s empty-skip and gap-out keep them low.
+  const greens = DIRS.filter(d => signalOf(d) === 'green');
+  const demand = d => cars.some(c => c.dir === d && c.u > -STOP - 26 && c.u < 2);
+  if (greens.length && DIRS.some(d => !greens.includes(d) && demand(d))) {
+    const empty = greens.filter(d => !demand(d)).length;
+    if (empty) wastedGreen += dt * empty / greens.length;
+  }
   moveCars(dt);
   peds.tick(dt);
   spawnTick();
@@ -1282,8 +1354,11 @@ function tick() {
       if (qSampleAcc >= 0.75) { qSampleAcc = 0; qHist.push({ v: queuedNow(), on: systemOn }); if (qHist.length > 120) qHist.shift(); drawChart(); }
     }
     sendAcc += dt;
-    if (sendAcc >= 0.15 && ready) { sendAcc = 0; streamFrame(); }   // ~6.7Hz: boxes track motion instead of trailing it
+    if (sendAcc >= 0.1 && ready) { sendAcc = 0; streamFrame(); }   // ~10Hz: inference is ~30ms, so boxes glue to motion
   }
+  // capture mode: the organic mix has no ambulances (button-only), but the detector's visual
+  // ambulance class trains on captured frames — summon one every few seconds so retrains keep it.
+  if (CAP && ready && simTime % 9 < dt) forceSpawn(DIRS[(Math.random() * DIRS.length) | 0], 'ambulance');
   if (CAP && ready) captureTick(dt);
 
   // public state for dashboards / debugging: everything the system knows, one object
@@ -1291,7 +1366,7 @@ function tick() {
     mode: LIVE ? (systemOn ? 'relay' : 'fixed') : 'sim',
     phase: hud.phase.textContent, counts: c, cars: cars.length,
     queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
-    peds: peds.waiting(), density,
+    peds: peds.waiting(), density, wastedGreen: Math.round(wastedGreen),
     topo: TOPO, lanes: LANES,
   };
   requestAnimationFrame(tick);
@@ -1344,6 +1419,8 @@ function startEmbedBridge() {
     const cmd = (e.data && e.data.cmd) || '';
     if (cmd === 'amb') forceSpawn(N, 'ambulance');
     else if (cmd === 'surge') { for (let i = 0; i < 10; i++) setTimeout(() => forceSpawn(i % 2 ? S2 : N, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 120); }
+    else if (cmd === 'chaos') chaosUntil = simTime + 30;
+    else if (cmd === 'accident') doAccident();
     else if (cmd === 'density' && Number.isFinite(e.data.v)) setDensity(e.data.v);
     else if (cmd === 'reset') location.reload();
   });
