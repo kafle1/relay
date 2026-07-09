@@ -14,6 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { initPeds } from './peds.js';
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -276,42 +277,68 @@ buildWorld();
 // ─────────────────────────── signal heads ───────────────────────────
 const BULB = { red: 0xff3b30, yellow: 0xffcc00, green: 0x34c759, off: 0x181b20 };
 const signalHeads = {};
-for (const dir of DIRS) {
-  const a = APPROACH[dir], g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 6, 8), MAT.pole);
-  pole.position.y = 3;
-  g.add(pole);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.5, 0.1), MAT.housing);
-  back.position.set(0, 6, -0.26);
+function makeHead(scale = 1) {                             // housing + backplate + 3 bulbs
+  const g = new THREE.Group(), bulbs = {};
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1.5 * scale, 3.5 * scale, 0.1), MAT.housing);
+  back.position.z = -0.26 * scale;
   g.add(back);
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 0.6), MAT.housing);
-  housing.position.y = 6;
-  g.add(housing);
-  const bulbs = {};
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 14),
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34 * scale, 12, 12),
       new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off }));
-    m.position.set(0, 7 - i, 0.32);
+    m.position.set(0, (1 - i) * scale, 0.32 * scale);
     g.add(m);
     bulbs[c] = m;
   });
-  // on the kerb beside this approach's incoming lanes, just past the stop line
+  return { g, bulbs };
+}
+// every approach gets a kerb pole; multi-lane approaches also get an overhead gantry with
+// one head per lane, all facing the traffic they control. World-space placement throughout.
+for (const dir of DIRS) {
+  const a = APPROACH[dir], root = new THREE.Group(), bulbSets = [];
   const along = a.sign * -(STOP + 1.2);
-  const aside = (a.side > 0 ? -1 : 1) * (ROAD_HALF + 1.6);
-  if (a.axis === 'z') g.position.set(-aside, 0, along);
-  else g.position.set(along, 0, -aside);
-  g.rotation.y = a.rotY;                                 // bulbs face the oncoming traffic they control
-  g.userData.bulbs = bulbs;
-  scene.add(g);
-  signalHeads[dir] = g;
+  const kerbPerp = a.side * (ROAD_HALF + 1.6);             // kerb on this approach's own side
+  const world = (perp, y) => a.axis === 'z' ? [perp, y, along] : [along, y, perp];
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, LANES > 1 ? 7.2 : 6, 8), MAT.pole);
+  pole.position.set(...world(kerbPerp, LANES > 1 ? 3.6 : 3));
+  root.add(pole);
+
+  const kerbHead = makeHead();
+  kerbHead.g.position.set(...world(kerbPerp, 6));
+  kerbHead.g.rotation.y = a.rotY;
+  root.add(kerbHead.g);
+  bulbSets.push(kerbHead.bulbs);
+
+  if (LANES > 1) {                                          // gantry arm from the pole across the incoming half
+    const innerPerp = laneOff(dir, LANES - 1) - a.side * (LANE_W / 2);
+    const armLen = Math.abs(kerbPerp - innerPerp), armMid = (kerbPerp + innerPerp) / 2;
+    const arm = new THREE.Mesh(
+      a.axis === 'z' ? new THREE.BoxGeometry(armLen, 0.22, 0.22) : new THREE.BoxGeometry(0.22, 0.22, armLen),
+      MAT.pole);
+    arm.position.set(...world(armMid, 7.1));
+    root.add(arm);
+    for (let k = 0; k < LANES; k++) {
+      const laneHead = makeHead(0.55);
+      laneHead.g.position.set(...world(laneOff(dir, k), 6.3));
+      laneHead.g.rotation.y = a.rotY;
+      root.add(laneHead.g);
+      bulbSets.push(laneHead.bulbs);
+    }
+  }
+
+  root.userData.bulbSets = bulbSets;
+  scene.add(root);
+  signalHeads[dir] = root;
 }
 function setSignal(dir, state) {
-  const b = signalHeads[dir].userData.bulbs;
-  for (const c of ['red', 'yellow', 'green']) {
-    const on = c === state;
-    b[c].material.color.setHex(on ? BULB[c] : BULB.off);
-    b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
-    b[c].material.emissiveIntensity = on ? 2.2 : 1;
+  for (const b of signalHeads[dir].userData.bulbSets) {
+    for (const c of ['red', 'yellow', 'green']) {
+      const on = c === state;
+      b[c].material.color.setHex(on ? BULB[c] : BULB.off);
+      b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
+      b[c].material.emissiveIntensity = on ? 2.2 : 1;
+    }
   }
 }
 
@@ -854,6 +881,7 @@ function tick() {
   simTime += dt;
   const fixedLabel = tickSignals(dt);
   moveCars(dt);
+  pedsTick(dt);
   spawnTick();
   if (LIVE || LOCKFIX) { modeWait += queuedNow() * dt; modeT += dt; }   // veh·seconds queued under the current mode
 
@@ -951,7 +979,11 @@ function startEmbedBridge() {
   });
 }
 
-loadModels().then(() => {
+let pedsTick = () => {};
+loadModels().then(async () => {
+  const loadGLB = url => new Promise((res, rej) => loader.load(url, g => res(g.scene), undefined, rej));
+  pedsTick = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned });
+}).then(() => {
   injectStyles();
   for (let i = 0; i < 28; i++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 6));
   if (!EMBED) scenarioPanel();

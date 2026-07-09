@@ -5,32 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>R.E.L.A.Y. — Junction Sim</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; }
-    #app { width: 100vw; height: 100vh; display: block; }
-    #hud {
-      position: fixed; top: 12px; left: 12px; z-index: 10;
-      font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
-      color: #e8eaed; text-shadow: 0 1px 3px rgba(0,0,0,.8);
-      background: rgba(12,14,18,.55); padding: 10px 12px; border-radius: 8px;
-      border: 1px solid rgba(255,255,255,.08); min-width: 190px;
+    :root{
+      --bg:#0b0d10; --panel:rgba(16,19,24,.72); --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
+      --txt:#e8eaed; --muted:#9aa0a6; --cy:#7dd3fc; --grn:#86efac; --red:#ff6b62; --amb:#ffcc00;
     }
-    #hud h1 { font-size: 13px; letter-spacing: .06em; color: #7dd3fc; margin-bottom: 6px; }
-    #hud .row { display: flex; justify-content: space-between; gap: 16px; }
-    #hud .phase { color: #86efac; }
-    #hud .k { color: #9aa0a6; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    #app { width: 100vw; height: 100vh; display: block; }
+
+    #hud {
+      position: fixed; top: 14px; left: 14px; z-index: 10; width: 216px;
+      color: var(--txt); text-shadow: 0 1px 2px rgba(0,0,0,.6);
+      background: var(--panel); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+      padding: 13px 14px; border-radius: 11px; border: 1px solid var(--line);
+      box-shadow: 0 6px 22px rgba(0,0,0,.35);
+    }
+    #hud h1 { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+      color: var(--cy); margin-bottom: 11px; display: flex; align-items: center; gap: 7px; }
+    #hud h1 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--grn);
+      box-shadow: 0 0 8px var(--grn); animation: hud-pulse 1.8s ease-in-out infinite; }
+    @keyframes hud-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    #hud .phaserow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    #hud .k { color: var(--muted); font-size: 11.5px; }
+    #hud .phase { color: var(--grn); font-weight: 700; font-size: 12px; text-align: right; }
+
+    #hud .cap { color: var(--muted); font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 7px; }
+    #hud .queues { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+    #hud .q { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; }
+    #hud .q .ql { color: var(--cy); font-size: 11px; font-weight: 700; }
+    #hud .q .qv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    #hud .totalrow { display: flex; align-items: center; justify-content: space-between;
+      border-top: 1px solid var(--line); padding-top: 9px; }
+    #hud .totalrow span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
   <canvas id="app"></canvas>
   <div id="hud">
-    <h1>R.E.L.A.Y. · junction sim</h1>
-    <div class="row"><span class="k">phase</span><span id="h-phase" class="phase">—</span></div>
-    <div class="row"><span class="k">north</span><span id="h-N">0</span></div>
-    <div class="row"><span class="k">south</span><span id="h-S">0</span></div>
-    <div class="row"><span class="k">east</span><span id="h-E">0</span></div>
-    <div class="row"><span class="k">west</span><span id="h-W">0</span></div>
-    <div class="row"><span class="k">cars</span><span id="h-total">0</span></div>
+    <h1><span class="dot"></span>R.E.L.A.Y · junction</h1>
+    <div class="phaserow"><span class="k">signal phase</span><span id="h-phase" class="phase">—</span></div>
+    <div class="cap">approach queues · vehicles waiting</div>
+    <div class="queues">
+      <div class="q"><span class="ql">N</span><span id="h-N" class="qv">0</span></div>
+      <div class="q"><span class="ql">S</span><span id="h-S" class="qv">0</span></div>
+      <div class="q"><span class="ql">E</span><span id="h-E" class="qv">0</span></div>
+      <div class="q"><span class="ql">W</span><span id="h-W" class="qv">0</span></div>
+    </div>
+    <div class="totalrow"><span class="k">vehicles in view</span><span id="h-total">0</span></div>
   </div>
 
   <script type="importmap">

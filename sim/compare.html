@@ -3,54 +3,234 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>R.E.L.A.Y. — Fixed vs Adaptive</title>
+  <title>R.E.L.A.Y. — Live A/B: fixed timer vs adaptive</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-    #app { width: 100vw; height: 100vh; display: block; }
-    .tag { position: fixed; top: 14px; z-index: 10; padding: 8px 14px; border-radius: 8px;
-           font-weight: 700; font-size: 15px; letter-spacing: .05em; color: #fff;
-           background: rgba(12,14,18,.7); border: 1px solid rgba(255,255,255,.12); }
-    #tagL { left: 25%; transform: translateX(-50%); color: #ff6b62; }
-    #tagR { left: 75%; transform: translateX(-50%); color: #86efac; }
-    .stats { position: fixed; bottom: 14px; z-index: 10; padding: 10px 14px; border-radius: 8px;
-             font-size: 13px; line-height: 1.6; color: #e8eaed;
-             background: rgba(12,14,18,.7); border: 1px solid rgba(255,255,255,.12); min-width: 210px; }
-    #statL { left: 25%; transform: translateX(-50%); }
-    #statR { left: 75%; transform: translateX(-50%); }
-    .stats .big { font-size: 20px; font-weight: 700; }
-    #statL .big { color: #ff6b62; } #statR .big { color: #86efac; }
-    #divider { position: fixed; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.25); z-index: 9; }
-    #verdict { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 11;
-               padding: 9px 16px; border-radius: 8px; font-weight: 700; font-size: 16px; color: #86efac;
-               background: rgba(12,14,18,.85); border: 1px solid rgba(134,239,172,.35); }
-    #ctrls { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 11; display: flex; gap: 6px; }
-    #ctrls button { font: 12px ui-monospace, monospace; color: #e8eaed; background: rgba(20,24,30,.85);
-                    border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-    .k { color: #9aa0a6; }
+    :root{
+      --bg:#0b0d10; --panel:rgba(16,19,24,.82); --panel2:rgba(12,14,18,.66);
+      --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.16);
+      --txt:#e8eaed; --muted:#9aa0a6; --cy:#7dd3fc; --grn:#86efac; --grn2:#34c759; --red:#ff6b62; --amb:#ffcc00;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body { width:100%; height:100%; overflow:hidden; background:var(--bg);
+      color:var(--txt); font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+    body { display:grid; grid-template-rows:auto 1fr 176px; height:100vh; }
+
+    /* ── header ── */
+    header{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px;
+      padding:11px 18px; border-bottom:1px solid var(--line); background:rgba(9,11,14,.6);
+      backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); }
+    .brand{ display:flex; flex-direction:column; gap:2px; }
+    .brand b{ font-size:15px; font-weight:700; letter-spacing:.14em; color:var(--txt);
+      display:flex; align-items:center; gap:8px; }
+    .brand b .dot{ width:8px; height:8px; border-radius:50%; background:var(--grn);
+      box-shadow:0 0 9px var(--grn); animation:pulse 1.8s ease-in-out infinite; }
+    .brand span{ font-size:11px; color:var(--muted); letter-spacing:.03em; }
+    @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    #verdict{ text-align:center; padding:6px 22px; border-radius:12px; border:1px solid var(--line);
+      background:var(--panel2); transition:border-color .3s, background .3s; min-width:340px; }
+    #verdict .lead{ font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-bottom:1px; }
+    #verdict .big{ display:flex; align-items:baseline; justify-content:center; gap:10px; }
+    #v-num{ font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:.01em; }
+    #v-sub{ font-size:12.5px; color:var(--muted); }
+    #verdict.win{ border-color:rgba(134,239,172,.45); background:rgba(52,199,89,.10); }
+    #verdict.win #v-num{ color:var(--grn); }
+    #verdict.even #v-num{ color:var(--amb); font-size:22px; }
+    #verdict.wait #v-num{ color:var(--muted); font-size:22px; }
+
+    .controls{ display:flex; gap:7px; justify-content:flex-end; }
+    .btn{ font:600 12px/1 ui-monospace,monospace; color:var(--txt); background:rgba(28,33,41,.9);
+      border:1px solid var(--line2); border-radius:8px; padding:9px 12px; cursor:pointer;
+      transition:background .14s,border-color .14s,transform .06s; white-space:nowrap; }
+    .btn:hover{ background:rgba(42,49,60,.95); border-color:rgba(125,211,252,.5); }
+    .btn:active{ transform:translateY(1px); }
+    .btn.amb:hover{ border-color:rgba(255,107,98,.6); }
+
+    /* ── stage: two live sims ── */
+    #stage{ position:relative; display:grid; grid-template-columns:1fr 1fr; }
+    .panel{ position:relative; overflow:hidden; }
+    .panel iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; background:var(--bg); }
+    #divider{ position:absolute; left:50%; top:0; bottom:0; width:2px; transform:translateX(-1px);
+      background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.22),rgba(255,255,255,.02)); z-index:6; }
+
+    .label{ position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:7; text-align:center;
+      padding:7px 16px; border-radius:10px; background:var(--panel); border:1px solid var(--line);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); pointer-events:none;
+      box-shadow:0 5px 18px rgba(0,0,0,.4); }
+    .label b{ display:block; font-size:14px; font-weight:800; letter-spacing:.05em; }
+    .label span{ display:block; font-size:10.5px; color:var(--muted); margin-top:2px; letter-spacing:.02em; }
+    .left  .label b{ color:var(--red); } .right .label b{ color:var(--grn); }
+
+    .strip{ position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:7;
+      padding:8px 15px; border-radius:10px; background:var(--panel); border:1px solid var(--line);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); pointer-events:none;
+      font-size:12px; color:var(--muted); white-space:nowrap; box-shadow:0 5px 18px rgba(0,0,0,.4); }
+    .strip b{ font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .left  .strip b{ color:var(--red); } .right .strip b{ color:var(--grn); }
+    .strip .u{ font-size:11px; }
+
+    /* ── chart ── */
+    #chartwrap{ border-top:1px solid var(--line); background:rgba(9,11,14,.5); padding:9px 16px 8px; display:flex; flex-direction:column; }
+    .chead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+    .chead .t{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+    .chead .t b{ color:var(--txt); }
+    .legend{ display:flex; gap:16px; font-size:11.5px; color:var(--muted); align-items:center; }
+    .legend i{ width:11px; height:11px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+    .legend .lf{ background:var(--red); } .legend .lr{ background:var(--grn); }
+    #chart{ flex:1; width:100%; display:block; }
   </style>
 </head>
 <body>
-  <canvas id="app"></canvas>
-  <div id="divider"></div>
-  <div id="tagL" class="tag">FIXED TIMER (today)</div>
-  <div id="tagR" class="tag">R.E.L.A.Y. (adaptive)</div>
-  <div id="verdict">same traffic · —</div>
-  <div id="statL" class="stats"><span class="k">queued now</span> <span id="qL">0</span><br>
-    <span class="k">total wait</span> <span class="big" id="wL">0</span> <span class="k">veh·s</span></div>
-  <div id="statR" class="stats"><span class="k">queued now</span> <span id="qR">0</span><br>
-    <span class="k">total wait</span> <span class="big" id="wR">0</span> <span class="k">veh·s</span></div>
-  <div id="ctrls">
-    <button id="b-amb">🚑 ambulance (both)</button>
-    <button id="b-surge">surge N (both)</button>
-    <button id="b-reset">reset</button>
-  </div>
-  <script type="importmap">
-  { "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  } }
+  <header>
+    <div class="brand">
+      <b><span class="dot"></span>R.E.L.A.Y.</b>
+      <span>live A/B — the same traffic, run two ways</span>
+    </div>
+    <div id="verdict" class="wait">
+      <div class="lead">R.E.L.A.Y. vs today's fixed timer</div>
+      <div class="big"><span id="v-num">—</span><span id="v-sub">measuring…</span></div>
+    </div>
+    <div class="controls">
+      <button class="btn amb" id="b-amb">🚑 Emergency</button>
+      <button class="btn" id="b-surge">Surge N–S</button>
+      <button class="btn" id="b-reset">Reset</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <section class="panel left">
+      <iframe id="fL" title="fixed timer" src="/?embed=1&lockfixed=1"></iframe>
+      <div class="label"><b>TODAY</b><span>fixed timer · blind 20s cycle</span></div>
+      <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg veh·s/s</span></div>
+    </section>
+    <section class="panel right">
+      <iframe id="fR" title="relay adaptive" src="/?embed=1&live=1"></iframe>
+      <div class="label"><b>WITH R.E.L.A.Y.</b><span>adaptive · reads the camera</span></div>
+      <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg veh·s/s</span></div>
+    </section>
+    <div id="divider"></div>
+  </main>
+
+  <footer id="chartwrap">
+    <div class="chead">
+      <div class="t"><b>vehicles queued</b> — last 120s · same demand (busy N–S, quiet E–W)</div>
+      <div class="legend"><span><i class="lf"></i>fixed timer</span><span><i class="lr"></i>R.E.L.A.Y.</span></div>
+    </div>
+    <canvas id="chart"></canvas>
+  </footer>
+
+  <script>
+  (() => {
+    const $ = id => document.getElementById(id);
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const WINDOW = 120000;                          // 120s chart window
+
+    // per-panel live state fed by postMessage from each embedded sim
+    const S = {
+      L: { q: null, w: null, hist: [] },            // TODAY — fixed timer  (?lockfixed)
+      R: { q: null, w: null, hist: [] },            // WITH R.E.L.A.Y.      (?live)
+    };
+
+    addEventListener('message', e => {
+      const d = e.data;
+      if (!d || typeof d.who !== 'string') return;
+      const p = d.who.includes('lockfixed') ? S.L : d.who.includes('live') ? S.R : null;
+      if (!p) return;
+      if (typeof d.queued === 'number') { p.q = d.queued; p.hist.push({ t: performance.now(), q: d.queued }); }
+      if (typeof d.waitPerSec === 'number') p.w = d.waitPerSec;
+      const cut = performance.now() - WINDOW - 1000;
+      while (p.hist.length && p.hist[0].t < cut) p.hist.shift();
+    });
+
+    // ── verdict: prefer the stable cumulative-average metric, fall back to nothing ──
+    const verdict = $('verdict'), vNum = $('v-num'), vSub = $('v-sub');
+    function setVerdict(cls, num, sub) {
+      verdict.className = cls; vNum.textContent = num; vSub.textContent = sub;
+    }
+    function trailingAvg(hist, ms) {                 // avg queue length over a recent window
+      const now = performance.now(); let s = 0, n = 0;
+      for (const p of hist) if (now - p.t <= ms) { s += p.q; n++; }
+      return n ? s / n : null;
+    }
+    function updateVerdict() {
+      const la = trailingAvg(S.L.hist, 45000), ra = trailingAvg(S.R.hist, 45000);
+      if (la == null || ra == null || la < 1.5) {
+        setVerdict('wait', '—', 'measuring… give the junctions a few seconds of traffic');
+        return;
+      }
+      const red = Math.round((la - ra) / la * 100);
+      if (red >= 5)       setVerdict('win', '▼ ' + red + '%', 'fewer vehicles left waiting vs the fixed timer');
+      else if (red <= -5) setVerdict('wait', '…', 'warming up — R.E.L.A.Y. is reading the demand');
+      else                setVerdict('even', '≈ even', 'light traffic — hit Surge to open the gap');
+    }
+
+    function fmt(v) { return v == null ? '—' : (Number.isInteger(v) ? v : v.toFixed(1)); }
+    function updateStrips() {
+      $('qL').textContent = fmt(S.L.q); $('wL').textContent = fmt(S.L.w);
+      $('qR').textContent = fmt(S.R.q); $('wR').textContent = fmt(S.R.w);
+    }
+
+    // ── real-time line chart (own canvas, two series) ──
+    const chart = $('chart'), cctx = chart.getContext('2d');
+    function sizeCanvas() {
+      const w = chart.clientWidth, h = chart.clientHeight;
+      chart.width = Math.round(w * dpr); chart.height = Math.round(h * dpr);
+    }
+    function draw() {
+      const CW = chart.clientWidth, CH = chart.clientHeight;
+      cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cctx.clearRect(0, 0, CW, CH);
+      const x0 = 34, x1 = CW - 12, y0 = 8, y1 = CH - 20;
+      const now = performance.now();
+      const mx = Math.max(6, ...S.L.hist.map(p => p.q), ...S.R.hist.map(p => p.q));
+
+      cctx.font = '10px ui-monospace, monospace';
+      cctx.strokeStyle = 'rgba(255,255,255,.07)'; cctx.lineWidth = 1;
+      cctx.fillStyle = '#6b7178'; cctx.textBaseline = 'middle'; cctx.textAlign = 'right';
+      for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+        const y = y1 - f * (y1 - y0);
+        cctx.beginPath(); cctx.moveTo(x0, y); cctx.lineTo(x1, y); cctx.stroke();
+        cctx.fillText(Math.round(f * mx), x0 - 6, y);
+      }
+      cctx.textBaseline = 'top'; cctx.textAlign = 'center';
+      for (const s of [120, 90, 60, 30, 0]) {
+        const x = x1 - (s / 120) * (x1 - x0);
+        cctx.fillText(s ? '-' + s + 's' : 'now', x, y1 + 5);
+      }
+
+      const plot = (hist, col) => {
+        const pts = hist.filter(p => now - p.t <= WINDOW + 500);
+        if (pts.length < 2) return;
+        cctx.strokeStyle = col; cctx.lineWidth = 2; cctx.lineJoin = 'round'; cctx.lineCap = 'round';
+        cctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = x1 - ((now - p.t) / WINDOW) * (x1 - x0);
+          const y = y1 - (p.q / mx) * (y1 - y0);
+          i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
+        });
+        cctx.stroke();
+        const last = pts[pts.length - 1];
+        const lx = x1 - ((now - last.t) / WINDOW) * (x1 - x0), ly = y1 - (last.q / mx) * (y1 - y0);
+        cctx.fillStyle = col; cctx.beginPath(); cctx.arc(lx, ly, 3, 0, Math.PI * 2); cctx.fill();
+      };
+      plot(S.L.hist, '#ff6b62');
+      plot(S.R.hist, '#86efac');
+    }
+
+    // ── scenario controls: broadcast into both sims ──
+    const fL = $('fL'), fR = $('fR');
+    const sendBoth = cmd => { for (const f of [fL, fR]) { try { f.contentWindow.postMessage({ cmd }, '*'); } catch {} } };
+    $('b-amb').onclick   = () => sendBoth('amb');
+    $('b-surge').onclick = () => sendBoth('surge');
+    $('b-reset').onclick = () => {
+      S.L = { q: null, w: null, hist: [] }; S.R = { q: null, w: null, hist: [] };
+      sendBoth('reset');
+    };
+
+    addEventListener('resize', sizeCanvas);
+    sizeCanvas();
+    setInterval(() => { updateStrips(); updateVerdict(); draw(); }, 250);
+  })();
   </script>
-  <script type="module" src="./compare.js"></script>
 </body>
 </html>
