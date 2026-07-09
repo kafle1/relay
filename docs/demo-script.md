@@ -7,6 +7,7 @@
 - [ ] Open a second tab: http://127.0.0.1:8000/compare.html (leave it warming — its charts accumulate)
 - [ ] Dismiss the "What am I looking at?" card once so it doesn't pop mid-pitch
 - [ ] Laptop plugged in, notifications off, other apps closed (YOLO + Three.js want the GPU)
+- [ ] Close stray R.E.L.A.Y. tabs — extra live tabs share the detector and slow everyone's boxes
 - [ ] If anything hangs: `make dev` again — it kills and restarts everything. Zero cloud dependency; wifi can die and the demo doesn't.
 
 ## The 7 beats
@@ -57,3 +58,5 @@ Never quote 59% — retired number (benchmark bug, fixed).
 - **"Why trust the sim?"** — The sim is the *demo surface*; the benchmark runs on identical arrival streams through both controllers, and the real anchor is the SIDRA study.
 - **"Hasn't someone on GitHub done this?"** — Hundreds of YOLO-counts-cars demos; zero close the camera→signal loop with safety invariants, starvation bounds, or pedestrian wait — we surveyed ~140 repos (docs/research/2026-07-09-github-oss-landscape.md). Max-pressure is proven theory (Varaiya 2013); pedestrian-aware max-pressure was published 2024 *without code*. We're the first to run either on a live camera.
 - **"Cost — really?"** — Anchor ladder: legacy ATCS ~$65k/junction; Miovision publishes $11.4k + $998/yr; Bengaluru's BATCS took -33% travel time at Hudson Circle with mixed traffic. We're camera + edge box, ~$250–400.
+- **"It's just a simulation — this won't work on a real device."** — Three receipts, in order: (1) the cyan pipeline line on screen — `YOLO 27ms · N boxes → per-arm counts → phase` — every number is that frame's truth, and every box carries a persistent track id; (2) `make webcam` — point the laptop camera at a phone playing any junction footage and the SAME model + controller run on real pixels, live; (3) the 3D exists because you cannot A/B a real junction — it's the only honest way to run identical traffic through both controllers. The detector already reads real CCTV (Hanoi, Thailand — unseen in training).
+- **"Why do all heads on an arm show the same colour?"** — Approach-based phases, same as every deployed ATCS (including Lalitpur's). The controller takes any conflict-free phase set as config — a protected left arrow is one more `Junction` phase entry plus a lens, not an architecture change. Cameras can't read turn INTENT from a queue, so per-movement demand needs stop-line turn zones — a pilot-phase item, deliberately not faked.

@@ -88,7 +88,7 @@
 66. 🔴 **Vehicle bodies must never intersect** → hard three-disc separation clamp in the sim: an advance that would close below the safety gap is refused (sliding apart stays allowed), so contact is structurally impossible, not just unlikely.
 67. 🔴 **Pedestrian on the zebra when green arrives** → vehicles hold at the stop line while anyone is on their arm's crossing, and walkers are hard obstacles to every vehicle path (exit side included) — safety never depends on signal-timing luck.
 68. 🟠 **Walk window shorter than crossing time** (1s all-red vs ≥6s crossing on wide roads) → covered by 66/67; the person finishes, traffic waits.
-69. 🟠 **Scenario-button spam** (ambulance/surge clicks) → forced spawns bounded at cap+10, never unbounded array growth or self-inflicted gridlock.
+69. 🟠 **Scenario-button spam** (ambulance/surge clicks) → forced spawns bounded at cap+14, never unbounded array growth or self-inflicted gridlock; the buttons themselves never silently no-op (retry ladders + rearmost-yield for sirens).
 70. 🟠 **Live signal feed dies mid-green** → stale signals are dropped immediately and the sim falls back to the safe fixed cycle while reconnecting — never steer on dead data.
 71. 🟠 **Corner entry speed** → braking envelope (v² = 2·a·d) caps speed into stops *and* arcs; heavy vehicles accelerate slower — no full-speed 90° turns.
 72. 🟠 **One dropped detection frame during an ambulance hold** → 2.5 s emergency latch in the controller; preemption survives detector flicker instead of abandoning the ambulance mid-clear.

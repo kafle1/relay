@@ -106,7 +106,7 @@
 | 11 | "footages must be like top view of junction, or 4 different cameras for 4 different direction all cameras synced" | Mode A/B in spec; sim provides both; AI City noted for real 4-cam | ✅ |
 | 12 | "it cant be moving drone frootages" / "only need junction footage" / "none of the footages … good" | fixed-cam bar enforced; Hanoi 1080p60 + Bangkok verified-fixed clips used in dev (removed from repo per row 31) | ✅ |
 | 13 | "first we make perfect system by generating our own 3d traffic with real 3d treejs made cars" | Three.js sim, 15 GLB vehicle types + skinned pedestrian | ✅ |
-| 14 | "make it real random like bikes auto vehicle car taxi lilke super real" | weighted random mix (moto 50%, car, taxi, truck, bus, ambulance); auto-rickshaw: no free license-clean GLB exists — documented | ◐ |
+| 14 | "make it real random like bikes auto vehicle car taxi lilke super real" | weighted random mix (moto 50%, car, taxi, truck, bus); ambulances button-only by design; auto-rickshaw: no free license-clean GLB exists — documented | ◐ |
 | 15 | "different speed different pace" | per-vehicle speed = base × type × random jitter | ✅ |
 | 16 | "3d … real like gta types … then we use our system in that footage, it will detect real vehicle" | render → same YOLO detects (mixed fine-tune, mAP@50 ≈0.88) | ✅ |
 | 17 | "make 3d for every edge cases … 3 point junction 2 point junction 4 point junction, 2 lane … 6 lane" | `?topo=4|T|2` × `?lanes=1..3` per direction (2/4/6-lane roads); scenario buttons (ambulance, surge) | ✅ |
@@ -744,3 +744,19 @@
   
   
   what would be the best way to present this simulating looks fake that this system will not work in real device
+
+- <task-notification>
+  <task-id>bhpfyxd81</task-id>
+  <tool-use-id>toolu_01B6Gb9fQp6W1i9erVxqQj78</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/tasks/bhpfyxd81.output</output-file>
+  <status>completed</status>
+  <summary>Background command "Wait for both recorders" completed (exit code 0)</summary>
+  </task-notification>
+
+- <task-notification>
+  <task-id>bfgxbgkf8</task-id>
+  <tool-use-id>toolu_016EBUmhAxW6X5fGaJy7CcT5</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/tasks/bfgxbgkf8.output</output-file>
+  <status>completed</status>
+  <summary>Background command "Wait for recorder round 2" completed (exit code 0)</summary>
+  </task-notification>

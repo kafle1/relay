@@ -32,7 +32,8 @@ const STOP = ZEBRA.to + 0.9;                     // stop line sits BEHIND the cr
 const START = 78 + ROAD_HALF;                    // spawn / despawn distance from the centre
 const GAP = 1.6, SPEED = 14, MAX_CARS = 70;
 
-// vehicle mix — Kathmandu-style: motorcycle-dominant, taxis, few heavy vehicles, rare ambulance.
+// vehicle mix — Kathmandu-style: motorcycle-dominant, taxis, few heavy vehicles. Ambulances are
+// button-only (weight 0).
 // spd = pace multiplier (each vehicle adds its own jitter); cls = detector class when it differs.
 const TYPES = {
   // rot overrides the default 180° model-facing fix; rider puts a human on the saddle
@@ -106,8 +107,9 @@ function buildPoleCams() {
     const along = a.sign * -(STOP + 6);              // a few metres behind the signal head
     const aside = (a.side > 0 ? -1 : 1) * (ROAD_HALF + 4.5);
     const eye = a.axis === 'z' ? [aside, 7.5, along] : [along, 7.5, -aside];
-    const back = a.sign * -(STOP + 38);
-    const look = a.axis === 'z' ? [a.side * ROAD_HALF / 2, 0.5, back] : [back, 0.5, a.side * ROAD_HALF / 2];
+    // aim at the queue's midpoint, slightly below grade — the frame fills with road, not sky
+    const back = a.sign * -(STOP + 30);
+    const look = a.axis === 'z' ? [a.side * ROAD_HALF / 2, -2.5, back] : [back, -2.5, a.side * ROAD_HALF / 2];
     cam.position.set(...eye);
     cam.lookAt(...look);
     poleCams[dir] = cam;
@@ -830,10 +832,13 @@ const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + Math.random() * 2]));
 const rate = (LIVE || LOCKFIX)                    // both A/B panels share the imbalanced demand
   // busy NS, quiet EW — where a fixed timer bleeds green. Held just under NS saturation: past
   // it BOTH controllers drown identically and the honest A/B gap compresses to nothing.
-  ? { N: 1.0, S: 0.9, E: 0.25, W: 0.25 }
+  // NS combined (0.95/s) sits UNDER the two-arm green discharge (~1.1/s) but far OVER the ~50%
+  // share a blind cycle gives it, and EW is a genuine trickle: the fixed side drowns on its own
+  // split and bleeds empty-lane green; R.E.L.A.Y. drains. Past saturation both sides drown
+  // identically and every honest signal (gap AND wasted-green) dies — measured, don't re-hot.
+  ? { N: 0.5, S: 0.45, E: 0.08, W: 0.08 }
   : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));
 let simTime = 0, chaosUntil = 0, density = 1;         // density: user traffic dial (× spawn rate AND × cap)
-let wastedGreen = 0;                                  // s of green served to empty arms while others waited
 const DENSITY_MIN = 0.3, DENSITY_MAX = 2.0;
 const carCap = () => Math.round(MAX_CARS * density);
 // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
@@ -1308,15 +1313,10 @@ function tick() {
   const dt = Math.min(clock.getDelta(), 0.05) || 1e-6;   // duplicate rAF timestamps give dt=0, which breaks the blocked flag
   simTime += dt;
   const fixedLabel = tickSignals(dt);
-  // the pitch, measured live: green seconds served to EMPTY arms while someone waits on red,
-  // counted per arm (an NS green with N busy and S dead wastes half its capacity). The fixed
-  // timer bleeds these on the quiet road; R.E.L.A.Y.'s empty-skip and gap-out keep them low.
-  const greens = DIRS.filter(d => signalOf(d) === 'green');
-  const demand = d => cars.some(c => c.dir === d && c.u > -STOP - 26 && c.u < 2);
-  if (greens.length && DIRS.some(d => !greens.includes(d) && demand(d))) {
-    const empty = greens.filter(d => !demand(d)).length;
-    if (empty) wastedGreen += dt * empty / greens.length;
-  }
+  // NOTE: a live "green wasted on empty lanes" counter was built and killed here twice. In every
+  // reachable regime it inverts: a saturated fixed timer never has an empty served window (reads
+  // 0s), while the adaptive side's min-green transitions honestly accrue a few seconds against
+  // it. The empty-skip claim is carried by the controller's asserted invariant, not a screen stat.
   moveCars(dt);
   peds.tick(dt);
   spawnTick();
@@ -1366,7 +1366,7 @@ function tick() {
     mode: LIVE ? (systemOn ? 'relay' : 'fixed') : 'sim',
     phase: hud.phase.textContent, counts: c, cars: cars.length,
     queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
-    peds: peds.waiting(), density, wastedGreen: Math.round(wastedGreen),
+    peds: peds.waiting(), density,
     topo: TOPO, lanes: LANES,
   };
   requestAnimationFrame(tick);

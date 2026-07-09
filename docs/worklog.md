@@ -69,7 +69,7 @@ APPLY AFTER UI agent releases main.js, then re-verify + commit.
    a. Crop Hanoi 1080p into 4 per-approach feeds (use zones/hanoi.json regions),
       ffmpeg xstack 2x2 labeled mosaic -> footage/hanoi_4cam.mp4; quadrant zones json;
       run src/pipeline.py on the mosaic = 4 real synced camera feeds driving our controller.
-   b. Write docs/aicity-request.md: how the user requests the AI City multi-camera dataset
+   b. Write docs/aicity-request.md: how the user requests the AI City multi-camera dataset (doc since removed — dataset never needed)
       (the only public source of true separate synced junction cams).
 9. CHAOS + ACCIDENT scenarios: buttons — (a) "accident": stop a vehicle mid-junction/lane for N
    seconds (blocks a lane; system must keep serving others; alert banner); (b) "Kathmandu chaos":
