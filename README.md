@@ -95,6 +95,21 @@ tools/
 docs/               research synthesis · design spec · 65-case edge-case register
 ```
 
+## Deploying on a new junction — no training required
+
+One shared detector serves every real camera (vehicles look the same everywhere; the general
+model needs zero per-site training — verified on Thailand, China, and Hanoi junctions unseen
+during development). Per junction, setup is one minute:
+
+```bash
+.venv/bin/python tools/draw_zones.py <camera-or-clip> myjunction.json   # click the approach zones
+.venv/bin/python src/pipeline.py <camera-or-clip> --zones myjunction.json
+```
+
+Optional, once per region (not per junction): fine-tune on local traffic (e.g. South-Asian
+datasets) to sharpen motorcycle detection city-wide with a single set of weights. The only
+training this repo does is for the synthetic feed, whose rendered look isn't in COCO.
+
 ## Honest scope
 
 Working prototype with a credible pilot path — not a deployed product. Signal timing is one proven

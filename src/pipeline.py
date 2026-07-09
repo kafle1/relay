@@ -46,10 +46,9 @@ def main():
     ap.add_argument("--device", default="mps")
     args = ap.parse_args()
 
-    here = os.path.dirname(os.path.abspath(__file__))
     if args.model is None:
-        cands = [os.path.join(here, "..", "dataset", "runs", n, "weights", "best.pt") for n in ("ft_mixed", "ft")]
-        args.model = next((os.path.abspath(p) for p in cands if os.path.exists(p)), "yolo11s.pt")
+        args.model = "yolo11s.pt"   # general model: works on any real junction, zero per-site training.
+                                    # pass --model dataset/runs/ft_mixed/weights/best.pt for the synthetic feed.
     zones = json.load(open(args.zones)) if args.zones else QUADRANTS
     zones = {k: [tuple(p) for p in v] for k, v in zones.items()}
 
