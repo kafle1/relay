@@ -5,11 +5,12 @@ PORT := 8000
 
 .PHONY: dev setup check pipeline compare capture train stop
 
-## make dev — set up (if needed) + start everything: live server, then open the demos
+## make dev — start everything, open the demo, stay in the foreground with live logs (Ctrl-C = stop)
 dev: setup stop
-	@echo "→ starting R.E.L.A.Y. live server on :$(PORT)"
+	@echo "→ starting R.E.L.A.Y. live server on :$(PORT)  (loads the detector, ~10-15s)"
 	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 & echo $$! > /tmp/relay_server.pid
-	@for i in $$(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && break; sleep 1; done
+	@ok=0; for i in $$(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && { ok=1; break; }; sleep 1; done; \
+	if [ $$ok -ne 1 ]; then echo ""; echo "✗ server FAILED to start — log:"; tail -20 /tmp/relay_server.log; exit 1; fi
 	@echo ""
 	@echo "  R.E.L.A.Y. is up:"
 	@echo "    live closed loop   →  http://127.0.0.1:$(PORT)/?live=1"
@@ -18,6 +19,8 @@ dev: setup stop
 	@echo "    free-roam sim      →  http://127.0.0.1:$(PORT)/"
 	@echo ""
 	@open "http://127.0.0.1:$(PORT)/?live=1" 2>/dev/null || true
+	@echo "── live server log (Ctrl-C stops everything) ──"
+	@trap '$(MAKE) stop >/dev/null; echo; echo "stopped."' INT; tail -f /tmp/relay_server.log
 
 setup:
 	@test -d $(VENV) || (echo "→ creating venv + installing deps (first run only)" && \
