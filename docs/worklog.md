@@ -65,3 +65,9 @@ APPLY AFTER UI agent releases main.js, then re-verify + commit.
    in frame, no dead corners; add small physical CCTV camera props on the signal poles.
 7. Exit condition (user asleep, wake-up bar): NOTHING broken — full battery green, judge-agent pass
    with no high-severity findings, all modes screenshot-verified, all commits pushed.
+8. END DELIVERABLE — real 4-camera junction control:
+   a. Crop Hanoi 1080p into 4 per-approach feeds (use zones/hanoi.json regions),
+      ffmpeg xstack 2x2 labeled mosaic -> footage/hanoi_4cam.mp4; quadrant zones json;
+      run src/pipeline.py on the mosaic = 4 real synced camera feeds driving our controller.
+   b. Write docs/aicity-request.md: how the user requests the AI City multi-camera dataset
+      (the only public source of true separate synced junction cams).
