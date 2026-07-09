@@ -119,6 +119,11 @@
 | 33 | "how other countries are doiing this … lalitpur … make our better than that cheap efficient … fullly working in real world" | docs/research/global-landscape.md — SCATS/SCOOT/Surtrac/ATCS + Lalitpur post-mortem + our edge | ✅ |
 | 34 | "every time i say anything in the conversation send to requirements md" / "rename it as all prompts md file" | file renamed `docs/all-prompts.md`; UserPromptSubmit hook auto-appends every prompt to the live log below | ✅ |
 | 35 | "/goal … fix bugs or edge cases … robust not temporary … simplify, no legacy, no over-engineering" | this pass: review fleet over src/ tools/ sim/, findings fixed, cleanup applied | ✅ |
+| 36 | "vehichles are striking with each other … make junction bigger better … must not ever touch or strike" | hard 3-disc separation (cars + pedestrians, never overlap); junction box widened with shoulder margin | ✅ |
+| 37 | "how the fuck are the vehicles moving and turning, fix it to be like real life real physics" | braking envelope v²=2ad into stops and corners, arc speed by lateral-g, per-type acceleration | ✅ |
+| 38 | "make 3d of balkhu point from kalanki road to sanepa … deep research and make 3d of it and we simulate our system there" | OSM-geometry research + corridor scene — real junctions, Bagmati river + bridge, per-junction R.E.L.A.Y. | ◐ |
+| 39 | "deep research list out every single problems … 100s of todos … god mode super speed" | 3-agent review fleet + full findings register, all confirmed issues fixed this session | ✅ |
+| 40 | "why are vehicles moving so slow" / "why are vehicles colliding … not able to do right and left turns properly" / "why are there no pedestrians" / "fix it all" | corner lateral-g raised, wedge-breaker inching (still zero-contact), pedestrians verified on-screen | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
 
@@ -140,3 +145,85 @@
 - make 3d of balkhu point from kalanki road to sanepa there are junctions in dakshinkali road then above the balkhu bridge on side going vayodha hospita and kuleshwor road then sanepa and all so deep research and make 3d of it and we simulate our system there
 
 - do deep research list out every single problems and issues one by one make 100s of todos and make it one by one in god mode super speed
+
+- <ide_selection>The user selected the lines 71 to 71 from /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/README.md:
+  | **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~10–73% less waiting, avg ≈ 36% | reproducible offline benchmark, not the live demo; discharge bounded to physical saturation flow |
+  
+  This may or may not be related to the current task.</ide_selection>
+  why are vehicles moving so slow
+
+- <ide_selection>The user selected the lines 71 to 71 from /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/README.md:
+  | **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~10–73% less waiting, avg ≈ 36% | reproducible offline benchmark, not the live demo; discharge bounded to physical saturation flow |
+  
+  This may or may not be related to the current task.</ide_selection>
+  why are vehicles colliding with each other and why are they not able to do right and left turns properly
+
+- <ide_selection>The user selected the lines 71 to 71 from /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/README.md:
+  | **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~10–73% less waiting, avg ≈ 36% | reproducible offline benchmark, not the live demo; discharge bounded to physical saturation flow |
+  
+  This may or may not be related to the current task.</ide_selection>
+  why are there no pedestrians
+
+- fix it all
+
+- Goal: Identify and fix bugs or edge cases.
+  
+  Rules:
+  - Understand the root cause of the bug before fixing (not just symptoms).
+  - Write minimal, targeted fixes — don’t introduce new complexity.
+  - Add/adjust tests to cover the fixed bug and edge cases.
+  - Double-check that fixes don’t break other parts of the system.
+  - this will be your flow: understand, plan, fix, test, cleanup
+  - Clean up any temporary or redundant code after fixing.
+  - rather than fixing and ptaching things later do not let that thing happen in the first place so that later patch thing is not needed and we can remove it completely
+  every line must be written by senior human developer, not by ai by just adding random lines even if its not that necessary, ai does over complicating things i dont need that
+  also make sure there is no runtime and build issues at the end
+  YOU ARE NOT STOPPING AT ANY COST UNTIL EVERYTHING IS DONE COMPLETELY 
+  you have access to litterally everything you need
+  completey fix this issue from the whole system i should never get this error, fix it permanently
+  your fixes must not be temporary patches, it must be robust solution to wider range of that issue covering all cases
+  while fixing whatever i say, think from your brain too what are the edge cases and what other bugs can be there and fix it
+  
+  in the name of fixing dont overcomplicate things it must be simplified
+  at the end recheck is 100% done from your side if not do it and do not stop until then
+  do all and do not stop until all done idc 50k line is changed
+  make max use of subagents
+  
+  if you feel stuck then do more deep dive research on the internet and everywhere possible,what are making is made by someone already what every single problem we facing is fixed by other keep research ing keep improving and keep testing until we hit rockbottom
+
+- <task-notification>
+  <task-id>a929c5f45acc01c6b</task-id>
+  <tool-use-id>toolu_019quy8jn6Eioy84LtZdky38</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/c6b51e12-fd00-498e-9807-f793ec3fffc8/tasks/a929c5f45acc01c6b.output</output-file>
+  <status>completed</status>
+  <summary>Agent "Review perception+pipeline" finished</summary>
+  <note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+  <result>Reviewed both files in full. Findings below in the requested format (absolute paths).
+  
+  **HIGH**
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/perception.py:50` | high | `self.model.names.get(cls_id, "")` calls the dict-only `.get()` method on `model.names`, which ultralytics returns as a plain `list` for some model/checkpoint/version combos. | Loading a YOLO model where `model.names` is a list (common with torch.hub-loaded or older-ultralytics checkpoints) raises `AttributeError: 'list' object has no attribute 'get'` on the first frame that has any detection at all, uncaught (outside the `try/except` that only wraps `model.predict`), killing the whole run.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:58` | high | Same dict-vs-list assumption, but here it fires before the video even opens: `model.names.values()`. | If `model.names` is a list, `AttributeError` is thrown immediately after `YOLO(args.model)` loads, so the script never processes a single frame.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:94` (root cause at 78-81) | high | `ok, frame = cap.read()` is checked only via `ok`; `frame` itself is never checked for `None` before `ov = frame.copy()`. | OpenCV can return `ok=True, frame=None` on a corrupted frame or dropped RTSP packet. `percep.read()` safely swallows its internal exception and returns cached counts, but the next line, `frame.copy()`, throws `AttributeError: 'NoneType' object has no attribute 'copy'` and crashes the whole pipeline — despite the module's own docstring claiming "corrupt-frame tolerance."
+  
+  **MEDIUM**
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/perception.py:51-54` | medium | The COCO-id fallback re-labels any fine-tuned class not present in `PCU` by looking up its numeric id against the *unrelated* stock-COCO id table (`COCO = {1:"bicycle",2:"car",3:"motorcycle",5:"bus",7:"truck"}`), instead of dropping it. | A fine-tuned 7-class model (car/motorcycle/bus/truck/ambulance/bicycle/autorickshaw — all already in `PCU`) that adds one extra class (e.g. "person"/"unknown") at id 2 gets that detection silently relabeled "car" purely by id coincidence, quietly inflating counts/PCU pressure on that approach instead of being ignored.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:71` (and 115) | medium | `cv2.VideoWriter(...)` return value is never checked with `.isOpened()` (unlike `cap`, which is checked at line 66). | If the `mp4v` fourcc is unavailable on the platform, or `--out` points at a non-existent directory, `out.write(frame)` silently no-ops for every frame, yet the script still prints `annotated: out_path` at the end as if a valid video was produced.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:78-80` | medium | A single failed `cap.read()` is treated identically to end-of-video and permanently ends processing — no reconnect/retry for live streams. | Against a live RTSP feed (an explicitly supported input per the module docstring), one transient network hiccup sets `ok=False` for a frame, and the loop `break`s for good — the signal controller stops updating for the rest of the session instead of skipping just the bad frame.
+  
+  **LOW / PLAUSIBLE**
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/perception.py:19-26` (used at line 60) | low | `point_in_poly` on a zone with fewer than 3 points always returns `False` (a 1- or 2-point "polygon" degenerates into testing the same edge twice, which cancels the parity flip), so a misconfigured zone silently never registers any vehicle. | A `zones.json` approach with a typo'd single-point or 2-point polygon passes the `if poly` truthy check and compiles fine, but that approach permanently reads zero vehicles with no warning (aging/max-wait in the controller can still eventually force-serve it, but real demand there is never seen).
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:69` | low | `w, h` are read once via `cap.get(CAP_PROP_FRAME_WIDTH/HEIGHT)` before any frame is fetched; some RTSP/live sources report `0` until the stream actually connects. | Against such a stream, `w,h = 0,0` and `cv2.VideoWriter(..., (0,0))` is created with a degenerate size, producing a broken/empty output video with no error surfaced.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/perception.py:45,58-61` | low | `h, w = frame.shape[:2]` runs unconditionally right after the `try/except` that only guards `model.predict`; if predict somehow succeeds on a zero-height/width frame and still emits boxes, `x1/w` / `.../h` divides by zero. | Unlikely in practice since a 0-dim frame would normally also fail YOLO preprocessing and get caught by the same `try/except`, but if a given backend tolerates it, this throws `ZeroDivisionError` outside the guarded block.
+  
+  `/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/src/pipeline.py:68,77` | low | `fps = cap.get(cv2.CAP_PROP_FPS) or 25` only guards falsy/zero, not a negative or nonsensical value some broken camera drivers report. | A driver returning `fps = -1` passes the `or` unchanged (truthy), so `int(args.max_seconds * fps)` goes negative and the `while n &lt; ...` loop exits immediately after processing 0 frames, with no diagnostic explaining why the output is empty.</result>
+  <usage><subagent_tokens>50346</subagent_tokens><tool_uses>3</tool_uses><duration_ms>247623</duration_ms></usage>
+  </task-notification>

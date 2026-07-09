@@ -56,6 +56,7 @@ const APPROACH = {
 if (TOPO === 'T') { delete APPROACH.W; APPROACH.E.group = 'E'; }
 if (TOPO === '2') { delete APPROACH.E; delete APPROACH.W; }
 const DIRS = Object.keys(APPROACH);
+const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };  // oncoming approach (arm may be absent on T/2 topologies)
 const GROUPS = [...new Set(DIRS.map(d => APPROACH[d].group))];
 const laneOff = (dir, lane) => APPROACH[dir].side * ((lane + 0.5) * LANE_W);
 const hasRoad = (axis, s) =>                     // does a road arm exist on this side of the centre?
@@ -437,6 +438,7 @@ function pickType() {
 }
 
 const cars = [];
+window.__relay = { cars };                       // console/debug handle (read-only use)
 // route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
 function planRoute(dir, lane) {
   const options = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
@@ -446,6 +448,9 @@ function planRoute(dir, lane) {
   let move = options[0][0], arm = options[0][1];
   for (const [m, a] of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; arm = a; break; } }
   if (move === 'straight') return null;
+  // lane discipline: right turns only from the kerb lane, left turns only from the inner lane —
+  // a turn from any other lane sweeps across its neighbours' straight paths
+  if (lane !== (move === 'right' ? LANES - 1 : 0)) return null;
 
   // tangent quarter-circle between the entry lane line and the exit lane line
   const a = APPROACH[dir], exit = ARM[arm];
@@ -455,9 +460,15 @@ function planRoute(dir, lane) {
   const ex = exit.out;                                    // exit travel sign on the perp axis
   const ez = -a.sign;                                     // approach side of the exit line
   const rotSign = Math.sign(ex * ez);
+  // rotSign orients the arc's position math only. world() swaps x/z for E/W entries — a
+  // reflection, which mirrors handedness — so mesh yaw must come from the real entry→exit
+  // heading change, never from rotSign (that spun E/W turners backwards through the arc).
+  const dYaw = ARM[arm].rotY - a.rotY;
+  const yawSign = Math.sign(Math.atan2(Math.sin(dYaw), Math.cos(dYaw)));
   return {
+    crossing: move === 'left',                            // wide arc across the oncoming flow → must yield
     uA: o2 / a.sign - r,                                  // arc begins here (u-space)
-    arcLen: r * Math.PI / 2, r, ex, rotSign,
+    arcLen: r * Math.PI / 2, r, ex, rotSign, yawSign,
     Cperp: o1 + r * ex, Calong: o2 + r * ez, o2,
     exitStartPerp: o1 + ex * r,
     entryRotY: a.rotY, exitRotY: ARM[arm].rotY,
@@ -474,7 +485,7 @@ function poseOf(c, u) {                                   // pure pose: movement
   if (r && u >= r.uA) {                                   // on the arc
     const th = (u - r.uA) / r.r;
     const [x, z] = world(r.Cperp - r.ex * r.r * Math.cos(th), r.Calong + r.rotSign * -r.ex * r.r * Math.sin(th));
-    return { x, z, ry: r.entryRotY - r.rotSign * th };
+    return { x, z, ry: r.entryRotY + r.yawSign * th };
   }
   const [x, z] = world(laneOff(c.dir, c.lane), a.sign * u); // straight approach
   return { x, z, ry: a.rotY };
@@ -497,6 +508,7 @@ function addCar(dir, u, forcedType) {
   if (T.rider && riderTemplate) {
     const rider = cloneSkinned(riderTemplate);           // skinned model: plain .clone() renders at origin
     rider.position.y = 0.55;                             // on the saddle
+    rider.traverse(o => { o.frustumCulled = false; });   // skinned bind-pose bounds mis-cull riders off-screen
     mesh.add(rider);
   }
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(T.len * 0.9, T.len * 1.25), blobMat);
@@ -553,37 +565,66 @@ function moveCars(dt) {
         const c = list[i], before = c.u;
         if (c.accident > 0) { c.accident -= dt; c.blocked = true; c.vel = 0; continue; }
         let target = c.u + c.speed * dt;
+        let stopDist = Infinity;         // distance to the nearest thing worth braking for
         const stopAt = -STOP - c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
-        if (held && c.u <= stopAt + 0.01) target = Math.min(target, stopAt);
-        // don't enter a packed box even on green ("do not block the junction")
-        if (!held && c.u <= stopAt + 0.01 && boxCount > 2 * LANES + 3) target = Math.min(target, stopAt);
+        // held → red or someone on our zebra; else don't enter a packed box ("do not block the junction")
+        if (c.u <= stopAt + 0.01 && (held || boxCount >= LANES + 2)) {
+          target = Math.min(target, stopAt);
+          stopDist = stopAt - c.u;
+        }
         const leader = list[i + 1];
-        if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
+        if (leader) {
+          const wall = leader.u - (c.len + leader.len) / 2 - GAP;
+          target = Math.min(target, wall);
+          stopDist = Math.min(stopDist, wall - c.u);
+        }
+        // gap acceptance: a left-turner's arc crosses the oncoming flow — wait at the line for a
+        // real gap. Without this, opposing streams wedge head-on mid-box and no-overlap makes the
+        // knot permanent (this, not vehicle speed, is what freezes the whole junction).
+        if (c.route?.crossing && c.u <= stopAt + 0.01 && target > stopAt) {
+          for (const o of cars) {
+            if (o.dir !== OPP[c.dir]) continue;
+            const oStop = -STOP - o.len / 2;
+            const committed = o.u > oStop + 0.01 && o.u < ROAD_HALF + 4;    // already in/near the box
+            const incoming = o.u <= oStop + 0.01 && oStop - o.u < 12 && (o.vel ?? 0) > 2;
+            if (committed || incoming) { target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
+          }
+        }
         if (target > c.u && c.u > stopAt && vehicleAhead(c)) {
           const wasStuck = c.stuck || 0;
           // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles
           if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) { target = c.u + c.speed * 0.4 * dt; c.vel = Math.max(c.vel ?? 0, c.speed * 0.4); }
           else target = c.u;
+          stopDist = Math.min(stopDist, target - c.u);
           c.stuck = wasStuck + dt;
         } else if (target > c.u) {
           c.stuck = 0;
         }
-        // real driving envelope: v² = 2·a·d braking, slow into corners, accelerate out
+        // real driving envelope: v² = 2·a·d braking toward the CONSTRAINT (stop line / leader),
+        // never toward this frame's kinematic step — that capped free cars at √(2·a·v·dt) ≈ 1.6 m/s
         const allowed = Math.max(0, target - c.u);
-        let vMax = Math.min(c.speed, Math.sqrt(2 * 5.5 * allowed));   // never outrun the stopping distance
+        let vMax = Math.min(c.speed, Math.sqrt(2 * 5.5 * Math.max(0, stopDist)));
         const rt = c.route;
         if (rt && c.u < rt.uA + rt.arcLen) {
-          const vArc = Math.sqrt(2.2 * rt.r);                         // comfortable lateral g through the arc
+          const vArc = Math.sqrt(3.4 * rt.r);                         // brisk-but-real lateral g through the arc
           vMax = Math.min(vMax, c.u >= rt.uA ? vArc : Math.sqrt(vArc * vArc + 11 * (rt.uA - c.u)));
         }
         const acc = c.type === 'bus' || c.type === 'truck' ? 3.5 : 6.5;
         c.vel = (c.vel ?? 0) < vMax ? Math.min(vMax, (c.vel ?? 0) + acc * dt) : Math.max(vMax, c.vel - 8 * dt);
         let adv = Math.min(allowed, c.vel * dt);
         if (adv > 1e-4) {
+          const now = minGapAt(c, c.u, walkers);
           const next = minGapAt(c, c.u + adv, walkers);
-          // would close in on someone below the safety gap → hold (still free to slide APART)
-          if (next < SEP && next < minGapAt(c, c.u, walkers)) { adv = 0; c.vel = 0; }
+          // three tiers, all zero-contact: normal keeps SEP daylight; a stuck driver inches while not
+          // worsening anyone's gap; the single longest-stuck driver squeezes past to break a knot.
+          const wedged = (c.stuck || 0) > 4 && (c.stuck || 0) >= maxStuck - 1e-6;
+          const inching = (c.stuck || 0) > 1.5;
+          if (wedged || inching) adv = Math.min(adv, c.speed * 0.25 * dt);
+          const blockedNow = wedged ? next < 0.02
+                           : inching ? next < 0.06 && next < now
+                           : next < SEP && next < now;
+          if (blockedNow) { adv = 0; c.vel = 0; c.stuck = (c.stuck || 0) + dt; }
         }
         c.u += adv;
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
@@ -592,9 +633,13 @@ function moveCars(dt) {
     }
   }
   for (let i = cars.length - 1; i >= 0; i--) {
-    if (cars[i].u > START) {
-      cars[i].mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
-      scene.remove(cars[i].mesh);
+    const c = cars[i];
+    // ponytail: wedged >30s in the box → towed away (real knots get untangled by traffic police);
+    // guarantees gridlock always clears — upgrade path is true multi-car negotiation
+    const towed = (c.stuck || 0) > 30 && inBox(c) && !(c.accident > 0);
+    if (c.u > START || towed) {
+      c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
+      scene.remove(c.mesh);
       cars.splice(i, 1);
     }
   }
