@@ -800,19 +800,52 @@ function button(label, onClick, id) {
 function scenarioPanel() {
   const p = document.createElement('div');
   p.className = 'relay-scenario';
-  for (const d of DIRS) p.appendChild(button('🚑 ' + d, () => addCar(d, -START, 'ambulance'), 'amb-' + d));
+  const scBody = document.createElement('div');
+  scBody.className = 'sc-body glass';
+  const scBtn = button('⚡ scenarios ▾', () => {
+    scBtn.textContent = scBody.classList.toggle('open') ? '⚡ scenarios ▴' : '⚡ scenarios ▾';
+  });
+
+  const ambCap = document.createElement('div');
+  ambCap.className = 'sc-cap'; ambCap.textContent = 'ambulance green-wave:';
+  scBody.appendChild(ambCap);
+  for (const d of DIRS) {
+    const b = button('🚑 ' + d, () => addCar(d, -START, 'ambulance'), 'amb-' + d);
+    b.classList.add('half');
+    scBody.appendChild(b);
+  }
+
+  const surgeCap = document.createElement('div');
+  surgeCap.className = 'sc-cap'; surgeCap.textContent = 'surge an approach:';
+  scBody.appendChild(surgeCap);
   const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => addCar(d, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
-  for (const d of DIRS) p.appendChild(button('surge ' + d, () => surge(d)));
-  p.appendChild(button('💥 accident', () => {
+  for (const d of DIRS) {
+    const b = button('surge ' + d, () => surge(d));
+    b.classList.add('half');
+    scBody.appendChild(b);
+  }
+
+  const eventsCap = document.createElement('div');
+  eventsCap.className = 'sc-cap'; eventsCap.textContent = 'events:';
+  scBody.appendChild(eventsCap);
+  const accidentBtn = button('💥 accident', () => {
     const victim = cars.find(c => c.u > -STOP - 8 && c.u < ROAD_HALF);
     if (victim) { victim.accident = 12; victim.stuck = 0; }
-  }));
-  p.appendChild(button('🌀 chaos ×3', () => { chaosUntil = simTime + 30; }));
+  });
+  accidentBtn.classList.add('half');
+  scBody.appendChild(accidentBtn);
+  const chaosBtn = button('🌀 chaos ×3', () => { chaosUntil = simTime + 30; });
+  chaosBtn.classList.add('half');
+  scBody.appendChild(chaosBtn);
+
+  const dialCap = document.createElement('div');
+  dialCap.className = 'sc-cap'; dialCap.textContent = 'traffic volume:';
+  scBody.appendChild(dialCap);
 
   // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
   // (no cars vanish mid-road); increasing fills toward the higher cap.
   const dial = document.createElement('div');
-  dial.className = 'relay-dial';
+  dial.className = 'relay-dial full';
   const readout = document.createElement('span');
   readout.className = 'dval';
   const showDensity = () => { readout.textContent = 'traffic ×' + density.toFixed(2).replace(/0$/, ''); };
@@ -835,8 +868,9 @@ function scenarioPanel() {
   dial.appendChild(readout);
   dial.appendChild(button('+ traffic', () => bump(0.25)));
   showDensity();
-  p.appendChild(dial);
+  scBody.appendChild(dial);
 
+  p.append(scBtn, scBody);
   document.body.appendChild(p);
   junctionPanel();
 }
@@ -914,8 +948,14 @@ function injectStyles() {
     padding:9px 18px; border-radius:10px; border:1px solid rgba(255,255,255,.25);
     animation:relay-flash 1s steps(1,end) infinite; }
   @keyframes relay-flash{ 0%,100%{box-shadow:0 6px 24px rgba(255,59,48,.55)} 50%{box-shadow:0 4px 10px rgba(255,59,48,.2)} }
-  .relay-scenario{ position:fixed; top:14px; right:14px; z-index:11; display:flex; gap:6px; flex-wrap:wrap;
-    max-width:264px; justify-content:flex-end; }
+  .relay-scenario{ position:fixed; top:14px; right:14px; z-index:11; display:flex; flex-direction:column;
+    gap:7px; align-items:flex-end; }
+  .sc-body{ display:none; padding:10px; width:238px; flex-wrap:wrap; gap:6px; }
+  .sc-body.open{ display:flex; }
+  .sc-body .full{ flex-basis:100%; }
+  .sc-body .half{ flex:1 1 44%; }
+  .sc-cap{ flex-basis:100%; color:var(--muted); font:10px ui-monospace,monospace; letter-spacing:.05em;
+    text-transform:uppercase; margin-top:2px; }
   .relay-dial{ display:flex; gap:6px; align-items:center; }
   .relay-dial .dval{ min-width:82px; text-align:center; color:var(--txt); font:600 12px ui-monospace,monospace;
     font-variant-numeric:tabular-nums; }
