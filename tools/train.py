@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Fine-tune YOLO on the auto-labeled sim dataset to close the synthetic-render gap.
-Usage: .venv/bin/python tools/train.py [epochs] [imgsz] [device]
+Usage: .venv/bin/python tools/train.py [epochs] [imgsz] [device] [run_name]
 """
 import glob, os, random, sys
 import torch

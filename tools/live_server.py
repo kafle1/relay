@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 from controller import Controller, four_way, Timings, PCU, junction_from_dirs  # noqa: E402
 from microsim import FixedTimer, poisson                                       # noqa: E402
-from perception import CONF                                                    # noqa: E402  per-class confidence gates
+from perception import CONF, point_in_poly                                     # noqa: E402  shared with the offline pipeline
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
 DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
@@ -43,18 +43,6 @@ DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 # ~100-300ms per frame — with several tabs open the server starved to death), single worker because
 # concurrent predict() on one model isn't thread-safe. Extra clients queue here, loop stays live.
 INFER = ThreadPoolExecutor(max_workers=1)
-
-
-def point_in_poly(x, y, poly):
-    inside = False
-    n = len(poly)
-    j = n - 1
-    for i in range(n):
-        xi, yi = poly[i]; xj, yj = poly[j]
-        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / ((yj - yi) or 1e-9) + xi):
-            inside = not inside
-        j = i
-    return inside
 
 
 class LiveCompare:

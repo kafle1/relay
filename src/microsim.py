@@ -9,7 +9,7 @@ Run `python src/microsim.py` to print the measured wait-time reduction.
 import math
 import random
 from collections import deque
-from controller import Controller, Junction, four_way, Timings
+from controller import Controller, four_way, Timings
 
 SAT = 0.55   # vehicles discharged per second per approach while green (≈1.8s saturation headway)
 

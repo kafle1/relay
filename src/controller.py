@@ -45,16 +45,6 @@ def four_way():
     return Junction(["N", "S", "E", "W"], {"NS": ["N", "S"], "EW": ["E", "W"]})
 
 
-def three_way_T():
-    # T: through road N-S plus a stem E. Conflict-free phases: N-S through, or E turning.
-    return Junction(["N", "S", "E"], {"NS": ["N", "S"], "E": ["E"]})
-
-
-def two_way():
-    # a signalized crossing on one road (e.g. pedestrian/side access) — one vehicle phase.
-    return Junction(["N", "S"], {"NS": ["N", "S"]})
-
-
 def junction_from_dirs(dirs):
     """Build a conflict-free Junction from whichever approaches a camera can see (2/3/4-arm)."""
     dirs = set(dirs)
@@ -348,13 +338,11 @@ def demo():
 
     # invariant: never two conflicting greens; never green->green without yellow+all-red between
     c = Controller(four_way(), T)
-    prev_phase, prev_stage = c.phase, c.stage
     saw_clearance = True
     def feed_full(_):  # everyone busy
         return {"N": {"car": 5}, "S": {"car": 5}, "E": {"car": 5}, "W": {"car": 5}}
     hist = _run(c, feed_full, steps=400)
-    greens = set()
-    switches, clean_switches = 0, 0
+    switches = 0
     last = hist[0]
     for h in hist[1:]:
         # only one phase's approaches ever green at once → conflict-free by construction, assert stage sanity
@@ -392,11 +380,9 @@ def demo():
     # invariant: MIN-GREEN honored — a green phase always lasts >= min_green
     c = Controller(four_way(), T)
     hist = _run(c, feed_full, dt=0.5, steps=600)
-    run_len, cur, viol = 0.0, hist[0]["phase"] + hist[0]["stage"], False
     green_durations = []
     dur = 0.0
     for h in hist:
-        key = h["phase"] + h["stage"]
         if h["stage"] == "GREEN":
             dur += 0.5
         else:

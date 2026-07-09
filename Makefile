@@ -8,7 +8,7 @@ PORT := 8000
 ## make dev — start everything, open the demo, stay in the foreground with live logs (Ctrl-C = stop)
 dev: setup stop
 	@echo "→ starting R.E.L.A.Y. live server on :$(PORT)  (loads the detector, ~10-15s)"
-	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 & echo $$! > /tmp/relay_server.pid
+	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 &
 	@ok=0; for i in $$(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && { ok=1; break; }; sleep 1; done; \
 	if [ $$ok -ne 1 ]; then echo ""; echo "✗ server did not come up in 60s — log:"; tail -20 /tmp/relay_server.log; \
 	echo "   (try: make stop && make dev)"; exit 1; fi
@@ -50,7 +50,7 @@ compare:
 
 ## make capture N=300 — dump N auto-labeled training frames from the sim (via the live server)
 capture: setup stop
-	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 & echo $$! > /tmp/relay_server.pid
+	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 &
 	@for i in $$(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && break; sleep 1; done
 	@open "http://127.0.0.1:$(PORT)/?capture=$(or $(N),300)"
 
