@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -31,7 +32,9 @@ const GAP = 1.6, SPEED = 14, MAX_CARS = 70;
 // vehicle mix — Kathmandu-style: motorcycle-dominant, taxis, few heavy vehicles, rare ambulance.
 // spd = pace multiplier (each vehicle adds its own jitter); cls = detector class when it differs.
 const TYPES = {
-  motorcycle: { files: ['polypizza_motorcycle.glb', 'polypizza_scooter.glb'], len: 2.1, weight: 0.50, spd: 1.15 },
+  // rot overrides the default 180° model-facing fix; rider puts a human on the saddle
+  // per-file facing fix: the two bike models ship with opposite native orientations
+  motorcycle: { files: [['polypizza_motorcycle.glb', 0], ['polypizza_scooter.glb', Math.PI]], len: 2.1, weight: 0.50, spd: 1.15, rider: true },
   car:        { files: ['kenney_sedan.glb', 'kenney_sedan-sports.glb', 'kenney_hatchback-sports.glb', 'kenney_suv.glb', 'kenney_suv-luxury.glb', 'kenney_van.glb'], len: 4.2, weight: 0.20, spd: 1.0 },
   taxi:       { files: ['kenney_taxi.glb'], len: 4.2, weight: 0.12, spd: 1.0, cls: 'car' },
   truck:      { files: ['kenney_truck.glb', 'kenney_delivery.glb', 'kenney_garbage-truck.glb', 'kenney_truck-flat.glb'], len: 6, weight: 0.06, spd: 0.82 },
@@ -55,6 +58,20 @@ const laneOff = (dir, lane) => APPROACH[dir].side * ((lane + 0.5) * LANE_W);
 const hasRoad = (axis, s) =>                     // does a road arm exist on this side of the centre?
   axis === 'z' ? true : TOPO === '4' || (TOPO === 'T' && s === 1);
 
+// turning: which arm a vehicle exits through, per approach and movement (right-hand traffic)
+const EXITS = {
+  N: { straight: 'S', right: 'W', left: 'E' },
+  S: { straight: 'N', right: 'E', left: 'W' },
+  E: { straight: 'W', right: 'N', left: 'S' },
+  W: { straight: 'E', right: 'S', left: 'N' },
+};
+const ARM = {                                     // world-side data for exits (independent of APPROACH deletions)
+  N: { axis: 'z', out: +1, side: -1, rotY: Math.PI },
+  S: { axis: 'z', out: -1, side: +1, rotY: 0 },
+  E: { axis: 'x', out: +1, side: +1, rotY: -Math.PI / 2 },
+  W: { axis: 'x', out: -1, side: -1, rotY: Math.PI / 2 },
+};
+
 // ─────────────────────────── renderer / scene ───────────────────────────
 const canvas = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -69,15 +86,38 @@ scene.fog = new THREE.Fog(0x9ab4cc, 200, 420);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 
 const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 800);
-camera.position.set(26, 28, 38);                 // elevated pole-cam, CCTV-like
+camera.position.set(26, 28, 38);                 // elevated overview
 camera.lookAt(0, -1, 2);
 
+// view modes: single overview, or one pole-mounted CCTV per approach (how a real deployment sees)
+let camMode = P.get('cam') === 'cctv' ? 'cctv' : 'overview';
+const poleCams = {};
+function buildPoleCams() {
+  for (const dir of DIRS) {
+    const a = APPROACH[dir];
+    const cam = new THREE.PerspectiveCamera(52, 1, 0.1, 400);
+    const along = a.sign * -(STOP + 6);              // a few metres behind the signal head
+    const aside = (a.side > 0 ? -1 : 1) * (ROAD_HALF + 4.5);
+    const eye = a.axis === 'z' ? [aside, 7.5, along] : [along, 7.5, -aside];
+    const back = a.sign * -(STOP + 38);
+    const look = a.axis === 'z' ? [a.side * ROAD_HALF / 2, 0.5, back] : [back, 0.5, a.side * ROAD_HALF / 2];
+    cam.position.set(...eye);
+    cam.lookAt(...look);
+    poleCams[dir] = cam;
+  }
+}
+buildPoleCams();
+
 let controls = null;
-if (!CAP && !LIVE) {                             // free-roam only; live/capture keep the canonical pose
+if (!CAP) {                                      // drag anywhere except capture (training needs one fixed pose)
   controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
+  // in live mode the detector's zones depend on the camera — recompute them after every drag
+  controls.addEventListener('end', () => {
+    if (LIVE && wsOpen) ws.send(JSON.stringify({ type: 'zones', zones: computeZones() }));
+  });
 }
 
 scene.add(new THREE.HemisphereLight(0xcfe0f0, 0x5a604e, 0.5));
@@ -209,6 +249,25 @@ function buildWorld() {
   }
   mergedBoxes(trunks, MAT.trunk);
   mergedBoxes(crowns, MAT.leaves);
+
+  // floating N/S/E/W markers over each arm so you always know which approach is which
+  for (const dir of DIRS) {
+    const arm = ARM[dir];
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgba(15,18,22,0.75)';
+    g.beginPath(); g.arc(64, 64, 56, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#7dd3fc';
+    g.font = '700 72px ui-monospace, monospace';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(dir, 64, 68);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
+    sprite.scale.setScalar(4.5);
+    const d = R + 18;
+    sprite.position.set(arm.axis === 'x' ? arm.out * d : 0, 10, arm.axis === 'z' ? arm.out * d : 0);
+    scene.add(sprite);
+  }
 }
 buildWorld();
 
@@ -291,7 +350,7 @@ const blobMat = (() => {
   return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false });
 })();
 
-function normalize(root, targetLen) {
+function normalize(root, targetLen, rot = Math.PI) {
   let bb = new THREE.Box3().setFromObject(root), size = new THREE.Vector3();
   bb.getSize(size);
   if (size.x > size.z) root.rotation.y = Math.PI / 2;    // put the length along Z
@@ -303,19 +362,31 @@ function normalize(root, targetLen) {
   const pivot = new THREE.Group();
   pivot.add(root);
   pivot.scale.setScalar(targetLen / Math.max(size.x, size.z));
-  pivot.rotation.y = Math.PI;                            // models face -Z; our forward is +u
+  pivot.rotation.y = rot;                                // most models face -Z; bikes already face +Z
   return pivot;
 }
 
+let riderTemplate = null;                                // human for the bike saddles
 async function loadModels() {
   const load = url => new Promise((res, rej) => loader.load(url, g => res(g.scene), undefined, rej));
   for (const [type, cfg] of Object.entries(TYPES)) {
     pools[type] = [];
-    for (const f of cfg.files) {
-      try { pools[type].push(normalize(await load('assets/models/' + f), cfg.len)); }
+    for (const entry of cfg.files) {
+      const [f, rot] = Array.isArray(entry) ? entry : [entry, cfg.rot];
+      try { pools[type].push(normalize(await load('assets/models/' + f), cfg.len, rot)); }
       catch { console.warn('model failed to load:', f); }
     }
   }
+  try {
+    const man = await load('assets/models/polypizza_pedestrian_man.glb');
+    const bb = new THREE.Box3().setFromObject(man), size = new THREE.Vector3();
+    bb.getSize(size);
+    man.scale.setScalar(1.55 / size.y);                  // seated-human height
+    const ctr = new THREE.Vector3();
+    bb.getCenter(ctr);
+    man.position.set(-ctr.x * man.scale.x, 0, -ctr.z * man.scale.z);
+    riderTemplate = man;
+  } catch { console.warn('rider model missing — bikes ride themselves'); }
   ready = Object.values(pools).some(p => p.length);
 }
 
@@ -326,8 +397,37 @@ function pickType() {
 }
 
 const cars = [];
+// route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
+function planRoute(dir, lane) {
+  const options = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
+  if (!options.length) return null;
+  const weights = { straight: 0.55, right: 0.2, left: 0.25 };
+  let r = Math.random() * options.reduce((s, [m]) => s + weights[m], 0);
+  let move = options[0][0], arm = options[0][1];
+  for (const [m, a] of options) { r -= weights[m]; if (r <= 0) { move = m; arm = a; break; } }
+  if (move === 'straight') return null;                  // no pivot needed
+  const exit = ARM[arm];
+  const exitPerp = -exit.side * ((lane + 0.5) * LANE_W); // outgoing lane of the exit arm
+  const a = APPROACH[dir];
+  return { pivotU: exitPerp / a.sign, exitAxis: exit.axis, exitSign: exit.out, exitPerp, exitRotY: ARM[arm].rotY };
+}
+const lerpAngle = (a, b, t) => {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+};
 function placeCar(c) {
-  const a = APPROACH[c.dir], along = a.sign * c.u, off = laneOff(c.dir, c.lane);
+  const a = APPROACH[c.dir];
+  if (c.route && c.u >= c.route.pivotU) {                // past the pivot: on the exit arm
+    const r = c.route, out = laneOff(c.dir, c.lane), travelled = r.exitSign * (c.u - r.pivotU);
+    if (r.exitAxis === 'x') c.mesh.position.set(out + travelled, 0, r.exitPerp);
+    else c.mesh.position.set(r.exitPerp, 0, out + travelled);
+    const swing = Math.min(1, (c.u - r.pivotU) / 3);     // ease through the corner, no snap
+    c.mesh.rotation.y = lerpAngle(APPROACH[c.dir].rotY, r.exitRotY, swing);
+    return;
+  }
+  const along = a.sign * c.u, off = laneOff(c.dir, c.lane);
   if (a.axis === 'z') c.mesh.position.set(off, 0, along);
   else c.mesh.position.set(along, 0, off);
 }
@@ -340,12 +440,18 @@ function addCar(dir, u, forcedType) {
   if (cars.some(c => c.dir === dir && c.lane === lane && Math.abs(c.u - u) < (c.len + T.len) / 2 + GAP)) return;
   const mesh = new THREE.Group();
   mesh.add(pool[(Math.random() * pool.length) | 0].clone(true));
+  if (T.rider && riderTemplate) {
+    const rider = cloneSkinned(riderTemplate);           // skinned model: plain .clone() renders at origin
+    rider.position.y = 0.55;                             // on the saddle
+    mesh.add(rider);
+  }
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(T.len * 0.9, T.len * 1.25), blobMat);
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.02;
   mesh.add(blob);
   mesh.rotation.y = APPROACH[dir].rotY;
-  const c = { dir, u, lane, mesh, len: T.len, type, speed: SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3) };
+  const c = { dir, u, lane, mesh, len: T.len, type, route: planRoute(dir, lane),
+              speed: SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3) };
   placeCar(c);
   scene.add(mesh);
   cars.push(c);
@@ -366,6 +472,7 @@ function moveCars(dt) {
         if (held && c.u <= stopAt + 0.01) target = Math.min(target, stopAt);
         const leader = list[i + 1];
         if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
+        if (target > c.u && c.u > stopAt && vehicleAhead(c)) target = c.u;   // in the box: yield, never overlap
         c.u = Math.max(c.u, target);
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
         placeCar(c);
@@ -375,6 +482,19 @@ function moveCars(dt) {
   for (let i = cars.length - 1; i >= 0; i--) {
     if (cars[i].u > START) { scene.remove(cars[i].mesh); cars.splice(i, 1); }
   }
+}
+
+function vehicleAhead(c) {
+  const p = c.mesh.position, ry = c.mesh.rotation.y;
+  const hx = -Math.sin(ry), hz = -Math.cos(ry);          // unit heading on the ground plane
+  for (const o of cars) {
+    if (o === c) continue;
+    const dx = o.mesh.position.x - p.x, dz = o.mesh.position.z - p.z;
+    const ahead = dx * hx + dz * hz;                     // along my heading
+    const beside = Math.abs(dx * hz - dz * hx);          // lateral offset
+    if (ahead > 0 && ahead < (c.len + o.len) / 2 + 1.2 && beside < 1.7) return true;
+  }
+  return false;
 }
 
 const counts = () => {
@@ -448,6 +568,14 @@ function junctionPanel() {
   };
   p.appendChild(row('shape', [['4-way', '4'], ['T', 'T'], ['2-arm', '2']], TOPO, v => rebuild(v, LANES)));
   p.appendChild(row('lanes', [['1', 1], ['2', 2], ['3', 3]], LANES, v => rebuild(TOPO, v)));
+  p.appendChild(row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, v => {
+    camMode = v;
+    [...p.children[2].querySelectorAll('button')].forEach(b => {
+      const on = (b.textContent.startsWith('CCTV') ? 'cctv' : 'overview') === v;
+      b.style.background = on ? '#7dd3fc' : 'rgba(20,24,30,.85)';
+      b.style.color = on ? '#0b0d10' : '#e8eaed';
+    });
+  }));
   document.body.appendChild(p);
 }
 
@@ -643,13 +771,37 @@ function tick() {
   hud.total.textContent = cars.length;
 
   if (controls) controls.update();
-  renderer.render(scene, camera);
+  if (camMode === 'cctv' && DIRS.length > 1) {
+    renderer.setScissorTest(true);
+    const W = renderer.domElement.width, H = renderer.domElement.height;
+    const cw = Math.ceil(W / 2), ch = Math.ceil(H / Math.ceil(DIRS.length / 2));
+    DIRS.forEach((dir, i) => {
+      const x = (i % 2) * cw, yTop = Math.floor(i / 2) * ch, y = H - yTop - ch;   // GL origin = bottom-left
+      renderer.setViewport(x, y, cw, ch);
+      renderer.setScissor(x, y, cw, ch);
+      poleCams[dir].aspect = cw / ch;
+      poleCams[dir].updateProjectionMatrix();
+      renderer.render(scene, poleCams[dir]);
+    });
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, W, H);
+  } else {
+    renderer.render(scene, camera);
+  }
   if (LIVE) {
     drawOverlay();
     sendAcc += dt;
     if (sendAcc >= 0.25 && ready) { sendAcc = 0; streamFrame(); }
   }
   if (CAP && ready) captureTick(dt);
+
+  // public state for dashboards / debugging: everything the system knows, one object
+  window.RELAY = {
+    mode: LIVE ? (systemOn ? 'relay' : 'fixed') : 'sim',
+    phase: hud.phase.textContent, counts: c, cars: cars.length,
+    queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
+    topo: TOPO, lanes: LANES,
+  };
   requestAnimationFrame(tick);
 }
 
