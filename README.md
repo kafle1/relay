@@ -64,17 +64,19 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # 3) train mixed:               .venv/bin/python tools/train.py 25 640 mps ft_mixed
 ```
 
-## Measured results
+## Measured results — what each number is (and is not)
 
-| What | Result |
-|---|---|
-| Detector on held-out sim frames | mAP@50 ≈ 0.90, precision 0.97 |
-| Mixed-domain model | one model detects real CCTV **and** the synthetic feed (incl. ambulance class) |
-| Adaptive vs fixed (identical arrivals, imbalanced demand) | **~46–86% less waiting** (avg ≈ 59%) |
-| Controller invariants | all pass: clearance, empty-skip, min-green, no-starvation, preemption |
+| Setting | Result | Nature |
+|---|---|---|
+| **Controlled benchmark** — identical arrivals through both controllers (`src/microsim.py`) | ~46–86% less waiting, avg ≈ 59% | reproducible offline benchmark, not the live demo |
+| **Live interactive demo** — toggle R.E.L.A.Y. ON/OFF and measure on screen | typically 10–35% fewer queued (varies with the traffic you spawn) | measured live from the scene you're watching |
+| **Detector, synthetic held-out frames** | mAP@50 ≈ 0.88, precision 0.96 | synthetic-domain only |
+| **Detector, real footage** | cars: strong; dense two-wheeler swarms: undercounts (improves at `--imgsz 960`) | known limitation — regional fine-tune is the fix, documented below |
+| **Controller invariants** | all pass: clearance, empty-skip, min-green, no-starvation, preemption | asserted by `src/controller.py` |
 
-*(Comparable real-world anchor: a 2023 SIDRA study of two Kathmandu junctions measured 33–49%
-delay reduction from smarter timing alone.)*
+*(Real-world anchor: a 2023 SIDRA re-timing study of two Kathmandu junctions measured 33–49% delay
+reduction from smarter signal timing alone — Neupane & Jha, "Traffic flow optimization at urban
+intersections of Kathmandu", IOE/SIDRA analysis, 2023.)*
 
 ## Repository layout
 

@@ -881,7 +881,7 @@ function connectWS() {
     }
     if (m.metrics && statLine) {
       const load = modeT > 3 ? (modeWait / modeT).toFixed(1) : '—';
-      const tel = m.telemetry ? ` · ${m.telemetry.infer_ms}ms/frame` : '';
+      const tel = m.telemetry ? ` · inference ${m.telemetry.infer_ms}ms` : '';
       if (systemOn) {
         statLine.style.color = 'var(--grn)';
         const onS = qHist.filter(x => x.on), offS = qHist.filter(x => !x.on);

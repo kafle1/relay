@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--max-seconds", type=float, default=45)
     ap.add_argument("--out", default=None)
     ap.add_argument("--device", default="mps")
+    ap.add_argument("--imgsz", type=int, default=960, help="inference size; small objects need 960+ on real footage")
     args = ap.parse_args()
 
     if args.model is None:
@@ -72,7 +73,7 @@ def main():
         ok, frame = cap.read()
         if not ok:
             break
-        counts, emergencies, boxes = percep.read(frame, device=args.device)
+        counts, emergencies, boxes = percep.read(frame, device=args.device, imgsz=args.imgsz)
         state = ctrl.tick(counts, emergencies, 1.0 / fps)
         if state["phase"] != prev_phase:
             switches += 1 if prev_phase is not None else 0

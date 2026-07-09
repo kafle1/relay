@@ -13,7 +13,7 @@ PCU = {"car": 1.0, "motorcycle": 0.3, "bus": 2.5, "truck": 2.5, "ambulance": 2.0
 # COCO ids -> our names (stock models); fine-tuned models already emit our names
 COCO = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 # per-class confidence: lower for two-wheelers (small, easily missed — edge case A2)
-CONF = {"motorcycle": 0.30, "bicycle": 0.30, "default": 0.40}
+CONF = {"motorcycle": 0.24, "bicycle": 0.24, "default": 0.38}
 EMERGENCY = {"ambulance"}
 
 
@@ -37,10 +37,10 @@ class Perception:
         self.smoothed = {a: {} for a in zones}
         self.last_update = 0.0
 
-    def read(self, frame, device=None):
+    def read(self, frame, device=None, imgsz=640):
         """One frame -> (counts, emergencies, boxes). Never raises on a bad frame (edge case A9)."""
         try:
-            res = self.model.predict(frame, conf=0.25, device=device, verbose=False)[0]
+            res = self.model.predict(frame, conf=0.2, imgsz=imgsz, device=device, verbose=False)[0]
         except Exception:
             return self.counts(), set(), []            # reuse last smoothed counts
         h, w = frame.shape[:2]
