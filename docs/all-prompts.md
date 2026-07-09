@@ -713,3 +713,34 @@
   make max use of subagents
   
   if you feel stuck then do more deep dive research on the internet and everywhere possible,what are making is made by someone already what every single problem we facing is fixed by other keep research ing keep improving and keep testing until we hit rockbottom
+
+- R.E.L.A.Y.
+  live A/B — the same traffic, run two ways
+  R.E.L.A.Y. vs today's fixed timer
+  ▼ 19%
+  fewer vehicles waiting right now vs the fixed timer
+  −
+  ×1
+  +
+  🚑 Emergency
+  Surge N–S
+  Reset
+  
+  TODAY
+  fixed timer · blind 20s cycle
+  queued 50 now  ·  42.6 avg queued · 30s
+  
+  WITH R.E.L.A.Y.
+  adaptive · reads the camera
+  queued 35 now  ·  34.4 avg queued · 30s
+  vehicles queued — last 120s · same demand (busy N–S, quiet E–W)
+  fixed timer
+  R.E.L.A.Y.
+  
+  
+  fix this optimize this to insane level
+  
+  also vehicle detection must be insanely good and accurate, it must be all real doesnt look like its fake simulated
+  
+  
+  what would be the best way to present this simulating looks fake that this system will not work in real device
