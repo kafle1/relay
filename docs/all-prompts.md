@@ -126,3 +126,9 @@
 
 # Live prompt log (auto-appended by hook — every message, verbatim)
 
+
+- continue
+
+- i just said lalitpur did it idk i thnk other place also has done it do deep research and find what they did how and what are the flawss
+
+- also the vehichles are striking with each other in the junction make junction bigger better also they must not ever touch or strike wth
