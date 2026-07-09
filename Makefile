@@ -9,8 +9,9 @@ PORT := 8000
 dev: setup stop
 	@echo "→ starting R.E.L.A.Y. live server on :$(PORT)  (loads the detector, ~10-15s)"
 	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 & echo $$! > /tmp/relay_server.pid
-	@ok=0; for i in $$(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && { ok=1; break; }; sleep 1; done; \
-	if [ $$ok -ne 1 ]; then echo ""; echo "✗ server FAILED to start — log:"; tail -20 /tmp/relay_server.log; exit 1; fi
+	@ok=0; for i in $$(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && { ok=1; break; }; sleep 1; done; \
+	if [ $$ok -ne 1 ]; then echo ""; echo "✗ server did not come up in 60s — log:"; tail -20 /tmp/relay_server.log; \
+	echo "   (try: make stop && make dev)"; exit 1; fi
 	@echo ""
 	@echo "  R.E.L.A.Y. is up:"
 	@echo "    live closed loop   →  http://127.0.0.1:$(PORT)/?live=1"
@@ -20,7 +21,7 @@ dev: setup stop
 	@echo ""
 	@open "http://127.0.0.1:$(PORT)/?live=1" 2>/dev/null || true
 	@echo "── live server log (Ctrl-C stops everything) ──"
-	@trap '$(MAKE) stop >/dev/null; echo; echo "stopped."' INT; tail -f /tmp/relay_server.log
+	@trap '$(MAKE) stop >/dev/null 2>&1; echo; echo "stopped."; exit 0' INT; tail -f /tmp/relay_server.log || true
 
 setup:
 	@test -d $(VENV) || (echo "→ creating venv + installing deps (first run only)" && \
@@ -28,7 +29,9 @@ setup:
 		$(VENV)/bin/pip install -q -r requirements.txt)
 
 stop:
+	@pkill -f "[l]ive_server.py" 2>/dev/null || true
 	@lsof -ti tcp:$(PORT) | xargs kill 2>/dev/null || true
+	@sleep 1
 
 ## make check — run every self-check (controller invariants + benchmark)
 check: setup
