@@ -61,6 +61,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # → http://127.0.0.1:8000/?live=1            4-way, live detection + adaptive control
 # → http://127.0.0.1:8000/?live=1&topo=T     3-arm T junction
 # → http://127.0.0.1:8000/compare.html         fixed-vs-adaptive split screen
+# → http://127.0.0.1:8000/network.html         3-signal arterial + ambulance green wave
 
 # checks
 .venv/bin/python src/controller.py    # safety + fairness invariants
@@ -93,6 +94,7 @@ intersections of Kathmandu", IOE/SIDRA analysis, 2023.)*
 sim/                the synthetic live junction (Three.js)
   main.js           live feed · ?live=1 closed loop · ?capture=N auto-labels · ?topo=4|T|2
   compare.html      split-screen fixed-vs-adaptive: live verdict + controlled server benchmark
+  network.html      three signals on one arterial — coordination + ambulance green wave
   assets/models/    CC0 / CC-BY 3D vehicles
 src/
   controller.py     weighted max-pressure controller (+ invariant self-check)
