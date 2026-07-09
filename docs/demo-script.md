@@ -29,6 +29,9 @@
 **6. Pedestrians (30s)** — point at a walk-man pole + someone waiting
 "People are demand too. Waiting pedestrians add pressure; nobody waits past 45 seconds for a walk window; and a walk is never cut while someone is on the zebra. No deployed system in Nepal manages pedestrian waiting time. Ours does — it's asserted by a runnable safety check, not a promise."
 
+**6b. One street, three lights (optional, 30s)** — open network.html
+"A junction doesn't live alone. Here's one arterial with three signals: each runs its own controller and subtracts its neighbour's downstream queue, so an upstream light stops feeding a jam it can see building ahead. Hit the ambulance and watch a green wave roll through all three. This is the path from one smart junction to a smart corridor."
+
 **7. Proof + price (45s)** — switch to compare.html tab
 "Split screen, fixed vs adaptive. Offline, on *identical* arrivals, the controlled benchmark measures **36% less waiting on average** (10–73% across seeds). Real-world anchor: a 2023 SIDRA study of two Kathmandu junctions found 33–49% from timing alone. And the hardware story: this runs on one camera and an edge box — **~$250–400 per junction** against $20–80k for SCATS-class systems. Kathmandu's lights failed for a decade because nobody maintains them — ours is cheap enough to replace, simple enough to own locally, and falls back to a fixed cycle if the camera dies."
 
