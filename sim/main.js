@@ -12,8 +12,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ─── config ───
-const ROAD_HALF = 5, LANE = 2.5, STOP = 6, HALF_JCT = 5;
-const GAP = 1.6, SPEED = 14, START = 70, EXIT = 70, SPAWN_EVERY = 0.9;
+// lanes per direction (?lanes=1|2|3 → 2/4/6-lane roads). Geometry scales with it.
+const _P = new URLSearchParams(location.search);
+const LANES = Math.min(3, Math.max(1, +(_P.get('lanes') || 1)));
+const LANE_W = 3;
+const ROAD_HALF = LANES * LANE_W + 0.4;
+const STOP = ROAD_HALF + 1.5, HALF_JCT = ROAD_HALF;
+const GAP = 1.6, SPEED = 14, START = 70 + ROAD_HALF, EXIT = 70 + ROAD_HALF, SPAWN_EVERY = 0.9;
 const MODELS = 'assets/models/';
 
 // vehicle types → GLB files, target length, spawn weight (Kathmandu = motorcycle-heavy), PCU, yaw fix
@@ -29,12 +34,14 @@ const TYPES = {
 };
 
 // approaches: dir = side the car comes FROM. progress u: -START → -STOP (line) → 0 → +EXIT.
+// side = which half of the road this approach drives on; lanes fan out from the centreline
 const APPROACH = {
-  N: { axis: 'z', sign: -1, off: -LANE, group: 'NS', rotY: 0 },
-  S: { axis: 'z', sign: +1, off: +LANE, group: 'NS', rotY: Math.PI },
-  E: { axis: 'x', sign: -1, off: +LANE, group: 'EW', rotY: Math.PI / 2 },
-  W: { axis: 'x', sign: +1, off: -LANE, group: 'EW', rotY: -Math.PI / 2 },
+  N: { axis: 'z', sign: -1, side: -1, group: 'NS', rotY: 0 },
+  S: { axis: 'z', sign: +1, side: +1, group: 'NS', rotY: Math.PI },
+  E: { axis: 'x', sign: -1, side: +1, group: 'EW', rotY: Math.PI / 2 },
+  W: { axis: 'x', sign: +1, side: -1, group: 'EW', rotY: -Math.PI / 2 },
 };
+const laneOff = (dir, lane) => APPROACH[dir].side * ((lane + 0.5) * LANE_W);
 // topology is config, not hardcode: ?topo=4 (default) | T (3-arm: N,S,E) | 2 (straight road crossing)
 const TOPO = (new URLSearchParams(location.search).get('topo') || '4').toUpperCase();
 if (TOPO === 'T') { delete APPROACH.W; APPROACH.E.group = 'E'; }
@@ -44,11 +51,13 @@ const GROUPS = [...new Set(DIRS.map(d => APPROACH[d].group))];
 
 // ─── renderer ───
 const canvas = document.getElementById('app');
-const CAP = +(new URLSearchParams(location.search).get('capture') || 0);   // ?capture=N → dump N labeled frames
-const LIVE = new URLSearchParams(location.search).has('live');             // ?live → closed loop (YOLO server drives signals)
+const CAP = +(_P.get('capture') || 0);   // ?capture=N → dump N labeled frames
+const LIVE = _P.has('live');             // ?live → closed loop (YOLO server drives signals)
+const FX = _P.has('fx');                 // ?fx → enable post-processing (costly; off by default for perf)
 let liveSignals = null, liveCounts = null, livePhase = '—', liveBoxes = [], liveMetrics = null;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: CAP > 0 || LIVE });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+let systemOn = true;                     // the ON/OFF switch: ON = R.E.L.A.Y. adaptive, OFF = fixed timer
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !LIVE, preserveDrawingBuffer: CAP > 0 || LIVE });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // perf: 1.5 is visually fine, far cheaper
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -84,7 +93,7 @@ scene.add(new THREE.HemisphereLight(0xbcd6f0, 0x55564a, 0.3));
 const sun = new THREE.DirectionalLight(0xfff2e0, 1.5);
 sun.position.set(48, 78, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);   // perf
 sun.shadow.camera.near = 10; sun.shadow.camera.far = 240;
 sun.shadow.camera.left = -95; sun.shadow.camera.right = 95;
 sun.shadow.camera.top = 95; sun.shadow.camera.bottom = -95;
@@ -137,19 +146,24 @@ for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
   b.castShadow = true; b.receiveShadow = true; scene.add(b);
 }
 
-// markings (centrelines only where a road exists)
+// markings: centre line + dashed lane dividers for every lane boundary, only where a road exists
 for (let d = HALF_JCT + 2; d < 260; d += 8) for (const s of [-1, 1]) {
-  scene.add(box(0.3, 0.02, 3, M.mark, 0, 0.14, s * d));
-  if (TOPO === '4' || (TOPO === 'T' && s === 1)) scene.add(box(3, 0.02, 0.3, M.mark, s * d, 0.141, 0));
+  for (let k = 0; k < LANES; k++) {
+    const off = k === 0 ? 0 : k * LANE_W;                      // centreline + dividers at k·LANE_W
+    for (const o of k === 0 ? [0] : [-off, off]) {
+      scene.add(box(0.25, 0.02, 3, M.mark, o, 0.14, s * d));
+      if (TOPO === '4' || (TOPO === 'T' && s === 1)) scene.add(box(3, 0.02, 0.25, M.mark, s * d, 0.141, o));
+    }
+  }
 }
 for (const dir of DIRS) {
   const a = APPROACH[dir], coord = a.sign * (-STOP);
   if (a.axis === 'z') {
     scene.add(box(ROAD_HALF * 2, 0.02, 0.5, M.mark, 0, 0.145, coord));
-    for (let i = -4; i <= 4; i += 2) scene.add(box(0.7, 0.02, 2.4, M.mark, i, 0.144, coord + a.sign * 2));
+    for (let i = -ROAD_HALF + 1; i <= ROAD_HALF - 1; i += 2) scene.add(box(0.7, 0.02, 2.4, M.mark, i, 0.144, coord + a.sign * 2));
   } else {
     scene.add(box(0.5, 0.02, ROAD_HALF * 2, M.mark, coord, 0.145, 0));
-    for (let i = -4; i <= 4; i += 2) scene.add(box(2.4, 0.02, 0.7, M.mark, coord + a.sign * 2, 0.144, i));
+    for (let i = -ROAD_HALF + 1; i <= ROAD_HALF - 1; i += 2) scene.add(box(2.4, 0.02, 0.7, M.mark, coord + a.sign * 2, 0.144, i));
   }
 }
 
@@ -167,8 +181,8 @@ for (const dir of DIRS) {
     m.position.set(0, 7 - i, 0.32); g.add(m); bulbs[c] = m;
   });
   const coord = a.sign * (-STOP);
-  if (a.axis === 'z') g.position.set(a.off > 0 ? -ROAD_HALF - 1.2 : ROAD_HALF + 1.2, 0, coord + a.sign * 1.5);
-  else g.position.set(coord + a.sign * 1.5, 0, a.off > 0 ? ROAD_HALF + 1.2 : -ROAD_HALF - 1.2);
+  if (a.axis === 'z') g.position.set(a.side > 0 ? -ROAD_HALF - 1.2 : ROAD_HALF + 1.2, 0, coord + a.sign * 1.5);
+  else g.position.set(coord + a.sign * 1.5, 0, a.side > 0 ? ROAD_HALF + 1.2 : -ROAD_HALF - 1.2);
   g.userData.bulbs = bulbs; scene.add(g); signalHeads[dir] = g;
 }
 function setSignal(dir, state) {
@@ -186,15 +200,15 @@ const CYCLE = GROUPS.flatMap(g => [{ green: g, d: 7 }, { yellow: g, d: 2 }, { al
 let cycleIdx = 0, cycleT = 0;
 const groupState = g => CYCLE[cycleIdx].green === g ? 'green' : CYCLE[cycleIdx].yellow === g ? 'yellow' : 'red';
 function updateSignals(dt) {
-  cycleT += dt;
+  cycleT += dt;                                          // the fixed cycle always ticks (it's the OFF mode)
   if (cycleT >= CYCLE[cycleIdx].d) { cycleT = 0; cycleIdx = (cycleIdx + 1) % CYCLE.length; }
-  for (const dir of DIRS) setSignal(dir, groupState(APPROACH[dir].group));
+  for (const dir of DIRS) setSignal(dir, signalOf(dir)); // heads always show whichever brain is in charge
   const s = CYCLE[cycleIdx];
   return s.allred ? 'ALL-RED' : `${s.green || s.yellow} ${s.green ? 'GREEN' : 'YELLOW'}`;
 }
-// current signal for an approach: the live server's decision when in live mode, else the internal cycle
+// current signal for an approach: R.E.L.A.Y. ON → the server's adaptive decision; OFF → the dumb fixed cycle
 function signalOf(dir) {
-  if (LIVE && liveSignals) return liveSignals[dir] || 'red';
+  if (LIVE && systemOn && liveSignals) return liveSignals[dir] || 'red';
   return groupState(APPROACH[dir].group);
 }
 
@@ -240,35 +254,31 @@ function pickType() {
 const cars = [];
 function placeCar(c) {
   const a = APPROACH[c.dir], coord = a.sign * c.u;
-  if (a.axis === 'z') c.mesh.position.set(a.off, 0, coord);
-  else c.mesh.position.set(coord, 0, a.off);
+  const off = laneOff(c.dir, c.lane || 0);
+  if (a.axis === 'z') c.mesh.position.set(off, 0, coord);
+  else c.mesh.position.set(coord, 0, off);
 }
 function pickModel(type) {
   const p = pools[type];
   return p && p.length ? p[(Math.random() * p.length) | 0].clone(true) : null;
 }
-function addCar(dir, u) {                                 // one vehicle: random type, its own speed/pace
-  const type = pickType(), model = pickModel(type);
+const MAX_CARS = 70;                                      // perf cap: keep the scene light
+function addCar(dir, u, forcedType) {                     // one vehicle: random type + random lane + own pace
+  if (cars.length >= MAX_CARS && !forcedType) return false;
+  const type = forcedType || pickType(), model = pickModel(type);
   if (!model) return false;
   const T = TYPES[type], len = T.len;
-  if (cars.some(c => c.dir === dir && Math.abs(c.u - u) < (c.len + len) / 2 + GAP)) return false;  // keep gap
+  const lane = (Math.random() * LANES) | 0;
+  if (cars.some(c => c.dir === dir && (c.lane || 0) === lane && Math.abs(c.u - u) < (c.len + len) / 2 + GAP)) return false;
   const mesh = new THREE.Group(); mesh.add(model); mesh.rotation.y = APPROACH[dir].rotY;
   const speed = SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3);   // different speed / different pace per vehicle
-  const c = { dir, u, mesh, len, type, speed };
+  const c = { dir, u, mesh, len, type, speed, lane };
   placeCar(c); scene.add(mesh); cars.push(c);
   return true;
 }
 function spawn(dir) { if (ready) addCar(dir, -START); }
 function prefill(n) { for (let k = 0; k < n; k++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 4)); }
-function forceSpawn(dir, type) {                         // edge-case staging: force a specific vehicle in
-  if (!ready) return;
-  const model = pickModel(type); if (!model) return;
-  const T = TYPES[type];
-  const mesh = new THREE.Group(); mesh.add(model); mesh.rotation.y = APPROACH[dir].rotY;
-  const speed = SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3);
-  const c = { dir, u: -START, mesh, len: T.len, type, speed };
-  placeCar(c); scene.add(mesh); cars.push(c);
-}
+function forceSpawn(dir, type) { if (ready) addCar(dir, -START, type); }
 function surge(dir, n = 9) { for (let i = 0; i < n; i++) setTimeout(() => forceSpawn(dir, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); }
 function scenarioPanel() {
   const p = document.createElement('div');
@@ -284,27 +294,31 @@ function scenarioPanel() {
   document.body.appendChild(p);
 }
 function updateCars(dt) {
-  const byDir = {}; DIRS.forEach(d => byDir[d] = []);
-  for (const c of cars) byDir[c.dir].push(c);
+  const byLane = {};                                      // follow the leader in YOUR lane only
+  for (const c of cars) (byLane[c.dir + (c.lane || 0)] ||= []).push(c);
   for (const dir of DIRS) {
-    const list = byDir[dir].sort((p, q) => p.u - q.u);
     const mustStop = signalOf(dir) !== 'green';
-    for (let i = 0; i < list.length; i++) {
-      const c = list[i];
-      let target = c.u + c.speed * dt;
-      const stopTarget = -STOP - c.len / 2;
-      // <= + epsilon: a car parked exactly AT the line must stay held (strict < released it → red-running)
-      if (mustStop && c.u <= stopTarget + 0.01) target = Math.min(target, stopTarget);
-      const leader = list[i + 1];
-      if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
-      c.u = Math.max(c.u, target);
-      placeCar(c);
+    for (let lane = 0; lane < LANES; lane++) {
+      const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
+      for (let i = 0; i < list.length; i++) {
+        const c = list[i], before = c.u;
+        let target = c.u + c.speed * dt;
+        const stopTarget = -STOP - c.len / 2;
+        // <= + epsilon: a car parked exactly AT the line must stay held (strict < released it → red-running)
+        if (mustStop && c.u <= stopTarget + 0.01) target = Math.min(target, stopTarget);
+        const leader = list[i + 1];
+        if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
+        c.u = Math.max(c.u, target);
+        c.blocked = (c.u - before) < 0.25 * c.speed * dt;
+        placeCar(c);
+      }
     }
   }
   for (let i = cars.length - 1; i >= 0; i--) {
     if (cars[i].u > EXIT) { scene.remove(cars[i].mesh); cars.splice(i, 1); }
   }
 }
+function queuedNow() { return cars.filter(c => c.u < -STOP + 0.5 && c.blocked).length; }
 function counts() {
   const c = Object.fromEntries(DIRS.map(d => [d, 0]));
   for (const car of cars) if (car.u < HALF_JCT) c[car.dir]++;
@@ -313,7 +327,7 @@ function counts() {
 
 // ─── post-processing (filmic camera look), with safe fallback ───
 let composer = null;
-try {
+try { if (!FX) throw new Error('fx off');
   composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.12, 0.5, 0.9);
@@ -376,7 +390,7 @@ if (LIVE) {
     padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,.08)', minWidth: '224px' });
   panel.innerHTML = '<div style="color:#7dd3fc;letter-spacing:.06em;margin-bottom:6px">R.E.L.A.Y · live control</div>' +
     '<div id="m-red" style="font-size:22px;color:#86efac;font-weight:700">— %</div>' +
-    '<div style="color:#9aa0a6;margin-bottom:6px">less waiting vs a fixed timer</div>' +
+    '<div style="color:#9aa0a6;margin-bottom:6px">current mode load (lower = better)</div>' +
     '<canvas id="spark" width="224" height="52" style="width:224px;height:52px"></canvas>' +
     '<div style="color:#9aa0a6;margin-top:4px"><span style="color:#ff453a">■</span> fixed &nbsp; <span style="color:#86efac">■</span> R.E.L.A.Y</div>';
   document.body.appendChild(panel);
@@ -385,8 +399,23 @@ if (LIVE) {
   Object.assign(banner.style, { position: 'fixed', top: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 12, display: 'none',
     font: '700 14px ui-monospace, monospace', color: '#fff', background: 'rgba(255,59,48,.92)', padding: '8px 16px', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,.45)' });
   document.body.appendChild(banner);
+  // THE SWITCH: R.E.L.A.Y. ON (adaptive) vs OFF (today's fixed timer) — watch the queues
+  const sw = document.createElement('button');
+  sw.id = 'sys-toggle';
+  Object.assign(sw.style, { position: 'fixed', bottom: '14px', left: '50%', transform: 'translateX(-50%)', zIndex: 12,
+    font: '700 16px ui-monospace, monospace', color: '#0b0d10', background: '#86efac', border: 'none',
+    borderRadius: '10px', padding: '12px 22px', cursor: 'pointer', boxShadow: '0 4px 18px rgba(0,0,0,.5)' });
+  const paint = () => {
+    sw.textContent = systemOn ? 'R.E.L.A.Y.  ON  — click to switch OFF' : 'FIXED TIMER (system OFF) — click to turn ON';
+    sw.style.background = systemOn ? '#86efac' : '#ff6b62';
+    sw.style.color = systemOn ? '#0b0d10' : '#fff';
+  };
+  sw.onclick = () => { systemOn = !systemOn; modeWait = 0; modeT = 0; paint(); };
+  paint();
+  document.body.appendChild(sw);
   sizeOverlay();
 }
+let modeWait = 0, modeT = 0;   // veh·s waited since the last toggle — makes ON-vs-OFF directly comparable
 function sizeOverlay() { if (overlay) { overlay.width = innerWidth * PR; overlay.height = innerHeight * PR; } }
 function drawOverlay() {
   if (!octx) return;
@@ -418,9 +447,10 @@ function computeZones() {   // 4 screen-space approach polygons (incoming lane s
   const Z = {}, hw = ROAD_HALF / 2, y = 1.2, back = 45;
   for (const dir of DIRS) {
     const a = APPROACH[dir], near = a.sign * (-STOP), far = a.sign * (-back);
+    const zc = a.side * (ROAD_HALF / 2);          // zone spans this approach's whole half-road (all lanes)
     Z[dir] = (a.axis === 'z'
-      ? [[a.off - hw, y, near], [a.off + hw, y, near], [a.off + hw, y, far], [a.off - hw, y, far]]
-      : [[near, y, a.off - hw], [near, y, a.off + hw], [far, y, a.off + hw], [far, y, a.off - hw]]
+      ? [[zc - hw, y, near], [zc + hw, y, near], [zc + hw, y, far], [zc - hw, y, far]]
+      : [[near, y, zc - hw], [near, y, zc + hw], [far, y, zc + hw], [far, y, zc - hw]]
     ).map(c => projPt(c[0], c[1], c[2]));
   }
   return Z;
@@ -434,14 +464,14 @@ function connectWS() {
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     liveSignals = m.signals; livePhase = `${m.phase} ${m.stage}`; liveBoxes = m.boxes || []; liveCounts = m.counts; liveMetrics = m.metrics;
-    for (const dir of DIRS) setSignal(dir, m.signals[dir] || 'red');
     if (banner) {
       const emg = m.emergencies || [];
       banner.style.display = emg.length ? 'block' : 'none';
       if (emg.length) banner.textContent = '🚑 EMERGENCY PREEMPT — clearing ' + emg.join(', ');
     }
     if (m.metrics) {
-      mstat.textContent = `↓ ${m.metrics.reduction} %`;
+      const rate = modeT > 3 ? (modeWait / modeT).toFixed(1) : '…';
+      mstat.textContent = `${queuedNow()} queued · ${rate} veh waiting/s`;
       waHist.push(m.metrics.adaptive); wfHist.push(m.metrics.fixed);
       if (waHist.length > 224) { waHist.shift(); wfHist.shift(); }
       drawSpark();
@@ -453,11 +483,14 @@ function connectWS() {
 const clock = new THREE.Clock();
 let simTime = 0;
 const nextSpawn = { N: 0, S: 0, E: 0, W: 0 };
-const dirRate = Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));   // some approaches busier than others
+const dirRate = LIVE ? { N: 1.7, S: 1.5, E: 0.4, W: 0.4 }
+  : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));   // live demo: busy NS, quiet EW
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
-  const phaseLabel = LIVE ? livePhase : updateSignals(dt);
+  const fixedLabel = updateSignals(dt);
+  const phaseLabel = (LIVE && systemOn) ? livePhase : fixedLabel + (LIVE ? ' (FIXED)' : '');
   updateCars(dt);
+  modeWait += queuedNow() * dt; modeT += dt;   // waiting accumulated under the CURRENT mode
   simTime += dt;                                          // organic per-approach random flow (varied rates)
   for (const dir of DIRS) if (ready && simTime >= nextSpawn[dir]) {
     spawn(dir);
