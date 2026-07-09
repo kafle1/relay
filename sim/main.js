@@ -280,18 +280,27 @@ buildWorld();
 // ─────────────────────────── signal heads ───────────────────────────
 const BULB = { red: 0xff3b30, yellow: 0xffcc00, green: 0x34c759, off: 0x181b20 };
 const signalHeads = {};
-function makeHead(scale = 1) {                             // housing + backplate + 3 bulbs
+function makeHead(scale = 1) {                             // housing + backplate + 3 hooded lenses
   const g = new THREE.Group(), bulbs = {};
   const back = new THREE.Mesh(new THREE.BoxGeometry(1.5 * scale, 3.5 * scale, 0.1), MAT.housing);
   back.position.z = -0.26 * scale;
   g.add(back);
   g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34 * scale, 12, 12),
-      new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off }));
-    m.position.set(0, (1 - i) * scale, 0.32 * scale);
+    const y = (1 - i) * scale;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.34 * scale, 14, 14),
+      new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off, emissiveIntensity: 1 }));
+    m.position.set(0, y, 0.32 * scale);
     g.add(m);
     bulbs[c] = m;
+    // hood/visor over each lens — reads as a real traffic-light head at any distance, and shades
+    // the lit lens so the active colour pops instead of washing into the housing
+    const hood = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42 * scale, 0.42 * scale, 0.34 * scale, 14, 1, true, 0, Math.PI),
+      MAT.housing);
+    hood.rotation.set(Math.PI / 2, 0, 0);
+    hood.position.set(0, y + 0.12 * scale, 0.36 * scale);
+    g.add(hood);
   });
   return { g, bulbs };
 }
@@ -322,8 +331,8 @@ for (const dir of DIRS) {
     arm.position.set(...world(armMid, 7.1));
     root.add(arm);
     for (let k = 0; k < LANES; k++) {
-      const laneHead = makeHead(0.55);
-      laneHead.g.position.set(...world(laneOff(dir, k), 6.3));
+      const laneHead = makeHead(0.7);                      // per-lane head, one over each lane centre
+      laneHead.g.position.set(...world(laneOff(dir, k), 6.4));
       laneHead.g.rotation.y = a.rotY;
       root.add(laneHead.g);
       bulbSets.push(laneHead.bulbs);
@@ -350,7 +359,8 @@ function setSignal(dir, state) {
       const on = c === state;
       b[c].material.color.setHex(on ? BULB[c] : BULB.off);
       b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
-      b[c].material.emissiveIntensity = on ? 2.2 : 1;
+      b[c].material.emissiveIntensity = on ? 3.2 : 1;     // lit lens glows hard; dark lenses stay matte
+      b[c].scale.setScalar(on ? 1.18 : 1);                // active lens swells slightly — reads at distance
     }
   }
 }
