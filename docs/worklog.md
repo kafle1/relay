@@ -104,8 +104,9 @@ corridor in 3D, log every prompt to docs/all-prompts.md (hook now does this auto
   were frustum-culled by skinned bind-pose bounds (fixed); pedestrians hold traffic on zebras.
 - Research: docs/research/2026-07-09-global-landscape.md (SCATS/SCOOT/Surtrac/City Brain/ATCS
   costs + results, mixed-traffic detection literature, Lalitpur Dec-2024 AI lights post-mortem,
-  KTM's 90%-dead signal history, what beats them) + 2026-07-09-balkhu-corridor.md (OSM geometry:
-  Balkhu Chowk + Kuleshwor bridgehead + Ekantakuna, 2+2 bridge pinch, zero signal nodes — all
-  police-managed today).
-- In flight: sim/corridor.html — Balkhu corridor with per-junction decentralized max-pressure
-  controllers and downstream-queue coordination.
+  KTM's 90%-dead signal history, what beats them) + Balkhu OSM geometry notes (Balkhu Chowk +
+  Kuleshwor bridgehead + Ekantakuna, 2+2 bridge pinch, zero signal nodes — all police-managed
+  today; folded into the corridor build, scene since generalized to network.html).
+- Shipped as sim/network.html — the corridor generalized to a 3-signal arterial (T · 4-way · T)
+  with per-junction decentralized max-pressure and downstream-queue coordination; the
+  Balkhu-specific scene was retired on founder call (generic beats place-specific for judges).

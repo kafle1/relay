@@ -84,22 +84,22 @@
 
 | # | Raw requirement (verbatim) | Where it lives | Status |
 |---|---|---|---|
-| 1 | "we will do hours of research before we start to code" | docs/research/ (8-axis cited synthesis) | ✅ |
+| 1 | "we will do hours of research before we start to code" | docs/research/ (multi-axis cited synthesis) | ✅ |
 | 2 | "in synthetic 3d also same yolo model must use" | mixed fine-tune reads real CCTV + render; live loop runs it | ✅ |
 | 3 | "dont do too much overcomplicate we need mvp, not shitty mvp bro it must get funding … ready to release" | lean single-repo stack; honest-scope README | ✅ |
 | 4 | "do whatever to win hackathon" | ON/OFF toggle, split-screen, webcam demo, pitch ammo | ✅ |
 | 5 | "priority mapping, abulance school bus vip" | ambulance: visual detect + preempt ✅; school-bus/VIP: same `emergency_boost` mechanism, needs only a class + weight (no free 3D/visual signature — documented, not faked) | ◐ |
 | 6 | "lanes are bad in kathmandu consider everything" | approach polygons not lane lines; PCU weights | ✅ |
 | 7 | "if there is 2 in other then we send other but … we cant let 2 old ones keep waiting" | aging weight + max-wait force-serve; asserted by self-check | ✅ |
-| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (65 cases) + in-code handling | ✅ |
+| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (77 cases) + in-code handling | ✅ |
 | 9 | "re validate everything that i said" | premise re-validation (baseline, VIP politics, claim honesty) | ✅ |
 | 10 | "lane that needs to wait for 200 seconds even if there is 2 bikes and the empty lane is given green" | empty-phase-skip invariant, asserted by self-check | ✅ |
 | 11 | "footages must be like top view of junction, or 4 different cameras for 4 different direction all cameras synced" | Mode A/B in spec; sim provides both; AI City noted for real 4-cam | ✅ |
-| 12 | "it cant be moving drone frootages" / "only need junction footage" / "none of the footages … good" | fixed-cam bar enforced; Hanoi 1080p60 + Bangkok verified-fixed junction clips | ✅ |
-| 13 | "first we make perfect system by generating our own 3d traffic with real 3d treejs made cars" | Three.js sim, 18 GLB vehicles | ✅ |
+| 12 | "it cant be moving drone frootages" / "only need junction footage" / "none of the footages … good" | fixed-cam bar enforced; Hanoi 1080p60 + Bangkok verified-fixed clips used in dev (removed from repo per row 31) | ✅ |
+| 13 | "first we make perfect system by generating our own 3d traffic with real 3d treejs made cars" | Three.js sim, 15 GLB vehicle types + skinned pedestrian | ✅ |
 | 14 | "make it real random like bikes auto vehicle car taxi lilke super real" | weighted random mix (moto 50%, car, taxi, truck, bus, ambulance); auto-rickshaw: no free license-clean GLB exists — documented | ◐ |
 | 15 | "different speed different pace" | per-vehicle speed = base × type × random jitter | ✅ |
-| 16 | "3d … real like gta types … then we use our system in that footage, it will detect real vehicle" | render → same YOLO detects (fine-tuned, mAP@50 .90) | ✅ |
+| 16 | "3d … real like gta types … then we use our system in that footage, it will detect real vehicle" | render → same YOLO detects (mixed fine-tune, mAP@50 ≈0.88) | ✅ |
 | 17 | "make 3d for every edge cases … 3 point junction 2 point junction 4 point junction, 2 lane … 6 lane" | `?topo=4|T|2` × `?lanes=1..3` per direction (2/4/6-lane roads); scenario buttons (ambulance, surge) | ✅ |
 | 18 | "infinitely auto randomly generating realtime cc camera footage like live realtime" | endless organic per-approach spawner | ✅ |
 | 19 | "i should be able to drag to move view" / "vehicles are moving in opposite direction" | OrbitControls; yaw fixed | ✅ |
@@ -109,7 +109,7 @@
 | 23 | "you are over focused on simulating, first make the whole core algorithm and detection system" | src/perception.py + src/controller.py + src/pipeline.py (source-agnostic) | ✅ |
 | 24 | "when i run make dev everything must start" | Makefile `dev` target, tested | ✅ |
 | 25 | "i should be able to see the different when our system is on and off (normal fixed time traffic light)" | live ON/OFF toggle + per-mode stats; screenshots in docs/img | ✅ |
-| 26 | "simulating looks fake … i dont have any hardwayre" | webcam demo (`make webcam`), on-screen inference telemetry, judge-interference controls | ✅ |
+| 26 | "simulating looks fake … i dont have any hardwayre" | webcam demo (`make webcam`) + on-screen inference telemetry; judge-interference controls (chaos/accident/surge/dial) in the sim | ✅ |
 | 27 | "optimize it all my system is hanging" / "everything must run smoothly in 60fps live realtime" | this pass: no shadow maps, merged geometry, blob shadows, async downscaled streaming, pixelRatio cap | ✅ |
 | 28 | "proper sidewalks proper zebracrossing … regenerate from scratch" | scene rebuilt: curbed sidewalks, real zebra bands, stop lines behind crossings, box-junction hatching | ✅ |
 | 29 | "remove all the unnecessary code … no ambiguty, conflicting and duplicate code … no legacy" | cleanup: real_demo.py + capture_server.py + live_zones.py removed, /save + junction helper consolidated, deprecated FastAPI hooks migrated | ✅ |
@@ -119,14 +119,14 @@
 | 33 | "how other countries are doiing this … lalitpur … make our better than that cheap efficient … fullly working in real world" | docs/research/global-landscape.md — SCATS/SCOOT/Surtrac/ATCS + Lalitpur post-mortem + our edge | ✅ |
 | 34 | "every time i say anything in the conversation send to requirements md" / "rename it as all prompts md file" | file renamed `docs/all-prompts.md`; UserPromptSubmit hook auto-appends every prompt to the live log below | ✅ |
 | 35 | "/goal … fix bugs or edge cases … robust not temporary … simplify, no legacy, no over-engineering" | this pass: review fleet over src/ tools/ sim/, findings fixed, cleanup applied | ✅ |
-| 36 | "vehichles are striking with each other … make junction bigger better … must not ever touch or strike" | hard 3-disc separation (cars + pedestrians, never overlap); junction box widened with shoulder margin | ✅ |
+| 36 | "vehichles are striking with each other … make junction bigger better … must not ever touch or strike" | hard capsule separation (cars + pedestrians, never overlap); junction box widened with shoulder margin | ✅ |
 | 37 | "how the fuck are the vehicles moving and turning, fix it to be like real life real physics" | braking envelope v²=2ad into stops and corners, arc speed by lateral-g, per-type acceleration | ✅ |
-| 38 | "make 3d of balkhu point from kalanki road to sanepa … deep research and make 3d of it and we simulate our system there" | OSM-geometry research + sim/corridor.html — 3 real junctions, Bagmati river + bridge, per-junction R.E.L.A.Y. | ✅ |
+| 38 | "make 3d of balkhu point from kalanki road to sanepa … deep research and make 3d of it and we simulate our system there" | built + verified Jul 9 (OSM-geometry corridor, 3 real junctions); later superseded on founder call by the generic 3-signal arterial `sim/network.html` — same per-junction R.E.L.A.Y. mechanics | ✅ |
 | 39 | "deep research list out every single problems … 100s of todos … god mode super speed" | 3-agent review fleet + full findings register, all confirmed issues fixed this session | ✅ |
 | 40 | "why are vehicles moving so slow" / "why are vehicles colliding … not able to do right and left turns properly" / "why are there no pedestrians" / "fix it all" | corner lateral-g raised, wedge-breaker inching (still zero-contact), pedestrians verified on-screen | ✅ |
-| 41 | "full system must be there of bikes , bus parkings and all everything so that balkhu simulation is god level super real" | Balkhu Bus Park w/ parked buses, cargo trucks on the Dakshinkali shoulder, chowk bike cluster, Sajha Petrol, hospitals, bus stops | ✅ |
-| 42 | "keep simulation btn sanepa light to kalanki balkhu light there are 3 lighs there" / "keep upto this much only see open street map" | corridor scoped to the pinned OSM extent — exactly 3 signals: Balkhu, Kuleshwor, Sanepa; landmarks from that map | ✅ |
-| 43 | "make 3d of balkhu point …" (row 38 closed) | sim/corridor.html live: 3 real junctions, decentralized max-pressure each, downstream-queue coordination, ambulance green wave to Vayodha | ✅ |
+| 41 | "full system must be there of bikes , bus parkings and all everything so that balkhu simulation is god level super real" | delivered in the Balkhu build (bus park, parked trucks, petrol pump, hospitals); retired with that scene when the corridor was generalized (row 38) | ✅ |
+| 42 | "keep simulation btn sanepa light to kalanki balkhu light there are 3 lighs there" / "keep upto this much only see open street map" | honored in the Balkhu build (exactly 3 signals from the pinned OSM extent); the generalized `network.html` keeps the exact 3-signal scope (J1·J2·J3) | ✅ |
+| 43 | "make 3d of balkhu point …" (row 38 closed) | live today as `sim/network.html`: 3 junctions, decentralized max-pressure each, downstream-queue coordination, sequential ambulance green wave | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
 
