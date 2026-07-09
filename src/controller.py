@@ -51,6 +51,19 @@ def two_way():
     return Junction(["N", "S"], {"NS": ["N", "S"]})
 
 
+def junction_from_dirs(dirs):
+    """Build a conflict-free Junction from whichever approaches a camera can see (2/3/4-arm)."""
+    dirs = set(dirs)
+    phases = {}
+    ns = [d for d in ("N", "S") if d in dirs]
+    ew = [d for d in ("E", "W") if d in dirs]
+    if ns:
+        phases["NS" if len(ns) == 2 else ns[0]] = ns
+    if ew:
+        phases["EW" if len(ew) == 2 else ew[0]] = ew
+    return Junction(sorted(dirs), phases)
+
+
 class Controller:
     GREEN, YELLOW, ALLRED = "GREEN", "YELLOW", "ALLRED"
 

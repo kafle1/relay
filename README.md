@@ -62,9 +62,6 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # 1) auto-labeled sim frames:   open http://127.0.0.1:8000/?capture=300
 # 2) pseudo-label real frames:  .venv/bin/python tools/pseudo_label.py <frames_dir>
 # 3) train mixed:               .venv/bin/python tools/train.py 25 640 mps ft_mixed
-
-# annotate a real CCTV clip with live detections + adaptive green allocation
-.venv/bin/python tools/real_demo.py <clip.mp4>
 ```
 
 ## Measured results
@@ -91,11 +88,10 @@ src/
   microsim.py       adaptive-vs-fixed benchmark on identical arrivals
 tools/
   live_server.py    FastAPI + WebSocket: YOLO on streamed frames → signals back
-  capture_server.py serve sim + save auto-labeled training frames
+                    (also serves POST /save, so capture mode writes training frames here too)
   pseudo_label.py   label real CCTV frames with stock YOLO (free real-domain labels)
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
-  real_demo.py      annotate real CCTV with detections + adaptive green allocation
 docs/               research synthesis · design spec · 65-case edge-case register
 ```
 

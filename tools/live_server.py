@@ -11,31 +11,21 @@ live wait-time comparison chart (honest, apples-to-apples).
 Run:  .venv/bin/python tools/live_server.py   →  open http://127.0.0.1:8000/?live=1
 """
 import asyncio, base64, os, sys, time
+from contextlib import asynccontextmanager
 import numpy as np
 import cv2
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.staticfiles import StaticFiles
 from ultralytics import YOLO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
-from controller import Controller, Junction, four_way, Timings, PCU  # noqa: E402
-from microsim import FixedTimer, poisson                              # noqa: E402
-
-
-def junction_from_dirs(dirs):
-    """Build a conflict-free phase set from whichever approaches the sim announces (2/3/4-arm)."""
-    dirs = set(dirs)
-    phases = {}
-    ns = [d for d in ("N", "S") if d in dirs]
-    ew = [d for d in ("E", "W") if d in dirs]
-    if ns:
-        phases["NS" if len(ns) == 2 else ns[0]] = ns
-    if ew:
-        phases["EW" if len(ew) == 2 else ew[0]] = ew
-    return Junction(sorted(dirs), phases)
+from controller import Controller, four_way, Timings, PCU, junction_from_dirs  # noqa: E402
+from microsim import FixedTimer, poisson                                       # noqa: E402
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
+DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
+IMG, LBL = os.path.join(DS, "images"), os.path.join(DS, "labels")
 # prefer the mixed-domain fine-tune (real CCTV + synthetic render), then sim-only, then stock
 _CANDIDATES = [os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", n, "weights", "best.pt"))
                for n in ("ft_mixed", "ft")]
@@ -45,8 +35,6 @@ NAMES = {0: "car", 1: "motorcycle", 2: "bus", 3: "truck", 4: "ambulance", 5: "au
 print(f"loading detector: {MODEL_PATH}")
 model = YOLO(MODEL_PATH)
 DEVICE = "mps"
-
-app = FastAPI()
 
 
 def point_in_poly(x, y, poly):
@@ -100,13 +88,20 @@ class LiveCompare:
 cmp = LiveCompare()
 
 
-@app.on_event("startup")
-async def _start_stepper():
-    async def stepper():
-        while True:
-            await asyncio.sleep(0.2)
-            cmp.step(0.2)
-    asyncio.create_task(stepper())
+async def stepper():
+    while True:
+        await asyncio.sleep(0.2)
+        cmp.step(0.2)
+
+
+@asynccontextmanager
+async def lifespan(app):
+    task = asyncio.create_task(stepper())
+    yield
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/metrics")
@@ -178,6 +173,21 @@ async def ws(sock: WebSocket):
             })
     except Exception as e:
         print("ws closed:", type(e).__name__)
+
+
+@app.post("/save")
+async def save(req: Request):
+    """Capture mode: the sim POSTs a rendered frame + its auto-generated YOLO label here."""
+    data = await req.json()
+    os.makedirs(IMG, exist_ok=True)                 # survive a dataset wipe mid-run
+    os.makedirs(LBL, exist_ok=True)
+    name = os.path.basename(data["name"])            # no path traversal
+    img_b64 = data["image"].split(",", 1)[1]         # strip data:image/jpeg;base64,
+    with open(os.path.join(IMG, name + ".jpg"), "wb") as f:
+        f.write(base64.b64decode(img_b64))
+    with open(os.path.join(LBL, name + ".txt"), "w") as f:
+        f.write(data.get("label", ""))
+    return {"ok": True}
 
 
 app.mount("/", StaticFiles(directory=SIM, html=True), name="sim")

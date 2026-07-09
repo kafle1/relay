@@ -20,9 +20,8 @@ import cv2
 from ultralytics import YOLO
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from controller import Controller, Timings          # noqa: E402
-from perception import Perception, PCU              # noqa: E402
-from live_zones import junction_from_dirs           # noqa: E402
+from controller import Controller, Timings, junction_from_dirs  # noqa: E402
+from perception import Perception, PCU                          # noqa: E402
 
 COL = {"car": (80, 220, 80), "motorcycle": (10, 160, 255), "bus": (250, 200, 90),
        "truck": (70, 70, 255), "ambulance": (255, 255, 255), "bicycle": (200, 160, 250),

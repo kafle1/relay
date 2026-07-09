@@ -15,9 +15,8 @@ from ultralytics import YOLO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
-from controller import Controller, Timings          # noqa: E402
-from perception import Perception                   # noqa: E402
-from live_zones import junction_from_dirs           # noqa: E402
+from controller import Controller, Timings, junction_from_dirs  # noqa: E402
+from perception import Perception                                # noqa: E402
 
 ZONES = {   # split the camera view: left half = W approach, right half = E approach
     "W": [(0.02, 0.15), (0.49, 0.15), (0.49, 0.97), (0.02, 0.97)],

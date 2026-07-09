@@ -40,10 +40,11 @@ pipeline: setup
 compare:
 	@open "http://127.0.0.1:$(PORT)/compare.html?ff=120"
 
-## make capture N=300 — dump N auto-labeled training frames from the sim
+## make capture N=300 — dump N auto-labeled training frames from the sim (via the live server)
 capture: setup stop
-	@nohup $(PY) tools/capture_server.py $(PORT) > /tmp/relay_capture.log 2>&1 &
-	@sleep 2 && open "http://127.0.0.1:$(PORT)/?capture=$(or $(N),300)"
+	@nohup $(PY) tools/live_server.py > /tmp/relay_server.log 2>&1 & echo $$! > /tmp/relay_server.pid
+	@for i in $$(seq 1 20); do curl -s -o /dev/null http://127.0.0.1:$(PORT)/ && break; sleep 1; done
+	@open "http://127.0.0.1:$(PORT)/?capture=$(or $(N),300)"
 
 ## make train — fine-tune the detector on the captured dataset (mixed run name)
 train: setup
