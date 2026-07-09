@@ -489,6 +489,9 @@ function addCar(dir, u, forcedType) {
 }
 
 function moveCars(dt) {
+  const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
+  const boxCount = cars.filter(inBox).length;
+  const maxStuck = Math.max(0, ...cars.map(c => c.stuck || 0));
   const byLane = {};
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
@@ -501,9 +504,19 @@ function moveCars(dt) {
         const stopAt = -STOP - c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
         if (held && c.u <= stopAt + 0.01) target = Math.min(target, stopAt);
+        // don't enter a packed box even on green ("do not block the junction")
+        if (!held && c.u <= stopAt + 0.01 && boxCount > 2 * LANES + 3) target = Math.min(target, stopAt);
         const leader = list[i + 1];
         if (leader) target = Math.min(target, leader.u - (c.len + leader.len) / 2 - GAP);
-        if (target > c.u && c.u > stopAt && vehicleAhead(c)) target = c.u;   // in the box: yield, never overlap
+        if (target > c.u && c.u > stopAt && vehicleAhead(c)) {
+          const wasStuck = c.stuck || 0;
+          // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles
+          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) target = c.u + c.speed * 0.4 * dt;
+          else target = c.u;
+          c.stuck = wasStuck + dt;
+        } else if (target > c.u) {
+          c.stuck = 0;
+        }
         c.u = Math.max(c.u, target);
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
         placeCar(c);
@@ -523,7 +536,7 @@ function vehicleAhead(c) {
   const p = c.mesh.position, ry = c.mesh.rotation.y;
   const hx = -Math.sin(ry), hz = -Math.cos(ry);          // unit heading on the ground plane
   for (const o of cars) {
-    if (o === c || o.id > c.id) continue;          // only yield to earlier arrivals (no symmetric deadlock)
+    if (o === c) continue;
     const dx = o.mesh.position.x - p.x, dz = o.mesh.position.z - p.z;
     const ahead = dx * hx + dz * hz;                     // along my heading
     const beside = Math.abs(dx * hz - dz * hx);          // lateral offset
