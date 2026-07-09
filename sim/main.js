@@ -42,7 +42,9 @@ const TYPES = {
   taxi:       { files: ['kenney_taxi.glb'], len: 4.2, weight: 0.12, spd: 1.0, cls: 'car' },
   truck:      { files: ['kenney_truck.glb', 'kenney_delivery.glb', 'kenney_garbage-truck.glb', 'kenney_truck-flat.glb'], len: 6, weight: 0.06, spd: 0.82 },
   bus:        { files: ['polypizza_bus.glb'], len: 10.5, weight: 0.06, spd: 0.80 },
-  ambulance:  { files: ['kenney_ambulance.glb'], len: 5, weight: 0.02, spd: 1.05 },
+  // weight 0: ambulances enter ONLY via the 🚑 buttons. Organic sirens preempted the junction for
+  // 30-90s stretches, starved the busy corridor, and stole the thunder from the judge's own click.
+  ambulance:  { files: ['kenney_ambulance.glb'], len: 5, weight: 0, spd: 1.05 },
 };
 
 // approaches: dir = the side traffic comes FROM. Progress u runs -START → -STOP (line) → 0 → +START.
@@ -526,8 +528,9 @@ function placeCar(c) {
 }
 function addCar(dir, u, forcedType) {
   // forced spawns (ambulance / surge buttons) get slack over the cap, but never unbounded
+  // (+14: a full 10-car surge plus an ambulance must fit even when organic traffic sits at cap)
   const cap = carCap();
-  if (!ready || cars.length >= cap + 10 || (cars.length >= cap && !forcedType)) return;
+  if (!ready || cars.length >= cap + 14 || (cars.length >= cap && !forcedType)) return;
   const type = forcedType || pickType();
   const pool = pools[type];
   if (!pool || !pool.length) return;
@@ -551,6 +554,36 @@ function addCar(dir, u, forcedType) {
   placeCar(c);
   scene.add(mesh);
   cars.push(c);
+}
+
+// a button spawn must never silently no-op — a judge clicks 🚑 and SOMETHING must appear. The
+// spawn cell at the road edge is routinely occupied under busy demand, so retry a little further
+// down the approach (never past the stop line), like the network demo's ambulance.
+function forceSpawn(dir, type) {
+  // visible gaps first, then upstream of the scene edge (the road runs to ±320, the camera
+  // doesn't) — a saturated approach gets its surge as a convoy streaming IN, never a no-op.
+  const attempt = () => {
+    for (const off of [0, 6, 12, 18, 24, 30, 36, 42, 48, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60]) {
+      const n = cars.length;
+      addCar(dir, -START + off, type);
+      if (cars.length > n) return true;
+    }
+    return false;
+  };
+  if (attempt()) return true;
+  if (type !== 'ambulance') return false;                 // a fizzled surge car is fine; a fizzled siren is not
+  // approach fully saturated — no gap anywhere. Rearmost queued cars yield their slot at the
+  // scene edge (exactly where a real siren pushes into a jam) until the ambulance fits.
+  for (let k = 0; k < 3; k++) {
+    const rear = cars.filter(c => c.dir === dir && c.u < -STOP - 8 && c.type !== 'ambulance')
+                     .sort((a, b) => a.u - b.u)[0];   // never yield a sibling siren's slot
+    if (!rear) break;
+    rear.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
+    scene.remove(rear.mesh);
+    cars.splice(cars.indexOf(rear), 1);
+    if (attempt()) return true;
+  }
+  return false;
 }
 
 // hard separation: every vehicle is a capsule (spine segment + half-WIDTH); two bodies may NEVER
@@ -828,7 +861,7 @@ function scenarioPanel() {
   ambCap.className = 'sc-cap'; ambCap.textContent = 'ambulance green-wave:';
   scBody.appendChild(ambCap);
   for (const d of DIRS) {
-    const b = button('🚑 ' + d, () => addCar(d, -START, 'ambulance'), 'amb-' + d);
+    const b = button('🚑 ' + d, () => forceSpawn(d, 'ambulance'), 'amb-' + d);
     b.classList.add('half');
     scBody.appendChild(b);
   }
@@ -836,7 +869,7 @@ function scenarioPanel() {
   const surgeCap = document.createElement('div');
   surgeCap.className = 'sc-cap'; surgeCap.textContent = 'surge an approach:';
   scBody.appendChild(surgeCap);
-  const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => addCar(d, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
+  const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => forceSpawn(d, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
   for (const d of DIRS) {
     const b = button('surge ' + d, () => surge(d));
     b.classList.add('half');
@@ -1306,10 +1339,11 @@ function startEmbedBridge() {
   setInterval(() => {
     if (window.RELAY) { try { parent.postMessage({ who: location.search, ...window.RELAY }, '*'); } catch {} }
   }, 500);
+  const S2 = DIRS.includes('S') ? 'S' : N;         // "Surge N–S" feeds BOTH arms of the corridor
   addEventListener('message', e => {
     const cmd = (e.data && e.data.cmd) || '';
-    if (cmd === 'amb') addCar(N, -START, 'ambulance');
-    else if (cmd === 'surge') { for (let i = 0; i < 10; i++) setTimeout(() => addCar(N, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 120); }
+    if (cmd === 'amb') forceSpawn(N, 'ambulance');
+    else if (cmd === 'surge') { for (let i = 0; i < 10; i++) setTimeout(() => forceSpawn(i % 2 ? S2 : N, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 120); }
     else if (cmd === 'density' && Number.isFinite(e.data.v)) setDensity(e.data.v);
     else if (cmd === 'reset') location.reload();
   });

@@ -178,18 +178,24 @@
       return n ? s / n : null;
     }
     function updateVerdict() {
-      // 1) prefer the live gap when R.E.L.A.Y. is clearly ahead on the panels in front of you
+      // The big number ALWAYS reflects the two panels in front of you — never a background
+      // benchmark the visible queues could contradict. The controlled identical-arrivals
+      // benchmark rides in the sub-line, labeled as exactly what it is.
       const la = trailingAvg(S.L.hist, 30000), ra = trailingAvg(S.R.hist, 30000);
-      if (la != null && ra != null && la >= 1.5) {
-        const red = Math.round((la - ra) / la * 100);
-        if (red >= 5) { setVerdict('win', '▼ ' + red + '%', 'fewer vehicles waiting right now vs the fixed timer'); return; }
-      }
-      // 2) otherwise stand on the controlled identical-arrivals benchmark
-      if (serverRed != null && serverRed > 0) {
-        setVerdict('win', '▼ ' + Math.round(serverRed) + '%', 'controlled benchmark (identical arrivals) — panels above are independent traffic');
+      const bench = serverRed != null && serverRed > 0
+        ? 'controlled benchmark (identical arrivals): ▼' + Math.round(serverRed) + '%' : '';
+      if (la == null || ra == null || (la < 1.5 && ra < 1.5)) {
+        setVerdict('wait', '—', bench ? 'measuring live… · ' + bench
+                                      : 'measuring… give the junctions a few seconds of traffic');
         return;
       }
-      setVerdict('wait', '—', 'measuring… give the junctions a few seconds of traffic');
+      const red = Math.round((la - ra) / Math.max(la, 0.001) * 100);
+      if (red >= 5) { setVerdict('win', '▼ ' + red + '%', 'fewer vehicles waiting right now vs the fixed timer'); return; }
+      if (ra - la >= 4) {   // adaptive genuinely behind on screen — say so, in vehicles not noisy %
+        setVerdict('even', '▲ ' + Math.round(ra - la), 'more vehicles waiting right now — adaptive re-balancing' + (bench ? ' · ' + bench : ''));
+        return;
+      }
+      setVerdict('even', '≈ even', 'both panels right now' + (bench ? ' · ' + bench : ''));
     }
 
     function fmt(v) { return v == null ? '—' : (Number.isInteger(v) ? v : v.toFixed(1)); }
