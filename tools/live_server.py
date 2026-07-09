@@ -36,8 +36,10 @@ def junction_from_dirs(dirs):
     return Junction(sorted(dirs), phases)
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
-FT = os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", "ft", "weights", "best.pt"))
-MODEL_PATH = FT if os.path.exists(FT) else "yolo11s.pt"
+# prefer the mixed-domain fine-tune (real CCTV + synthetic render), then sim-only, then stock
+_CANDIDATES = [os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", n, "weights", "best.pt"))
+               for n in ("ft_mixed", "ft")]
+MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), "yolo11s.pt")
 NAMES = {0: "car", 1: "motorcycle", 2: "bus", 3: "truck", 4: "ambulance", 5: "autorickshaw"}
 
 print(f"loading detector: {MODEL_PATH}")

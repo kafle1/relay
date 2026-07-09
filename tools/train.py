@@ -10,6 +10,7 @@ DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
 epochs = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 imgsz = int(sys.argv[2]) if len(sys.argv) > 2 else 640
 device = sys.argv[3] if len(sys.argv) > 3 else "mps"
+run_name = sys.argv[4] if len(sys.argv) > 4 else "ft"
 
 imgs = sorted(glob.glob(os.path.join(DS, "images", "*.jpg")))
 random.seed(0); random.shuffle(imgs)
@@ -27,6 +28,6 @@ open(yaml_path, "w").write(
 print(f"train={len(train)} val={len(val)} epochs={epochs} imgsz={imgsz} device={device}")
 model = YOLO("yolo11n.pt")
 model.train(data=yaml_path, epochs=epochs, imgsz=imgsz, batch=8, device=device,
-            project=os.path.join(DS, "runs"), name="ft", exist_ok=True,
+            project=os.path.join(DS, "runs"), name=run_name, exist_ok=True,
             patience=12, cache=True, verbose=False, plots=False)
 print("BEST_WEIGHTS:", model.trainer.best)
