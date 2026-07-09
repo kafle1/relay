@@ -433,34 +433,43 @@ function planRoute(dir, lane) {
   const options = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
   if (!options.length) return null;
   const weights = { straight: 0.55, right: 0.2, left: 0.25 };
-  let r = Math.random() * options.reduce((s, [m]) => s + weights[m], 0);
+  let r0 = Math.random() * options.reduce((s, [m]) => s + weights[m], 0);
   let move = options[0][0], arm = options[0][1];
-  for (const [m, a] of options) { r -= weights[m]; if (r <= 0) { move = m; arm = a; break; } }
-  if (move === 'straight') return null;                  // no pivot needed
-  const exit = ARM[arm];
-  const exitPerp = -exit.side * ((lane + 0.5) * LANE_W); // outgoing lane of the exit arm
-  const a = APPROACH[dir];
-  return { pivotU: exitPerp / a.sign, exitAxis: exit.axis, exitSign: exit.out, exitPerp, exitRotY: ARM[arm].rotY };
+  for (const [m, a] of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; arm = a; break; } }
+  if (move === 'straight') return null;
+
+  // tangent quarter-circle between the entry lane line and the exit lane line
+  const a = APPROACH[dir], exit = ARM[arm];
+  const o1 = laneOff(dir, lane);                          // entry lane (perp coordinate)
+  const o2 = -exit.side * ((lane + 0.5) * LANE_W);        // exit lane (along coordinate)
+  const r = move === 'right' ? Math.max(2.4, ROAD_HALF * 0.55) : ROAD_HALF + LANE_W / 2 + 0.6;
+  const ex = exit.out;                                    // exit travel sign on the perp axis
+  const ez = -a.sign;                                     // approach side of the exit line
+  const rotSign = Math.sign(ex * ez);
+  return {
+    uA: o2 / a.sign - r,                                  // arc begins here (u-space)
+    arcLen: r * Math.PI / 2, r, ex, rotSign,
+    Cperp: o1 + r * ex, Calong: o2 + r * ez, o2,
+    exitStartPerp: o1 + ex * r,
+    entryRotY: a.rotY, exitRotY: ARM[arm].rotY,
+  };
 }
-const lerpAngle = (a, b, t) => {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return a + d * t;
-};
 function placeCar(c) {
   const a = APPROACH[c.dir];
-  if (c.route && c.u >= c.route.pivotU) {                // past the pivot: on the exit arm
-    const r = c.route, out = laneOff(c.dir, c.lane), travelled = r.exitSign * (c.u - r.pivotU);
-    if (r.exitAxis === 'x') c.mesh.position.set(out + travelled, 0, r.exitPerp);
-    else c.mesh.position.set(r.exitPerp, 0, out + travelled);
-    const swing = Math.min(1, (c.u - r.pivotU) / 3);     // ease through the corner, no snap
-    c.mesh.rotation.y = lerpAngle(APPROACH[c.dir].rotY, r.exitRotY, swing);
+  const world = (perp, along) => a.axis === 'z' ? c.mesh.position.set(perp, 0, along) : c.mesh.position.set(along, 0, perp);
+  const r = c.route;
+  if (r && c.u >= r.uA + r.arcLen) {                      // past the arc: straight out the exit arm
+    world(r.exitStartPerp + r.ex * (c.u - r.uA - r.arcLen), r.o2);
+    c.mesh.rotation.y = r.exitRotY;
     return;
   }
-  const along = a.sign * c.u, off = laneOff(c.dir, c.lane);
-  if (a.axis === 'z') c.mesh.position.set(off, 0, along);
-  else c.mesh.position.set(along, 0, off);
+  if (r && c.u >= r.uA) {                                 // on the arc
+    const th = (c.u - r.uA) / r.r;
+    world(r.Cperp - r.ex * r.r * Math.cos(th), r.Calong + r.rotSign * -r.ex * r.r * Math.sin(th));
+    c.mesh.rotation.y = r.entryRotY - r.rotSign * th;
+    return;
+  }
+  world(laneOff(c.dir, c.lane), a.sign * c.u);            // straight approach
 }
 function addCar(dir, u, forcedType) {
   if (!ready || (cars.length >= MAX_CARS && !forcedType)) return;
@@ -500,6 +509,7 @@ function moveCars(dt) {
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
       for (let i = 0; i < list.length; i++) {
         const c = list[i], before = c.u;
+        if (c.accident > 0) { c.accident -= dt; c.blocked = true; c.vel = 0; continue; }
         let target = c.u + c.speed * dt;
         const stopAt = -STOP - c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
@@ -511,13 +521,18 @@ function moveCars(dt) {
         if (target > c.u && c.u > stopAt && vehicleAhead(c)) {
           const wasStuck = c.stuck || 0;
           // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles
-          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) target = c.u + c.speed * 0.4 * dt;
+          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) { target = c.u + c.speed * 0.4 * dt; c.vel = Math.max(c.vel ?? 0, c.speed * 0.4); }
           else target = c.u;
           c.stuck = wasStuck + dt;
         } else if (target > c.u) {
           c.stuck = 0;
         }
-        c.u = Math.max(c.u, target);
+        // ease toward the allowance: accelerate up, brake down — like a real driver
+        c.vel = Math.min(c.speed, (c.vel ?? 0) + 7 * dt);
+        const allowed = Math.max(0, target - c.u);
+        const adv = Math.min(allowed, c.vel * dt);
+        if (adv < c.vel * dt) c.vel = Math.max(0, adv / dt);
+        c.u += adv;
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
         placeCar(c);
       }
@@ -558,12 +573,13 @@ const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + Math.random() * 2]));
 const rate = (LIVE || LOCKFIX)                    // both A/B panels share the imbalanced demand
   ? { N: 1.7, S: 1.5, E: 0.4, W: 0.4 }             // busy NS, quiet EW — where a fixed timer bleeds green
   : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));
-let simTime = 0;
+let simTime = 0, chaosUntil = 0;
 function spawnTick() {
   for (const dir of DIRS) {
     if (simTime >= nextSpawn[dir]) {
       addCar(dir, -START);
-      nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / (rate[dir] || 1);
+      const storm = simTime < chaosUntil ? 3 : 1;       // Kathmandu chaos mode
+      nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / ((rate[dir] || 1) * storm);
     }
   }
 }
@@ -586,6 +602,11 @@ function scenarioPanel() {
   const surge = d => { for (let i = 0; i < 9; i++) setTimeout(() => addCar(d, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 130); };
   p.appendChild(button('surge N', () => surge('N')));
   if (DIRS.includes('E')) p.appendChild(button('surge E', () => surge('E')));
+  p.appendChild(button('💥 accident', () => {
+    const victim = cars.find(c => c.u > -STOP - 8 && c.u < ROAD_HALF);
+    if (victim) { victim.accident = 12; victim.stuck = 0; }
+  }));
+  p.appendChild(button('🌀 chaos ×3', () => { chaosUntil = simTime + 30; }));
   document.body.appendChild(p);
   junctionPanel();
 }
