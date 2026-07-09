@@ -507,3 +507,5 @@
   </task-notification>
 
 - so you know everything and we are ready to start working to make this system flawless? take your time if you want to do more research and plan go ahead
+
+- continue

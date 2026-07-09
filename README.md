@@ -27,13 +27,6 @@ live by the same pipeline: detections, per-approach demand, and the signal decis
 
 ![T junction](docs/img/t_junction.jpg)
 
-**A real place, multiple junctions** — `corridor.html` replicates Kathmandu's Balkhu corridor from
-OpenStreetMap geometry (Balkhu Chowk × Dakshinkali Rd, Balkhu Bridge over the Bagmati,
-Kuleshwor/Vayodha, the Sanepa light — junctions that have **no working signals today**). Each
-junction runs its own decentralized controller and subtracts its neighbour's downstream queue from
-its own pressure, so a backed-up bridge makes the upstream light stop feeding it. The ambulance
-button preempts each junction in sequence — a green wave to Vayodha Hospitals.
-
 ## How it works — one brain, two eyes, one screen
 
 - **Perception:** one YOLO model reads a fixed junction camera → per-approach, per-class vehicle
