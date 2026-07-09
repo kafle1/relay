@@ -1245,6 +1245,11 @@ function drawChart() {
 const _v = new THREE.Vector3();
 const project = (x, y, z) => { _v.set(x, y, z).project(cctvCam); return [_v.x * 0.5 + 0.5, -_v.y * 0.5 + 0.5]; };   // CCTV space: zones + labels live where the detector looks
 function computeZones() {
+  // self-sufficient projection: matrixWorldInverse only refreshes when the camera renders, and the
+  // first zones of a connection are sent BEFORE any cctvCam render — stale matrices put every
+  // polygon in the wrong place and the controller goes blind until a lucky reconnect resends them.
+  cctvCam.updateMatrixWorld(true);
+  cctvCam.matrixWorldInverse.copy(cctvCam.matrixWorld).invert();
   const zones = {};
   for (const dir of DIRS) {
     const a = APPROACH[dir];
