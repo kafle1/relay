@@ -1140,8 +1140,18 @@ function buildHUD() {
   const cap = document.createElement('div');
   cap.className = 'sc-cap'; cap.textContent = 'surge +8 vehicles onto:';
   scBody.appendChild(cap);
+  // like spawnAmbulance: a surge spawn must never silently no-op — slack past the soft cap (the
+  // MAX_CARS+8 hard ceiling in addCar still bounds it) and retry down the route if the entry is
+  // congested, so the button delivers the 8 vehicles it promises.
+  const surgeOne = route => {
+    for (let at = 0; at <= 0.12; at += 0.015) {
+      const n = cars.length;
+      addCar(route, { slack: true, at });
+      if (cars.length > n) return;
+    }
+  };
   const surge = (label, route) => {
-    const b = button(label, () => { for (let i = 0; i < 8; i++) setTimeout(() => addCar(route, { slack: i < 2 }), i * 140); });
+    const b = button(label, () => { for (let i = 0; i < 8; i++) setTimeout(() => surgeOne(route), i * 140); });
     b.classList.add('half');
     return b;
   };
