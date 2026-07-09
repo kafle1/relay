@@ -363,7 +363,8 @@ function makeHead(scale = 1) {
   g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.4 * scale, 12, 12),
-      new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off }));
+      // toneMapped:false — ACES washed lit red to peach / green to mint-white at demo exposure
+      new THREE.MeshStandardMaterial({ color: BULB.off, emissive: BULB.off, toneMapped: false }));
     m.position.set(0, (1 - i) * scale, 0.32 * scale); g.add(m); bulbs[c] = m;
     // rear repeater sharing the lens material — the aspect reads from every camera angle
     const rep = new THREE.Mesh(new THREE.CircleGeometry(0.17 * scale, 10), m.material);
@@ -421,7 +422,7 @@ function setSignal(jid, arm, state) {
     const on = c === state;
     b[c].material.color.setHex(on ? BULB[c] : BULB.off);
     b[c].material.emissive.setHex(on ? BULB[c] : BULB.off);
-    b[c].material.emissiveIntensity = on ? 5 : 1;
+    b[c].material.emissiveIntensity = on ? 2.2 : 1;   // saturated, not blown out (toneMapped:false)
   }
 }
 

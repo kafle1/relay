@@ -84,6 +84,10 @@
 82. "every single requirement and prompt i said is there, all codebase is there, see line by one from every pov and make a mvp withing 2 3 hours now make max use of everything you are in god mode i need to win this hackathon at any cost" / "make insanely good that will drop their jaws see from every pov every angle and make it perfect"
 83. "use subagents for faster" / "make max use of fable do it all fast fast if needed use subagents and everywhere you can use fable, all i need is perfect working result flawless ready for presentation tomorrow"
 84. "also whole codebase has so much shits clean all and make clean simple workable system dont overcomplicate everything"
+85. "do final check end to end from scratch see what can beimproved and improve system" / "yes whatever you have found high and low fix all impoeove all"
+86. "when i rotate camera each item must be properly tracked detected by our vision and box must be there" / "this 3d thing should only be for simulation … everything other must be done by our system in real time and that must be clearly shown … we are not faking it"
+87. "remove that chaos and accident button, also the bus turning and moving still has issues" / "there is isses in fixed times also even if there was green they were not moving"
+88. "no single vehicle must colliede with each other and get stuck … log everything and keep running tests and keep fixing" / "make system production ready ready to ship anytime to any junction of kathmandu city"
 
 ---
 
@@ -118,7 +122,7 @@
 | 23 | "you are over focused on simulating, first make the whole core algorithm and detection system" | src/perception.py + src/controller.py + src/pipeline.py (source-agnostic) | ✅ |
 | 24 | "when i run make dev everything must start" | Makefile `dev` target, tested | ✅ |
 | 25 | "i should be able to see the different when our system is on and off (normal fixed time traffic light)" | live ON/OFF toggle + per-mode stats; screenshots in docs/img | ✅ |
-| 26 | "simulating looks fake … i dont have any hardwayre" | webcam demo (`make webcam`) + on-screen inference telemetry; judge-interference controls (chaos/accident/surge/dial) in the sim | ✅ |
+| 26 | "simulating looks fake … i dont have any hardwayre" | webcam demo (`make webcam`) + on-screen inference telemetry; judge-interference controls (🚑/surge/dial) in the sim — chaos/accident buttons later removed on founder call | ✅ |
 | 27 | "optimize it all my system is hanging" / "everything must run smoothly in 60fps live realtime" | this pass: no shadow maps, merged geometry, blob shadows, async downscaled streaming, pixelRatio cap | ✅ |
 | 28 | "proper sidewalks proper zebracrossing … regenerate from scratch" | scene rebuilt: curbed sidewalks, real zebra bands, stop lines behind crossings, box-junction hatching | ✅ |
 | 29 | "remove all the unnecessary code … no ambiguty, conflicting and duplicate code … no legacy" | cleanup: real_demo.py + capture_server.py + live_zones.py removed, /save + junction helper consolidated, deprecated FastAPI hooks migrated | ✅ |
@@ -762,3 +766,36 @@
   </task-notification>
 
 - do final check end to end from scratch see what can beimproved and improve system
+
+- <task-notification>
+  <task-id>a2d822596abaa8e0f</task-id>
+  <tool-use-id>toolu_01Yc5VQ39Mux8Q4h2KUgbcdj</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/tasks/a2d822596abaa8e0f.output</output-file>
+  <status>completed</status>
+  <summary>Agent "Fresh-eyes judge all surfaces" finished</summary>
+  <note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+  <result>Browser session closed. Fresh-eyes judge pass complete — ~35 minutes of hands-on across all four surfaces, zero JS console errors anywhere. Findings:
+  
+  ## Severity-ranked findings
+  
+  | Sev | Surface | What | Repro | Evidence |
+  |---|---|---|---|---|
+  | **HIGH** | `/` (live) | **Concurrent ambulances on crossing axes livelock the whole junction.** Controller flaps NS↔EW ("emergency detected on S, W — switching…") forever, never commits a corridor; ambulances frozen 150s+, 70 vehicles with 1 moving, queue grows unbounded. Does NOT self-heal. The scenario panel invites clicking all four 🚑 buttons in a row — two crossing-axis clicks within ~15s is enough. Escape hatch that works live: toggle to FIXED TIMER (the "dumb" mode rescues the AI — maximally embarrassing on stage), or reload. Single ambulances are flawless on all 4 approaches (hold green, no braking, release on clear). | scenarios → 🚑 S, then 🚑 W ~15s later while queues exist | `scratchpad/07-multi-ambulance.png`; polls: 60s+ at u=-15/-28/-21, worst-still 152s, moving 1/70 |
+  | **HIGH** | `/` (live) | **Dragging the camera blinds the controller with no warning and no way back.** YOLO runs on the user viewport: one ordinary orbit drag landed at street level, boxes fell 22→1-2, demand pinned N0S0E0W1 while true queue climbed 46→62; phases keep cycling but serve ghosts. No camera-reset button anywhere; only recovery is reload (which restarts sim + re-shows the explainer). The runbook explicitly invites judges to drag. | left-drag on canvas from default view, watch pipeline + queue counter for 30s | `scratchpad/04-rotated.png`; poll: "1 boxes → N0 S0 E0 W1" while "54→62 queued" |
+  | MED | `/`, `/?topo=2` | **Low-confidence ghost detections render**: half-screen-sized box (motorcycle 0.22), box around empty road/signal poles (motorcycle 0.29, car 0.42 glued to a signal head + red lamp), bus tagged "motorcycle 0.35". Doesn't corrupt counts visibly, but on a quiet scene the ghost box on bare asphalt reads as a glitch, not domain-gap honesty. | watch any view ~1 min; guaranteed on 2-arm quiet scene | `scratchpad/10-chaos.png` (giant box), `17-topo2.png` (box on empty road), `03-crop-peds.png` |
+  | MED | `/` (live) | **Lit signal aspects tone-map to near-white** — red reads as pale peach (I genuinely mistook red lamps for pedestrian heads), green reads mint-white. Materials are correct (#ff3b30 / #34c759, emissive ×5) so it's exposure washout, not logic; states are only distinguishable side-by-side or up close. HUD/pill carry the story regardless. | look at any signal head at default zoom during NS vs EW green | `scratchpad/03-crop-peds.png`, `04-rotated.png`; emissive dump in session log |
+  | MED | `/` + `compare` | **💥 Accident has zero visual identity**: no banner (ambulance gets one), no wreck/marker — just one car silently frozen at a stop line (`stuck` timer, self-clears ~30s). Judges clicking it see "button does nothing". Mechanically sound: lane blocks, absorbs, no wedge. | click 💥 accident, look for any change | `scratchpad/09-accident-fresh.png` (2.5s after click: nothing visible); state dump found `car@N u=-4 stuck=0.15` |
+  | LOW | `/network` | Green wave stutters at J2: mid-wave, the 4-way served its North arm exactly at ambulance arrival — dead stop ~6-8s before Arterial green resumed. Completes and releases correctly end-to-end; queues flush after. Same class of hiccup as single-junction queue-discharge lag (~7s on 🚑 E). | network → 🚑 Ambulance green-wave, watch J2 | HUD poll trace: J2 "North arm ⚠" while amb sat at x=-27 |
+  | LOW | `/network` | Default camera so far out the demo reads as beige cubes on green felt; vehicles/ambulance are specks, story lives entirely in HUD + counters. Noise-textured buildings look like TV static. | load /network.html | `scratchpad/14-network.png`, `15-network-live.png` |
+  | LOW | `compare` | Verdict banner says "right now" but computes from 30s averages (showed 40% when instantaneous chips read 28%). Direction never contradicted panels in ~6 min incl. surge/chaos/accident/reset; post-reset honestly shows "≈ even" before re-diverging. | compare chips vs banner after Emergency | poll log; `scratchpad/12-compare-emergency.png` |
+  | LOW | `/` (live) | Label soup + collisions in the far-queue corner under load (overlapping "car #585/cycle #593" etc. next to the scenarios button); labels clip at screen edges. | build any S queue &gt;8 | `scratchpad/03-crop-labelsoup.png`, `05-off-state.png` |
+  
+  ## What passed cleanly
+  Boxes+track IDs glued to vehicles (buses get cyan boxes); pipeline line updates live (YOLO 19-44ms) and demand→phase logic visibly sane; ON/OFF flips behavior with red pill/red chart/"(FIXED)" HUD and queues pile then drain; surge instant (+9 vehicles/2s); chaos absorbs; peds genuinely walk crosswalks (11 walkers confirmed — other humans are bike riders, a nice touch); compare verdict hits 27→58% green within 90s and all 6 header controls act on both panels; network soak `__burst(18000, 1/30)`: **0 tows, max-stuck 4.3s, 0 frames &gt;60ms**; RELAY toggle changes network queueing (10→15 off, 18→8 on); T/2-arm topologies clean (0 cars on missing arms); CCTV wall labeled, road-dominant, explainer correctly suppressed; zero console errors all session.
+  
+  ## Verdict
+  **Fix-first** — the multi-ambulance livelock sits one careless double-click away inside the exact scenario panel the demo showcases (and camera-drag blindness has no recovery affordance); if code can't change this morning, the demo script must enforce "one ambulance at a time, never drag past the default orbit, fixed-timer toggle is the panic button" — everything else is genuinely strong.
+  
+  Screenshots: `/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/scratchpad/01-live-default.png` through `18-cctv.png`.</result>
+  <usage><subagent_tokens>202095</subagent_tokens><tool_uses>121</tool_uses><duration_ms>2523817</duration_ms></usage>
+  </task-notification>

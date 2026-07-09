@@ -112,6 +112,17 @@ async def lifespan(app):
 app = FastAPI(lifespan=lifespan)
 
 
+@app.middleware("http")
+async def no_html_cache(request, call_next):
+    # browsers cache index.html and keep serving stale ?v= module pins across reloads — every
+    # "it's still broken" report tonight traced to this. HTML is never cacheable; hashed/versioned
+    # assets remain free to cache.
+    resp = await call_next(request)
+    if resp.headers.get("content-type", "").startswith("text/html"):
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.get("/metrics")
 async def metrics():          # async → runs on the event loop, never races stepper() mid-update
     wf = cmp.wf

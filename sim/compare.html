@@ -101,8 +101,6 @@
       </span>
       <button class="btn amb" id="b-amb">🚑 Emergency</button>
       <button class="btn" id="b-surge">Surge N–S</button>
-      <button class="btn" id="b-chaos">🌀 Chaos</button>
-      <button class="btn" id="b-acc">💥 Accident</button>
       <button class="btn" id="b-reset">Reset</button>
     </div>
   </header>
@@ -191,7 +189,7 @@
         return;
       }
       const red = Math.round((la - ra) / Math.max(la, 0.001) * 100);
-      if (red >= 5) { setVerdict('win', '▼ ' + red + '%', 'fewer vehicles waiting right now vs the fixed timer'); return; }
+      if (red >= 5) { setVerdict('win', '▼ ' + red + '%', 'fewer vehicles waiting (30s average) vs the fixed timer'); return; }
       if (ra - la >= 4) {   // adaptive genuinely behind on screen — say so, in vehicles not noisy %
         setVerdict('even', '▲ ' + Math.round(ra - la), 'more vehicles waiting right now — adaptive re-balancing' + (bench ? ' · ' + bench : ''));
         return;
@@ -275,8 +273,6 @@
     const sendBoth = cmd => { for (const f of [fL, fR]) { try { f.contentWindow.postMessage({ cmd }, '*'); } catch {} } };
     $('b-amb').onclick   = () => sendBoth('amb');
     $('b-surge').onclick = () => sendBoth('surge');
-    $('b-chaos').onclick = () => sendBoth('chaos');
-    $('b-acc').onclick   = () => sendBoth('accident');
     $('b-reset').onclick = () => {
       S.L = { q: null, hist: [] }; S.R = { q: null, hist: [] };
       sendBoth('reset');

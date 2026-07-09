@@ -247,11 +247,17 @@ class Controller:
                      and self._ped_demand(self.phase, peds) == 0)
         self.gap_timer = self.gap_timer + dt if empty_now else 0.0
 
-        # EMERGENCY preempt (respect min-green unless our lane is already empty; never skip clearance)
+        # EMERGENCY preempt (respect min-green unless our lane is already empty; never skip clearance).
+        # Crossing-axis sirens are SEQUENCED, never raced: while our own phase still holds a live
+        # emergency, we keep it (bounded by max_preempt below). Re-picking "longest waiting" every
+        # tick flip-flopped NS↔EW at min-green cadence — burning clearance on every flip — and
+        # neither ambulance ever reached its line.
         em_phase = self._phase_for_emergency(emergencies)
-        if em_phase and em_phase != self.phase and (self.elapsed >= t.min_green or empty_now):
+        own_emergency = any(a in emergencies for a in served)
+        if em_phase and em_phase != self.phase and not own_emergency \
+                and (self.elapsed >= t.min_green or empty_now):
             self._begin_switch(em_phase); return
-        if em_phase == self.phase:
+        if own_emergency:
             self.preempt_timer += dt                      # holding for an emergency on our own phase
             # anti-starvation is bounded, not suspended: a lane waiting 2x max_wait forces service
             # even over an active ambulance hold. Below that bound, ambulance priority wins outright.
@@ -418,6 +424,25 @@ def demo():
         if s["signals"]["N"] != "green":
             abandoned = True; break
     assert not abandoned, "VIOLATION: a single dropped detection frame abandoned the emergency preempt"
+
+    # CROSSING SIRENS SEQUENCE, NEVER RACE — emergencies on conflicting phases (N and E) held
+    # simultaneously must not flip-flop the green at min_green cadence: the served siren keeps its
+    # phase (bounded by max_preempt), then the other corridor gets its turn. Both must be served.
+    c = Controller(four_way(), T)
+    def feed_two_amb(_):
+        return {"N": {"ambulance": 1, "car": 3}, "S": {"car": 2}, "E": {"ambulance": 1, "car": 3}, "W": {"car": 2}}
+    switches, last_phase = 0, None
+    greens = {"NS": 0.0, "EW": 0.0}
+    for i in range(360):                          # 180s of two crossing sirens held continuously
+        s = c.tick(feed_two_amb(0), {"N", "E"}, 0.5)
+        if s["stage"] == "GREEN":
+            greens[s["phase"]] += 0.5
+            if s["phase"] != last_phase:
+                switches += 1; last_phase = s["phase"]
+    max_flips = int(180 / T.max_preempt) + 2      # one rotation per preempt window, plus slack
+    assert switches <= max_flips, f"VIOLATION: crossing sirens flapped the green {switches}x in 180s"
+    assert greens["NS"] > 0 and greens["EW"] > 0, "VIOLATION: one crossing siren was never served"
+    print(f"  ✓ crossing sirens sequenced, not raced ({switches} rotations in 180s, both corridors served)")
 
     # LOW-PCU PRESENCE — a lone motorcycle (0.3 PCU) is not an "empty" lane: it must get a full
     # min_green window, not a one-tick flash (empty-phase skip must key on presence, not PCU)
