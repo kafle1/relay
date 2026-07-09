@@ -327,6 +327,16 @@ for (const dir of DIRS) {
     }
   }
 
+  const cam = new THREE.Group();                          // the CCTV unit itself, aimed up the approach
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.8), MAT.housing);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.3, 8), MAT.pole);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(0, 0, 0.5);
+  cam.add(body, lens);
+  cam.position.set(...world(kerbPerp, LANES > 1 ? 7.6 : 6.4));
+  cam.rotation.y = a.rotY + Math.PI;                      // watches the incoming queue
+  cam.rotation.x = -0.35;
+  root.add(cam);
   root.userData.bulbSets = bulbSets;
   scene.add(root);
   signalHeads[dir] = root;
@@ -584,6 +594,27 @@ function spawnTick() {
   }
 }
 
+const NAMES_FULL = { N: 'north', S: 'south', E: 'east', W: 'west' };
+let cctvLabelEls = [];
+function cctvLabels(show) {
+  cctvLabelEls.forEach(el => el.remove());
+  cctvLabelEls = [];
+  if (!show) return;
+  DIRS.forEach((dir, i) => {
+    const el = document.createElement('div');
+    el.textContent = `● CAM ${i + 1} — ${NAMES_FULL[dir]} approach`;
+    const rows = Math.ceil(DIRS.length / 2);
+    Object.assign(el.style, {
+      position: 'fixed', left: (i % 2) * 50 + (i % 2 ? 1.2 : 21) + '%', top: Math.floor(i / 2) * (100 / rows) + 1.5 + '%',
+      zIndex: 8, font: '600 12px ui-monospace, monospace', color: '#ff6b62',
+      background: 'rgba(10,12,15,.72)', padding: '5px 10px', borderRadius: '6px',
+      border: '1px solid rgba(255,255,255,.12)', pointerEvents: 'none', letterSpacing: '.04em',
+    });
+    document.body.appendChild(el);
+    cctvLabelEls.push(el);
+  });
+}
+
 // ─────────────────────────── HUD + scenario controls ───────────────────────────
 const hud = Object.fromEntries(['phase', 'N', 'S', 'E', 'W', 'total'].map(k => [k, document.getElementById('h-' + k)]));
 
@@ -636,6 +667,7 @@ function junctionPanel() {
   p.appendChild(row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, v => {
     if (CAP || LIVE) return;                       // capture/live: labels+zones are projected via the overview camera
     camMode = v;
+    cctvLabels(v === 'cctv');
     [...p.children[2].querySelectorAll('button')].forEach(b =>
       b.classList.toggle('on', (b.textContent.startsWith('CCTV') ? 'cctv' : 'overview') === v));
   }));
@@ -1024,6 +1056,7 @@ loadModels().then(async () => {
   if (LIVE) { buildLiveUI(); connectWS(); }
   if (EMBED) startEmbedBridge();
   else if (!CAP) buildExplainer();
+  if (camMode === 'cctv') cctvLabels(true);
   clock.start();
   tick();
 });
