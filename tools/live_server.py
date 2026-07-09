@@ -34,6 +34,10 @@ _CANDIDATES = [os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", n, "w
                for n in ("ft_mixed", "ft")]
 MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), "yolo11s.pt")
 
+if MODEL_PATH == "yolo11s.pt":
+    print("WARNING: no fine-tuned weights found — falling back to stock COCO, which detects almost")
+    print("nothing on the synthetic feed. Expected at dataset/runs/ft_mixed/weights/best.pt (ships")
+    print("with the repo); to rebuild: make capture N=300, then make train.")
 print(f"loading detector: {MODEL_PATH}")
 model = YOLO(MODEL_PATH)
 # ultralytics returns names as a dict, but hub/exported checkpoints can give a list

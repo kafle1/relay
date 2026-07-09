@@ -760,3 +760,5 @@
   <status>completed</status>
   <summary>Background command "Wait for recorder round 2" completed (exit code 0)</summary>
   </task-notification>
+
+- do final check end to end from scratch see what can beimproved and improve system

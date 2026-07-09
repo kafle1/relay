@@ -69,7 +69,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python src/controller.py    # safety + fairness invariants
 .venv/bin/python src/microsim.py      # adaptive-vs-fixed benchmark on identical arrivals
 
-# rebuild the detector (optional — weights train in ~20 min on Apple Silicon)
+# the fine-tuned detector ships with the repo (dataset/runs/ft_mixed/weights/best.pt, 5MB) —
+# live detection works on a fresh clone. To rebuild it from scratch (optional, ~20 min on Apple Silicon):
 # 1) auto-labeled sim frames:   open http://127.0.0.1:8000/?capture=300
 # 2) pseudo-label real frames:  .venv/bin/python tools/pseudo_label.py <frames_dir>
 # 3) train mixed:               .venv/bin/python tools/train.py 25 640 mps ft_mixed
