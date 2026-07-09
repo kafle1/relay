@@ -27,6 +27,11 @@ live by the same pipeline: detections, per-approach demand, and the signal decis
 
 ![T junction](docs/img/t_junction.jpg)
 
+**A whole arterial, not one light** — `network.html` runs three signals on one street (T · 4-way · T
+at short spacing). Each junction runs its own controller and subtracts its neighbour's downstream
+queue from its own pressure, so a backed-up block upstream stops being fed into the jam. The
+ambulance button preempts each junction in sequence: a green wave down the corridor.
+
 ## How it works — one brain, two eyes, one screen
 
 - **Perception:** one YOLO model reads a fixed junction camera → per-approach, per-class vehicle

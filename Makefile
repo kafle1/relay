@@ -17,6 +17,7 @@ dev: setup stop
 	@echo "    live closed loop   →  http://127.0.0.1:$(PORT)/?live=1"
 	@echo "    T-junction live    →  http://127.0.0.1:$(PORT)/?live=1&topo=T"
 	@echo "    fixed-vs-adaptive  →  http://127.0.0.1:$(PORT)/compare.html"
+	@echo "    3-junction network →  http://127.0.0.1:$(PORT)/network.html"
 	@echo "    free-roam sim      →  http://127.0.0.1:$(PORT)/"
 	@echo ""
 	@open "http://127.0.0.1:$(PORT)/?live=1" 2>/dev/null || true
