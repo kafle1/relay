@@ -24,6 +24,7 @@ class Timings:
     all_red: float = 1.5         # clearance — no conflicting greens ever overlap
     gap_time: float = 2.5        # end green early if served lanes stay empty this long
     max_wait: float = 90.0       # hard anti-starvation: force-serve past this
+    max_preempt: float = 60.0    # cap on holding green for an emergency (D38: never freeze the junction)
     w_wait: float = 0.4          # aging weight (fairness)
     hysteresis: float = 1.0      # challenger must beat incumbent by this to switch (anti-thrash)
     emergency_boost: float = 1e6 # emergency dominates the score
