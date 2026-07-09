@@ -264,3 +264,5 @@
   - /Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/tools/camera_demo.py (unchanged, checked for compatibility)</result>
   <usage><subagent_tokens>79091</subagent_tokens><tool_uses>18</tool_uses><duration_ms>299825</duration_ms></usage>
   </task-notification>
+
+- ok lets go where can we go from there, also see github and find and bring every code and every idea ofc i think other have also did such things
