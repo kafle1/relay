@@ -46,6 +46,8 @@
     .btn:hover{ background:rgba(42,49,60,.95); border-color:rgba(125,211,252,.5); }
     .btn:active{ transform:translateY(1px); }
     .btn.amb:hover{ border-color:rgba(255,107,98,.6); }
+    .dial{ display:flex; align-items:center; gap:5px; margin-right:5px; padding-right:10px; border-right:1px solid var(--line); }
+    .dial b{ min-width:48px; text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }
 
     /* ── stage: two live sims ── */
     #stage{ position:relative; display:grid; grid-template-columns:1fr 1fr; }
@@ -94,6 +96,9 @@
       <div class="big"><span id="v-num">—</span><span id="v-sub">measuring…</span></div>
     </div>
     <div class="controls">
+      <span class="dial" title="traffic volume — scales demand in both panels equally">
+        <button class="btn" id="b-dn">−</button><b id="dv">×1</b><button class="btn" id="b-up">+</button>
+      </span>
       <button class="btn amb" id="b-amb">🚑 Emergency</button>
       <button class="btn" id="b-surge">Surge N–S</button>
       <button class="btn" id="b-reset">Reset</button>
@@ -148,6 +153,9 @@
       if (typeof d.waitPerSec === 'number') p.w = d.waitPerSec;
       const cut = performance.now() - WINDOW - 1000;
       while (p.hist.length && p.hist[0].t < cut) p.hist.shift();
+      // self-heal the dial: an embed that (re)loaded starts at ×1 — resync it off its own stats ping.
+      // idempotent on the embed side, so re-sending every ping is safe.
+      if (density !== 1 && e.source) { try { e.source.postMessage({ cmd: 'density', v: density }, '*'); } catch {} }
     });
 
     // ── verdict: prefer the stable cumulative-average metric, fall back to nothing ──
@@ -263,7 +271,19 @@
     $('b-reset').onclick = () => {
       S.L = { q: null, w: null, hist: [] }; S.R = { q: null, w: null, hist: [] };
       sendBoth('reset');
+      setDial(1);                                   // reloaded embeds restart at ×1 — keep the readout honest
     };
+
+    // ── traffic dial: same demand knob as the solo view, applied to both panels equally ──
+    let density = 1;                                // mirrors DENSITY_MIN/MAX (0.3–2.0, ±0.25 steps) in main.js
+    const dv = $('dv');
+    function setDial(v) {
+      density = Math.min(2, Math.max(0.3, +v.toFixed(2)));
+      dv.textContent = '×' + density.toFixed(2).replace(/\.?0+$/, '');
+      for (const f of [fL, fR]) { try { f.contentWindow.postMessage({ cmd: 'density', v: density }, '*'); } catch {} }
+    }
+    $('b-dn').onclick = () => setDial(density - 0.25);
+    $('b-up').onclick = () => setDial(density + 0.25);
 
     addEventListener('resize', sizeCanvas);
     sizeCanvas();

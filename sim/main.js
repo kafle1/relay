@@ -754,6 +754,24 @@ const rate = (LIVE || LOCKFIX)                    // both A/B panels share the i
 let simTime = 0, chaosUntil = 0, density = 1;         // density: user traffic dial (× spawn rate AND × cap)
 const DENSITY_MIN = 0.3, DENSITY_MAX = 2.0;
 const carCap = () => Math.round(MAX_CARS * density);
+// traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
+// (no cars vanish mid-road); increasing fills toward the higher cap. shared by the solo panel
+// and the compare.html embed bridge.
+function setDensity(v) {
+  const prev = density;
+  density = Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, +v.toFixed(2)));
+  // on a decrease, thin the surplus by pulling the FARTHEST-BACK cars (still out near the spawn
+  // edge, off the junction) — snappy feedback with nothing vanishing mid-scene; the rest drains.
+  if (density < prev) {
+    const far = cars.filter(c => c.u < -ROAD_HALF - 22).sort((a, b) => a.u - b.u);
+    for (const c of far) {
+      if (cars.length <= carCap()) break;
+      c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
+      scene.remove(c.mesh);
+      cars.splice(cars.indexOf(c), 1);
+    }
+  }
+}
 function spawnTick() {
   for (const dir of DIRS) {
     if (simTime >= nextSpawn[dir]) {
@@ -842,28 +860,12 @@ function scenarioPanel() {
   dialCap.className = 'sc-cap'; dialCap.textContent = 'traffic volume:';
   scBody.appendChild(dialCap);
 
-  // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
-  // (no cars vanish mid-road); increasing fills toward the higher cap.
   const dial = document.createElement('div');
   dial.className = 'relay-dial full';
   const readout = document.createElement('span');
   readout.className = 'dval';
   const showDensity = () => { readout.textContent = 'traffic ×' + density.toFixed(2).replace(/0$/, ''); };
-  const bump = step => {
-    density = Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, +(density + step).toFixed(2)));
-    showDensity();
-    // on a decrease, thin the surplus by pulling the FARTHEST-BACK cars (still out near the spawn
-    // edge, off the junction) — snappy feedback with nothing vanishing mid-scene; the rest drains.
-    if (step < 0) {
-      const far = cars.filter(c => c.u < -ROAD_HALF - 22).sort((a, b) => a.u - b.u);
-      for (const c of far) {
-        if (cars.length <= carCap()) break;
-        c.mesh.traverse(o => { if (o.geometry && o.geometry.type === 'PlaneGeometry') o.geometry.dispose(); });
-        scene.remove(c.mesh);
-        cars.splice(cars.indexOf(c), 1);
-      }
-    }
-  };
+  const bump = step => { setDensity(density + step); showDensity(); };
   dial.appendChild(button('− traffic', () => bump(-0.25)));
   dial.appendChild(readout);
   dial.appendChild(button('+ traffic', () => bump(0.25)));
@@ -1256,7 +1258,7 @@ function tick() {
     mode: LIVE ? (systemOn ? 'relay' : 'fixed') : 'sim',
     phase: hud.phase.textContent, counts: c, cars: cars.length,
     queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
-    peds: peds.waiting(),
+    peds: peds.waiting(), density,
     topo: TOPO, lanes: LANES,
   };
   requestAnimationFrame(tick);
@@ -1308,6 +1310,7 @@ function startEmbedBridge() {
     const cmd = (e.data && e.data.cmd) || '';
     if (cmd === 'amb') addCar(N, -START, 'ambulance');
     else if (cmd === 'surge') { for (let i = 0; i < 10; i++) setTimeout(() => addCar(N, -START, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 120); }
+    else if (cmd === 'density' && Number.isFinite(e.data.v)) setDensity(e.data.v);
     else if (cmd === 'reset') location.reload();
   });
 }
