@@ -1068,6 +1068,7 @@ loadModels().then(async () => {
   if (EMBED) startEmbedBridge();
   else if (!CAP) buildExplainer();
   if (camMode === 'cctv') cctvLabels(true);
+  document.getElementById('loading')?.remove();
   clock.start();
   tick();
 });
