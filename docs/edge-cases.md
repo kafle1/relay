@@ -97,6 +97,7 @@
 75. 🟠 **Garbage pedestrian payload** (wrong shape, unknown arms, NaN/negative/absurd values) → `_clean_peds` clamps or drops it; junk input can distort nothing and crash nothing.
 76. 🟡 **Single-phase junction with ped demand** (2-arm road: no conflicting phase exists to give the walk) → controller returns no walk target rather than inventing one; a dedicated ped stage is the documented upgrade path.
 77. 🔴 **Long vehicle wedged mid-turn** (a bus's left-turn arc sweeps nearly the whole box; a small vehicle stopping on that swept path makes the turn geometrically impossible → 18s freeze-then-tow jam) → while a bus/truck is actively turning, other approaches hold at their lines (claim self-releases if the turner wedges >3s); and a turn never commits while a stopped in-box vehicle sits on its swept arc. Verified headless: mid-arc freezes 3→0 per 54 injected buses, no left-turn starvation.
+78. 🔴 **Extra browser tabs starve the whole server** (YOLO ran synchronously inside the async WebSocket handler, blocking every HTTP request and socket ~100–300 ms per frame — a few open tabs and the demo machine stopped answering at all) → inference moved to a single dedicated worker thread: the event loop never blocks, concurrent clients queue for the detector instead of killing the server. Verified: 40 HTTP requests during an active stream, worst 9 ms (was: full timeout).
 
 ---
 

@@ -91,7 +91,7 @@
 | 5 | "priority mapping, abulance school bus vip" | ambulance: visual detect + preempt ✅; school-bus/VIP: same `emergency_boost` mechanism, needs only a class + weight (no free 3D/visual signature — documented, not faked) | ◐ |
 | 6 | "lanes are bad in kathmandu consider everything" | approach polygons not lane lines; PCU weights | ✅ |
 | 7 | "if there is 2 in other then we send other but … we cant let 2 old ones keep waiting" | aging weight + max-wait force-serve; asserted by self-check | ✅ |
-| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (77 cases) + in-code handling | ✅ |
+| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (78 cases) + in-code handling | ✅ |
 | 9 | "re validate everything that i said" | premise re-validation (baseline, VIP politics, claim honesty) | ✅ |
 | 10 | "lane that needs to wait for 200 seconds even if there is 2 bikes and the empty lane is given green" | empty-phase-skip invariant, asserted by self-check | ✅ |
 | 11 | "footages must be like top view of junction, or 4 different cameras for 4 different direction all cameras synced" | Mode A/B in spec; sim provides both; AI City noted for real 4-cam | ✅ |
