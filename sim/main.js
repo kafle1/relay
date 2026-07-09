@@ -761,6 +761,7 @@ function buildLiveUI() {
 
   banner = document.createElement('div');
   banner.className = 'relay-banner';
+  if (EMBED) banner.style.top = '64px';            // clear the compare panel's label
   document.body.appendChild(banner);
 
   if (EMBED) return;                               // parent (compare.html) owns the control chrome
