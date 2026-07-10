@@ -430,6 +430,7 @@ const CYCLE = GROUPS.flatMap(g => [{ green: g, d: 7 }, { yellow: g, d: 2 }, { al
 let cycleIdx = 0, cycleT = 0;
 let systemOn = !LOCKFIX;                         // live: ON = adaptive server, OFF = fixed timer. lockfixed pins OFF — it may stream for detection boxes, but the dumb timer keeps the wheel
 let liveSignals = null, liveCounts = null, livePhase = '—', liveBoxes = [];
+let lastInferMs = 0;                             // detector latency — paces the stream + warns on tab pile-up
 
 const groupState = g => CYCLE[cycleIdx].green === g ? 'green' : CYCLE[cycleIdx].yellow === g ? 'yellow' : 'red';
 function signalOf(dir) {
@@ -690,6 +691,10 @@ function minGapAt(c, u, walkers) {
 function moveCars(dt) {
   const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
   const boxCount = cars.filter(inBox).length;
+  // TEMP DEBUG INSTRUMENTATION — remove before commit
+  window.__boxCountHist = window.__boxCountHist || [];
+  window.__boxCountHist.push({ t: simTime, boxCount, signalNS: signalOf('N') });
+  if (window.__boxCountHist.length > 6000) window.__boxCountHist.shift();
   const maxStuck = Math.max(0, ...cars.map(c => c.stuck || 0));
   // a long vehicle (bus/truck) committed to a left-turn arc sweeps almost the whole box; hold the
   // other approaches out of the box so nothing parks in its swept path and deadlocks it mid-turn.
@@ -720,6 +725,19 @@ function moveCars(dt) {
             || (turnClaim && (!c.route || c.u < c.route.uA)))) {
           target = Math.min(target, stopAt);
           stopDist = stopAt - c.u;
+          // TEMP DEBUG INSTRUMENTATION — remove before commit
+          // only count cases where this car is essentially AT the line (within 2m) and its
+          // in-lane leader (if any) is already far enough away that the wall constraint isn't
+          // the real reason it's stopped — isolates the box-gate as the BINDING constraint.
+          if (!held && boxCount >= LANES + 2 && !turnClaim && c.u > stopAt - 2) {
+            const ldr = list[i + 1];
+            const leaderGapM = ldr ? (ldr.u - c.u) : Infinity;
+            if (leaderGapM > 8) {
+              window.__boxGateHits = (window.__boxGateHits || 0) + 1;
+              window.__boxGateLog = window.__boxGateLog || [];
+              window.__boxGateLog.push({ t: +simTime.toFixed(2), dir, lane, u: +c.u.toFixed(2), stopAt: +stopAt.toFixed(2), boxCount, leaderGapM: ldr ? +leaderGapM.toFixed(1) : null, listLen: list.length });
+            }
+          }
         }
         const leader = list[i + 1];
         // the lane wall only binds while both cars are still on the shared straight segment —
@@ -1289,6 +1307,7 @@ function connectWS() {
     }
     if (m.metrics && statLine) {
       const load = modeT > 3 ? (modeWait / modeT).toFixed(1) : '—';
+      if (m.telemetry) lastInferMs = m.telemetry.infer_ms;
       const tel = m.telemetry ? ` · inference ${m.telemetry.infer_ms}ms` : '';
       if (systemOn) {
         statLine.style.color = 'var(--grn)';
@@ -1309,7 +1328,8 @@ function connectWS() {
       const pipe = document.getElementById('m-pipe');
       if (pipe && m.counts) {
         const cts = ['N', 'S', 'E', 'W'].filter(d => m.counts[d] != null).map(d => d + m.counts[d]).join(' ');
-        pipe.textContent = `YOLO ${m.telemetry ? m.telemetry.infer_ms + 'ms' : '…'} · ${liveBoxes.length} boxes → ${cts} → ${m.phase} ${m.stage}`;
+        const warn = lastInferMs > 800 ? ' · ⚠ many tabs sharing the detector — close extras' : '';
+        pipe.textContent = `YOLO ${m.telemetry ? m.telemetry.infer_ms + 'ms' : '…'} · ${liveBoxes.length} boxes → ${cts} → ${m.phase} ${m.stage}${warn}`;
       }
     }
   };
@@ -1421,7 +1441,11 @@ function tick() {
       if (qSampleAcc >= 0.75) { qSampleAcc = 0; qHist.push({ v: queuedNow(), on: systemOn }); if (qHist.length > 120) qHist.shift(); drawChart(); }
     }
     sendAcc += dt;
-    if (sendAcc >= 0.1 && ready) { sendAcc = 0; streamFrame(); }   // ~10Hz: inference is ~30ms, so boxes glue to motion
+    // self-balancing stream rate: pace toward the detector's measured latency so N open tabs
+    // share it fairly (queue stays empty, every processed frame is FRESH). One tab on a cold
+    // machine = 10Hz; a pile of forgotten tabs degrades gracefully instead of queueing seconds.
+    const streamGap = Math.max(0.1, (lastInferMs * 1.2) / 1000);
+    if (sendAcc >= streamGap && ready) { sendAcc = 0; streamFrame(); }
   }
   // capture mode: the organic mix has no ambulances (button-only), but the detector's visual
   // ambulance class trains on captured frames — summon one every few seconds so retrains keep it.
