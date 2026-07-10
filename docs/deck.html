@@ -118,7 +118,18 @@
 <section class="slide">
   <div class="kicker">The decision, step by step</div>
   <h2>Each road gets a score.<br>Highest score gets the green.</h2>
-  <p class="sub">The score is how much traffic is waiting, and for how long. Here is one moment from a real run:</p>
+  <p class="sub" style="margin-bottom:12px">Score = waiting vehicles, weighed by size. Waiting multiplies it, up to double at 90 seconds.</p>
+  <div class="lbl" style="margin-top:0">vehicle weights (a car = 1)</div>
+  <div>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">bicycle 0.2</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">motorbike 0.3</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">auto-rickshaw 0.8</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">car 1.0</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">bus 2.5</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">truck 2.5</span>
+    <span class="pill" style="background:#f3f2ee;color:var(--ink)">waiting person 0.3</span>
+  </div>
+  <div class="lbl">one moment from a real run</div>
   <div class="grid4">
     <div class="stat" style="border:2px solid var(--green);background:var(--greenbg)">
       <div class="lbl" style="margin-top:0;color:var(--green)">North</div>
@@ -141,20 +152,23 @@
       <div class="k">Has waited 85 seconds already, <b>so it will be served next.</b></div>
     </div>
   </div>
-  <div class="lbl" style="margin-top:22px">fixed rules that always apply</div>
-  <div class="grid4">
-    <div class="card"><p>No one waits more than <b>90 seconds.</b></p></div>
-    <div class="card"><p>An ambulance goes first, <b>for a limited time.</b></p></div>
-    <div class="card"><p>Every green lasts <b>5 to 45 seconds.</b></p></div>
-    <div class="card"><p>When a lane empties, <b>the green moves on.</b></p></div>
+  <div class="lbl" style="margin-top:18px">priority order: what beats what</div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><b>Ambulance</b><span>Its road goes green, for up to 60 seconds.</span></div>
+    <div class="arr">→</div>
+    <div class="step"><div class="n">2</div><b>Road waiting past 90 s</b><span>Served immediately, whatever its score.</span></div>
+    <div class="arr">→</div>
+    <div class="step"><div class="n">3</div><b>People waiting past 60 s</b><span>Forced walk window. Held while anyone is on the zebra.</span></div>
+    <div class="arr">→</div>
+    <div class="step"><div class="n">4</div><b>Highest score</b><span>Green 5 to 45 seconds. Ends early if the lane empties.</span></div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>04</span></div>
 </section>
 
 <!-- 5 · demo: simulated city -->
 <section class="slide">
-  <div class="kicker">Demo 1 · training ground</div>
-  <h2>We trained it in a simulator<br>we built ourselves</h2>
+  <div class="kicker">Demo 1 · the simulator</div>
+  <h2>We built a working junction<br>in the browser</h2>
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/live_loop.jpg" alt="live simulated junction">
@@ -167,7 +181,7 @@
         <div class="stat"><div class="v g">1 click</div><div class="k">to create rush hour, or send an ambulance through</div></div>
         <div class="stat"><div class="v g">0</div><div class="k">collisions are possible inside the simulation</div></div>
       </div>
-      <p class="sub" style="margin-top:20px;font-size:1.31em">Junction camera footage in Kathmandu is police-only. The simulator gave us unlimited footage to train on. <b>The same model then reads real cameras.</b></p>
+      <p class="sub" style="margin-top:20px;font-size:1.31em">Good junction footage is hard to get, so we built our own junction and trained the detector on it. <b>The same model then reads real cameras.</b></p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>05</span></div>
@@ -239,17 +253,23 @@
 
 <!-- 9 · cost -->
 <section class="slide">
-  <div class="kicker">Cost</div>
-  <h2>A fraction of what cities<br>usually pay</h2>
-  <table style="margin-top:12px">
-    <tr><th>system</th><th>cost / junction</th><th>needs</th><th>pedestrians</th><th>ambulances</th></tr>
-    <tr><td>SCATS / SCOOT<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">adaptive systems from Australia and the UK</span></td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
-    <tr><td>Surtrac<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar on every arm</td><td>partial</td><td>partial</td></tr>
-    <tr><td>Lalitpur AI lights<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">running since December 2024</span></td><td>&mdash;</td><td>camera, reads density only</td><td>none</td><td>none</td></tr>
-    <tr class="win"><td>R.E.L.A.Y. <span style="font-size:0.81em;font-weight:400">(prototype)</span></td><td>~$250&ndash;400 hardware</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
-  </table>
-  <p class="cap" style="margin-top:14px">Their prices are for complete installed systems. Ours is the hardware cost of a prototype; a real deployment adds installation and support.</p>
-  <p class="sub" style="margin-top:12px;font-size:1.31em">No road is dug up. The camera is usually already installed.</p>
+  <div class="kicker">Cost, here in Nepal</div>
+  <h2>Why ours costs less</h2>
+  <div class="grid2" style="gap:26px;margin-top:8px">
+    <div>
+      <div class="lbl" style="margin-top:0">where the money goes today</div>
+      <div class="card" style="margin-bottom:13px"><p>Lalitpur's junctions get <b>new detector sensors, plate-reading cameras and a central server</b> installed by a contractor, with a bundled 5-year maintenance contract.</p></div>
+      <div class="card" style="margin-bottom:13px"><p>We reuse <b>the camera already on the pole</b> and add one small computer. The intelligence is software, not new hardware.</p></div>
+      <div class="card"><p>No road is dug up, no new poles, no central server needed. <b>One junction can run alone.</b></p></div>
+    </div>
+    <div>
+      <div class="lbl" style="margin-top:0">the numbers, all from Nepal</div>
+      <div class="card" style="margin-bottom:13px"><p><b>Rs 9 crore</b> — Lalitpur's 2022 budget for 6 smart crossroads plus 1,100 street lights, bundled.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b>Rs 1.4 to 1.9 crore per junction</b> — what the city's earlier signal plans priced (2016 and 2018 programmes).</p></div>
+      <div class="card" style="margin-bottom:13px;border:2px solid var(--green);background:var(--greenbg)"><p><b>Around Rs 50,000</b> — our prototype hardware for one junction.</p></div>
+      <p class="cap">Lalitpur's exact per-junction cost is not public. Ours is prototype hardware; a real deployment adds installation and support.</p>
+    </div>
+  </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
 </section>
 
