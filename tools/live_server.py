@@ -39,9 +39,19 @@ if MODEL_PATH == "yolo11s.pt":
     print("nothing on the synthetic feed. Expected at dataset/runs/ft_mixed/weights/best.pt (ships")
     print("with the repo); to rebuild: make capture N=300, then make train.")
 print(f"loading detector: {MODEL_PATH}")
-model = YOLO(MODEL_PATH)
-# ultralytics returns names as a dict, but hub/exported checkpoints can give a list
-NAMES = model.names if isinstance(model.names, dict) else dict(enumerate(model.names))
+# two detectors, one loop: the fine-tune reads the synthetic sim (stock sees nothing there),
+# stock COCO reads fresh real-world footage (the fine-tune only knows the sim + its one real
+# training camera). A client picks per connection; the sim pages take the default.
+MODELS = {"ft": MODEL_PATH, "stock": "yolo11s.pt"}
+_loaded = {}
+def get_model(key):
+    """(model, names) for 'ft' or 'stock', loaded once per process."""
+    if key not in _loaded:
+        m = YOLO(MODELS[key])
+        # ultralytics returns names as a dict, but hub/exported checkpoints can give a list
+        _loaded[key] = (m, m.names if isinstance(m.names, dict) else dict(enumerate(m.names)))
+    return _loaded[key]
+model, NAMES = get_model("ft")
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 # one dedicated inference thread: predict() off the event loop (a sync call blocked ALL HTTP/WS for
 # ~100-300ms per frame — with several tabs open the server starved to death), single worker because

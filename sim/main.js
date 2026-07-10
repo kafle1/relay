@@ -30,7 +30,7 @@ const ROAD_HALF = LANES * LANE_W + 1.9;          // lanes + shoulder: junction b
 const ZEBRA = { from: ROAD_HALF + 0.7, to: ROAD_HALF + 3.3 };
 const STOP = ZEBRA.to + 0.9;                     // stop line sits BEHIND the crossing
 const START = 78 + ROAD_HALF;                    // spawn / despawn distance from the centre
-const GAP = 2.0, SPEED = 14, MAX_CARS = 70;      // 2m nose-to-tail daylight: queues read as queues, never as a pile-up
+const GAP = 2.0, SPEED = 14, MAX_CARS = 100;     // 2m nose-to-tail daylight; ceiling high enough that a drowning fixed timer can actually drown (at 70 the cap throttled arrivals to outflow and both controllers converged)
 
 // vehicle mix — Kathmandu-style: motorcycle-dominant, taxis, few heavy vehicles. Ambulances are
 // button-only (weight 0).

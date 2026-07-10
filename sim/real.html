@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9A%A6%3C/text%3E%3C/svg%3E" />
+  <title>R.E.L.A.Y. — real CCTV, same pipeline</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --panel:rgba(16,19,24,.82); --line:rgba(255,255,255,.10);
+      --txt:#e8eaed; --muted:#9aa0a6; --cy:#7dd3fc; --grn:#86efac; --grn2:#34c759; --red:#ff6b62;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body { width:100%; height:100%; overflow:hidden; background:var(--bg);
+      color:var(--txt); font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+    body { display:grid; grid-template-rows:auto 1fr auto; height:100vh; }
+
+    header{ display:flex; align-items:center; justify-content:space-between; gap:16px;
+      padding:11px 18px; border-bottom:1px solid var(--line); background:rgba(9,11,14,.6); }
+    .brand b{ font-size:15px; font-weight:700; letter-spacing:.14em; display:flex; align-items:center; gap:8px; }
+    .brand b .dot{ width:8px; height:8px; border-radius:50%; background:var(--grn); box-shadow:0 0 9px var(--grn);
+      animation:pulse 1.8s ease-in-out infinite; }
+    .brand span{ font-size:11px; color:var(--muted); }
+    @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+    #tel{ font-size:11px; color:var(--muted); text-align:right; }
+
+    #stage{ position:relative; min-height:0; display:flex; align-items:center; justify-content:center; }
+    #cam{ max-width:100%; max-height:100%; display:block; }
+    #overlay{ position:absolute; pointer-events:none; }
+    #status{ position:absolute; top:12px; left:14px; font-size:12px; color:var(--cy);
+      background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:5px 10px; }
+
+    footer{ display:flex; align-items:center; justify-content:center; gap:18px; flex-wrap:wrap;
+      padding:10px 18px; border-top:1px solid var(--line); background:rgba(9,11,14,.6); }
+    #pipe{ font-size:12px; color:var(--cy); }
+    .chip{ display:flex; align-items:baseline; gap:8px; font-size:12px; border:1px solid var(--line);
+      border-radius:9px; padding:6px 12px; background:var(--panel); }
+    .chip b{ font-size:16px; font-variant-numeric:tabular-nums; }
+    .chip .sig{ font-weight:700; }
+    .sig.green{ color:var(--grn); } .sig.yellow{ color:#ffcc00; } .sig.red{ color:var(--red); }
+    .note{ font-size:10.5px; color:var(--muted); width:100%; text-align:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <b><span class="dot"></span>R.E.L.A.Y. · REAL CCTV</b>
+      <span>same detector, same controller as the sim — nothing pre-scripted</span>
+    </div>
+    <div id="tel">connecting…</div>
+  </header>
+
+  <main id="stage">
+    <video id="cam" muted autoplay loop playsinline></video>
+    <canvas id="overlay"></canvas>
+    <div id="status">loading footage…</div>
+  </main>
+
+  <footer>
+    <span id="pipe">—</span>
+    <span class="chip">LEFT APPROACH <b id="cL">—</b> <span class="sig" id="sL">—</span></span>
+    <span class="chip">RIGHT APPROACH <b id="cR">—</b> <span class="sig" id="sR">—</span></span>
+    <span class="note">signal chips = the decision R.E.L.A.Y. would set at this junction, computed live from the boxes above</span>
+  </footer>
+
+<script>
+// Real footage through the exact live pipeline: video frames stream over the same /ws the sim
+// uses, the same YOLO + controller answer back. Frame split: left half vs right half = the two
+// conflicting streams one corner CCTV sees (labeled N/E server-side so they compete for green).
+const P = new URLSearchParams(location.search);
+const SRC = P.get('src') || 'footage/real.mp4';
+const ZONES = {
+  N: [[0.02, 0.10], [0.49, 0.10], [0.49, 0.98], [0.02, 0.98]],   // left half
+  E: [[0.51, 0.10], [0.98, 0.10], [0.98, 0.98], [0.51, 0.98]],   // right half
+};
+const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
+
+const cam = document.getElementById('cam');
+const overlay = document.getElementById('overlay');
+const octx = overlay.getContext('2d');
+const $ = id => document.getElementById(id);
+
+cam.src = SRC;
+cam.onerror = () => { $('status').textContent = '✗ footage missing — put a clip at sim/' + SRC + ' (or pass ?src=)'; };
+cam.onplaying = () => { $('status').textContent = ''; $('status').style.display = 'none'; };
+
+// stream pump — same shape as the sim's: ~6.7Hz, skip frames when the socket backs up
+const feed = document.createElement('canvas');
+const fctx = feed.getContext('2d');
+let ws = null, wsOpen = false, last = null;
+
+function connectWS() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: ZONES })); };
+  ws.onclose = () => { wsOpen = false; last = null; $('tel').textContent = 'reconnecting…'; setTimeout(connectWS, 800); };
+  ws.onmessage = e => {
+    last = JSON.parse(e.data);
+    last.at = performance.now();
+    const t = last.telemetry || {};
+    $('tel').textContent = `${t.model || ''} · ${t.infer_ms} ms/frame`;
+    const n = last.counts || {};
+    $('cL').textContent = n.N ?? 0;
+    $('cR').textContent = n.E ?? 0;
+    for (const [el, dir] of [['sL', 'N'], ['sR', 'E']]) {
+      const s = (last.signals || {})[dir] || '—';
+      $(el).textContent = s.toUpperCase();
+      $(el).className = 'sig ' + s;
+    }
+    $('pipe').textContent = `YOLO ${t.infer_ms}ms · ${(last.boxes || []).length} boxes → L${n.N ?? 0} R${n.E ?? 0} → ${last.phase} ${last.stage}`;
+  };
+}
+setInterval(() => {
+  if (!wsOpen || cam.videoWidth === 0 || cam.paused || ws.bufferedAmount > 200000) return;
+  feed.width = 720;
+  feed.height = Math.round(cam.videoHeight / cam.videoWidth * 720);
+  fctx.drawImage(cam, 0, 0, feed.width, feed.height);
+  ws.send(JSON.stringify({ type: 'frame', image: feed.toDataURL('image/jpeg', 0.7) }));
+}, 150);
+
+// overlay: boxes + zone split, mapped onto the displayed (object-fit) video rect
+function draw() {
+  requestAnimationFrame(draw);
+  if (cam.videoWidth === 0) return;
+  const r = cam.getBoundingClientRect(), s = document.getElementById('stage').getBoundingClientRect();
+  overlay.width = r.width; overlay.height = r.height;
+  overlay.style.left = (r.left - s.left) + 'px';
+  overlay.style.top = (r.top - s.top) + 'px';
+  const W = overlay.width, H = overlay.height;
+  octx.clearRect(0, 0, W, H);
+  if (!last || performance.now() - last.at > 900) return;      // feed stalled — no ghost boxes
+
+  octx.setLineDash([7, 5]);
+  octx.lineWidth = 1;
+  for (const [dir, poly] of Object.entries(ZONES)) {
+    octx.strokeStyle = (last.signals || {})[dir] === 'green' ? 'rgba(134,239,172,.7)' : 'rgba(255,107,98,.45)';
+    octx.beginPath();
+    poly.forEach(([x, y], i) => i ? octx.lineTo(x * W, y * H) : octx.moveTo(x * W, y * H));
+    octx.closePath(); octx.stroke();
+  }
+  octx.setLineDash([]);
+
+  octx.lineWidth = 1.6;
+  octx.font = '600 11px ui-monospace, monospace';
+  for (const b of (last.boxes || [])) {
+    const col = BOX_COLORS[b.cls] || '#34c759';
+    octx.globalAlpha = Math.min(1, Math.max(0.25, (b.conf - 0.2) * 2.2));
+    octx.strokeStyle = col;
+    octx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+    if (b.conf >= 0.35) {
+      octx.fillStyle = col;
+      octx.fillText(`${b.cls} ${b.conf}`, b.x * W, Math.max(11, b.y * H - 3));
+    }
+  }
+  octx.globalAlpha = 1;
+}
+
+connectWS();
+draw();
+</script>
+</body>
+</html>
