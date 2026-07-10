@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>R.E.L.A.Y. · adaptive traffic signals</title>
+<title>Project RELAY · adaptive traffic signals</title>
 <style>
   :root{
     --bg:#fcfbf9; --ink:#141618; --mut:#68716c; --faint:#a3aaa5; --line:#e9e7e1;
@@ -80,6 +80,18 @@
 </style>
 <style id="theme-blue">
   /* blue theme skin: chrome goes blue, signal colors stay semantic */
+  @font-face{font-family:'Poppins';src:url('fonts/poppins-400.woff2') format('woff2');font-weight:400;font-display:swap}
+  @font-face{font-family:'Poppins';src:url('fonts/poppins-600.woff2') format('woff2');font-weight:600;font-display:swap}
+  @font-face{font-family:'Poppins';src:url('fonts/poppins-700.woff2') format('woff2');font-weight:700;font-display:swap}
+  @font-face{font-family:'Poppins';src:url('fonts/poppins-800.woff2') format('woff2');font-weight:800;font-display:swap}
+  body{font-family:'Poppins',"Helvetica Neue",Helvetica,Arial,sans-serif}
+  h1,h2{font-weight:700;letter-spacing:-.02em}
+  .wm{font-weight:800}
+  .ic{width:44px;height:44px;border-radius:12px;background:var(--bluebg);color:var(--bluedeep);
+      display:flex;align-items:center;justify-content:center;margin-bottom:12px;flex:0 0 auto}
+  .ic svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .ic.g{background:var(--greenbg);color:var(--green)}
+  .ic.r{background:#fdecea;color:var(--red)}
   :root{
     --bg:#f6f9fd; --ink:#0e1b2e; --mut:#5b6b80; --faint:#93a2b5; --line:#e2e9f4;
     --blue:#2563eb; --bluedeep:#1d4ed8; --bluebg:#e8f0fe;
@@ -128,14 +140,14 @@
 <section class="slide dark active">
   <div class="dots"><i></i><i></i><i></i></div>
   <div class="kicker">Kathmandu</div>
-  <h1>R.E.L.A.Y.</h1>
-  <p class="sub" style="font-size:2.1em;margin-top:22px"><b>Traffic lights that can see.</b></p>
-  <p class="sub" style="margin-top:-6px">The junction's cameras watch every approach. Green goes to the road that needs it.</p>
-  <p class="cap" style="margin-top:-10px;margin-bottom:16px">R.E.L.A.Y. stands for Real-time Evaluation of Lane Activity for Yield-control</p>
+  <h1>Project RELAY</h1>
+  <p class="sub" style="font-size:1.75em;margin-top:18px;font-weight:600"><b>Real-time Evaluation of Lane Activity for Yield-control</b></p>
+  <p class="sub" style="font-size:2.1em;margin-top:-4px"><b>Traffic lights that can see.</b></p>
+  <p class="sub" style="margin-top:-10px;margin-bottom:14px">The junction's cameras watch every approach. Green goes to the road that needs it.</p>
   <div style="margin-top:6px">
     <span class="pill">existing cameras</span><span class="pill">one small computer</span><span class="pill">the existing lights</span>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>team the pookies · July 2026</span><span>01</span></div>
+  <div class="foot"><span>Project RELAY</span><span>team the pookies · July 2026</span><span>01</span></div>
 </section>
 
 <!-- 2 · problem -->
@@ -153,7 +165,7 @@
   <div class="bar" style="width:92%;background:var(--red)">40 vehicles wait 200 seconds</div>
   <div style="height:9px"></div>
   <div class="bar" style="width:30%;background:var(--amber)">empty road gets its full green</div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>02</span></div>
+  <div class="foot"><span>Project RELAY</span><span>02</span></div>
 </section>
 
 <!-- objective -->
@@ -161,11 +173,11 @@
   <div class="kicker">The objective</div>
   <h2>Three goals, all measurable</h2>
   <div class="grid3" style="margin-top:16px">
-    <div class="card"><p><b>Cut waiting by a third or more</b> at signalized junctions. Independent studies of Kathmandu say 33 to 49% is achievable; our simulation measures 44%.</p></div>
-    <div class="card"><p><b>Give ambulances a clear path</b> through every junction on their route, automatically.</p></div>
-    <div class="card"><p><b>Keep it cheap enough that the city owns it.</b> Ordinary hardware, our own software, no dependence on a foreign vendor.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.5"/></svg></div><p><b>Cut waiting by a third or more</b> at signalized junctions. Independent studies of Kathmandu say 33 to 49% is achievable; our simulation measures 44%.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="9" width="13" height="8" rx="1.5"/><path d="M16 11h3l2 3v3h-2M8.5 11.5v3M7 13h3"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></div><p><b>Give ambulances a clear path</b> through every junction on their route, automatically.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5.5 10.5V19h13v-8.5"/><path d="M10 19v-5h4v5"/></svg></div><p><b>Keep it cheap enough that the city owns it.</b> Ordinary hardware, our own software, no dependence on a foreign vendor.</p></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>03</span></div>
+  <div class="foot"><span>Project RELAY</span><span>03</span></div>
 </section>
 
 <!-- 3 · idea -->
@@ -182,15 +194,15 @@
     <div class="step"><div class="n">4</div><b>Switch</b><span>Yellow first, then all red for a moment, then the next green.</span></div>
   </div>
   <div class="grid3" style="margin-top:20px">
-    <div class="card"><p><b>Ambulances get green before they arrive,</b> for a limited time.</p></div>
-    <div class="card"><p><b>Pedestrians are counted too.</b> The walk light stays on while someone is crossing.</p></div>
-    <div class="card"><p><b>The decision logic is one page of published math.</b> Anyone can check it.</p></div>
+    <div class="card"><div class="ic r"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></div><p><b>Ambulances get green before they arrive,</b> for a limited time.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.5"/><path d="M12 8.5v6M12 14.5l-3 6M12 14.5l3 6M8 11h8"/></svg></div><p><b>Pedestrians are counted too.</b> The walk light stays on while someone is crossing.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 6c-2-1.5-4.5-2-7-2v14c2.5 0 5 .5 7 2 2-1.5 4.5-2 7-2V4c-2.5 0-5 .5-7 2Z"/><path d="M12 6v14"/></svg></div><p><b>The decision logic is one page of published math.</b> Anyone can check it.</p></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>03</span></div>
+  <div class="foot"><span>Project RELAY</span><span>03</span></div>
 </section>
 
 <!-- 4 · how it decides -->
-<section class="slide">
+<section class="slide" style="font-size:.86em">
   <div class="kicker">The decision, step by step</div>
   <h2>Each road gets a score.<br>Highest score gets the green.</h2>
   <p class="sub" style="margin-bottom:12px">Score = waiting vehicles, weighed by size. Waiting multiplies it, up to double at 90 seconds.</p>
@@ -231,13 +243,13 @@
   <div class="steps">
     <div class="step"><div class="n">1</div><b>Ambulance</b><span>Its road goes green, for up to 60 seconds.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Road waiting past 90 s</b><span>Served immediately, whatever its score.</span></div>
+    <div class="step"><div class="n">2</div><b>Waited past 90 s</b><span>Served immediately, whatever its score.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>People waiting past 60 s</b><span>Forced walk window. Held while anyone is on the zebra.</span></div>
+    <div class="step"><div class="n">3</div><b>People past 60 s</b><span>Forced walk window. Held while anyone is on the zebra.</span></div>
     <div class="arr">→</div>
     <div class="step"><div class="n">4</div><b>Highest score</b><span>Green 5 to 45 seconds. Ends early if the lane empties.</span></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>04</span></div>
+  <div class="foot"><span>Project RELAY</span><span>04</span></div>
 </section>
 
 <!-- 5 · demo: simulated city -->
@@ -259,7 +271,7 @@
       <p class="sub" style="margin-top:20px;font-size:1.31em">Good junction footage is hard to get, so we built our own junction and trained the detector on it. <b>The same model then reads real cameras.</b></p>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>05</span></div>
+  <div class="foot"><span>Project RELAY</span><span>05</span></div>
 </section>
 
 <!-- 6 · demo: real streets -->
@@ -277,7 +289,7 @@
     </div>
   </div>
   <p class="sub" style="margin-top:18px;font-size:1.31em">These clips run with no junction-specific setup: <b>one model, working on junctions it has never seen.</b> On our validation footage it scores 0.95 out of 1.</p>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
+  <div class="foot"><span>Project RELAY</span><span>06</span></div>
 </section>
 
 <!-- 7 · demo: the race -->
@@ -303,7 +315,7 @@
       <p class="cap" style="margin-top:14px">A 2023 study of Kathmandu junctions estimated 33 to 49% from adaptive signals. Ours sits inside that range.</p>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>07</span></div>
+  <div class="foot"><span>Project RELAY</span><span>07</span></div>
 </section>
 
 <!-- 8 · demo: network -->
@@ -323,7 +335,7 @@
       <p class="sub" style="margin-top:20px;font-size:1.31em">When one junction gets congested, the junction before it sends fewer cars. <b>Adding a junction is a configuration change, not new hardware.</b></p>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>08</span></div>
+  <div class="foot"><span>Project RELAY</span><span>08</span></div>
 </section>
 
 <!-- 9 · cost -->
@@ -345,7 +357,7 @@
       <p class="cap">Lalitpur's exact per-junction cost is not public. Ours is an estimate for equipment and fitting; support comes on top. Even at double it, the gap stays enormous.</p>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
+  <div class="foot"><span>Project RELAY</span><span>09</span></div>
 </section>
 
 <!-- business model -->
@@ -353,15 +365,15 @@
   <div class="kicker">Business model</div>
   <h2>Who pays, and for what</h2>
   <div class="grid3" style="margin-top:16px">
-    <div class="card"><p><b>The customer is the municipality.</b> Lalitpur already proved a Nepali city will buy adaptive signals.</p></div>
-    <div class="card"><p><b>One-time setup per junction, then a yearly software and support subscription.</b> The city owns the hardware outright.</p></div>
-    <div class="card"><p><b>Growth is junction by junction.</b> Lalitpur's own feasibility study flagged 117 locations in that city alone.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V6l6-3v17M10 20V9l7 3v8M4 20h17"/><path d="M6.5 8.5v.5M6.5 11v.5M6.5 13.5v.5"/></svg></div><p><b>The customer is the municipality.</b> Lalitpur already proved a Nepali city will buy adaptive signals.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></div><p><b>One-time setup per junction, then a yearly software and support subscription.</b> The city owns the hardware outright.</p></div>
+    <div class="card"><div class="ic g"><svg viewBox="0 0 24 24"><path d="M4 19 10 13l4 3 6-7"/><path d="M20 13V9h-4"/></svg></div><p><b>Growth is junction by junction.</b> Lalitpur's own feasibility study flagged 117 locations in that city alone.</p></div>
   </div>
   <div class="grid2" style="margin-top:16px;gap:18px">
-    <div class="card"><p><b>Why a city picks us over a contractor system:</b> cheaper hardware, no central server to keep alive, results on a public dashboard, and software the city can audit.</p></div>
-    <div class="card"><p><b>The subscription replaces the vendor maintenance contract.</b> That contract lapsing is the exact thing that historically lapsed and killed Kathmandu's lights.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></div><p><b>Why a city picks us over a contractor system:</b> cheaper hardware, no central server to keep alive, results on a public dashboard, and software the city can audit.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13.5 6.5 17 3l3.5 3.5L17 10M13.5 6.5 4 16v4h4l9.5-9.5M13.5 6.5 17 10"/></svg></div><p><b>The subscription replaces the vendor maintenance contract.</b> That contract lapsing is the exact thing that historically killed Kathmandu's lights.</p></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>10</span></div>
+  <div class="foot"><span>Project RELAY</span><span>10</span></div>
 </section>
 
 <!-- 10 · trust -->
@@ -369,14 +381,14 @@
   <div class="kicker">Safety</div>
   <h2>What happens when<br>something goes wrong</h2>
   <div class="grid3" style="margin-top:16px">
-    <div class="card"><p><b>If the camera fails,</b> the junction goes back to a normal fixed timer.</p></div>
-    <div class="card"><p><b>13 safety rules are checked by the software itself.</b> Crossing greens are impossible.</p></div>
-    <div class="card"><p><b>85 failure situations are documented and handled</b> in the code.</p></div>
-    <div class="card"><p><b>It runs in watch-only mode first.</b> It controls nothing until the logs prove it works.</p></div>
-    <div class="card"><p><b>Traffic police keep a manual override</b> at all times.</p></div>
-    <div class="card"><p><b>The AI only counts vehicles.</b> The signal decision comes from readable math.</p></div>
+    <div class="card"><div class="ic r"><svg viewBox="0 0 24 24"><path d="M4 7h3l2-2h4l2 2h5v12H4zM4 4l16 16"/><circle cx="12" cy="13" r="3.5"/></svg></div><p><b>If the camera fails,</b> the junction goes back to a normal fixed timer.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4.5"/></svg></div><p><b>13 safety rules are checked by the software itself.</b> Crossing greens are impossible.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></div><p><b>85 failure situations are documented and handled</b> in the code.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></div><p><b>It runs in watch-only mode first.</b> It controls nothing until the logs prove it works.</p></div>
+    <div class="card"><div class="ic r"><svg viewBox="0 0 24 24"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/><path d="M9 12h6"/></svg></div><p><b>Traffic police keep a manual override</b> at all times.</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 4h14M5 20h14M7 4c0 4 3 5 3 8s-3 4-3 8M17 4c0 4-3 5-3 8s3 4 3 8"/></svg></div><p><b>The AI only counts vehicles.</b> The signal decision comes from readable math.</p></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>10</span></div>
+  <div class="foot"><span>Project RELAY</span><span>10</span></div>
 </section>
 
 <!-- 11 · pros & cons -->
@@ -399,7 +411,7 @@
       <div class="card"><p><b style="color:var(--red)">✕</b> Kathmandu's old lights died from poor maintenance. <b>We use ordinary parts and remote monitoring, and start in watch-only mode.</b></p></div>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>11</span></div>
+  <div class="foot"><span>Project RELAY</span><span>11</span></div>
 </section>
 
 <!-- 12 · kathmandu rollout -->
@@ -427,17 +439,17 @@
       </table>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>12</span></div>
+  <div class="foot"><span>Project RELAY</span><span>12</span></div>
 </section>
 
 <!-- 13 · closing -->
 <section class="slide dark">
   <div class="dots"><i></i><i></i><i></i></div>
   <div class="kicker">Kathmandu</div>
-  <h1 style="font-size:6em">R.E.L.A.Y.</h1>
+  <h1 style="font-size:6em">Project RELAY</h1>
   <p class="sub" style="font-size:2.1em;margin-top:18px"><b>Traffic lights that can see.</b></p>
   <p class="sub" style="margin-top:-6px">github.com/kafle1/relay</p>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>team the pookies</span><span>13</span></div>
+  <div class="foot"><span>Project RELAY</span><span>team the pookies</span><span>13</span></div>
 </section>
 
 </div>
@@ -457,7 +469,7 @@
   document.querySelectorAll('video').forEach(v=>{v.onerror=()=>{const p=v.getAttribute('poster');if(p){const i=new Image();i.src=p;i.alt='clip';v.replaceWith(i);}};});
   slides.forEach((s,i)=>{const f=s.querySelector('.foot span:last-child');if(f)f.textContent=String(i+1).padStart(2,'0');});
   slides.forEach(s=>{const k=s.querySelector('.kicker');const w=document.createElement('div');w.className='wm';
-    w.textContent=(k?k.textContent.replace(/^the /i,'').split(/[ ,·]/)[0]:'RELAY').toUpperCase();s.appendChild(w);});
+    w.textContent=s.classList.contains('dark')?'RELAY':(k?k.textContent.replace(/^the /i,'').split(/[ ,·]/)[0]:'RELAY').toUpperCase();s.appendChild(w);});
   show(0);
 </script>
 </body>
