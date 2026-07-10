@@ -95,8 +95,42 @@ const octx = overlay.getContext('2d');
 const $ = id => document.getElementById(id);
 
 cam.src = SRC;
-cam.onerror = () => { $('status').textContent = '✗ footage missing — put a clip at sim/' + SRC + ' (or pass ?src=)'; };
+// a mid-stream server blip (restart, wedged range request) errors the <video> PERMANENTLY —
+// the WS half of this page self-heals every 800ms, the video half just died and the page sat
+// "all broken". Same treatment: remember where playback was, reload the same URL, resume.
+// Status must be un-hidden first: onplaying display:none'd it, so the old error text was invisible.
+let vidWas = 0, vidPlayed = false, vidRetry = null;
+cam.ontimeupdate = () => { if (cam.currentTime > 0) { vidWas = cam.currentTime; vidPlayed = true; } };
+cam.onerror = () => {
+  const st = $('status');
+  st.style.display = '';
+  st.textContent = vidPlayed
+    ? '⟳ footage stream interrupted — recovering…'
+    : '✗ footage missing — put a clip at sim/' + SRC + ' (or pass ?src=) — retrying…';
+  clearTimeout(vidRetry);
+  vidRetry = setTimeout(() => { cam.src = SRC; cam.load(); }, 1500);
+};
+// resume where the stream died, not from 0 (clamped: an error at the very tail restarts clean)
+cam.onloadedmetadata = () => {
+  if (vidWas > 0 && vidWas < cam.duration - 1) cam.currentTime = vidWas;
+  cam.play().catch(() => {});
+};
 cam.onplaying = () => { $('status').textContent = ''; $('status').style.display = 'none'; };
+// a dropped connection doesn't always error — Chrome can stall forever on a frozen frame with
+// no event at all. Playing-but-not-advancing for 10s gets the same reload-and-resume treatment.
+// (paused/error states are excluded: initial load is paused, the error path already retries)
+let stallVt = -1, stallSince = 0;
+setInterval(() => {
+  const now = performance.now();
+  if (cam.paused || cam.error || cam.readyState === 0) { stallVt = -1; return; }
+  if (cam.currentTime !== stallVt) { stallVt = cam.currentTime; stallSince = now; return; }
+  if (now - stallSince > 10000) {
+    stallSince = now;
+    $('status').style.display = '';
+    $('status').textContent = '⟳ footage stream stalled — recovering…';
+    cam.src = SRC; cam.load();
+  }
+}, 2500);
 
 // stream pump — same shape as the sim's, paced to the detector's measured latency: a fixed-rate
 // pump piles unread frames server-side and every result lags seconds behind the video.
@@ -109,7 +143,12 @@ function connectWS() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   // stock model: this footage is an unseen junction — our fine-tune knows the sim + its own
   // training cameras, stock COCO generalizes to fresh real-world scenes (measured, not vibes)
-  ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: ZONES, model: 'stock' })); };
+  ws.onopen = () => {
+    wsOpen = true;
+    // connected ≠ first result: the stock model lazy-loads server-side on first use (seconds)
+    $('tel').textContent = 'live — awaiting first result…';
+    ws.send(JSON.stringify({ type: 'zones', zones: ZONES, model: 'stock' }));
+  };
   ws.onclose = () => { wsOpen = false; last = null; $('tel').textContent = 'reconnecting…'; setTimeout(connectWS, 800); };
   ws.onmessage = e => {
     last = JSON.parse(e.data);
