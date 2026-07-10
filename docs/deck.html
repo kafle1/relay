@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R.E.L.A.Y. — adaptive traffic signals from a single camera</title>
+<style>
+  :root{
+    --bg:#0b0f0d; --panel:#111713; --line:#1f2a23;
+    --fg:#eef4ef; --dim:#9fb0a5; --faint:#5c6f63;
+    --green:#34d16b; --amber:#ffb340; --red:#ff5348; --cyan:#5ac8fa;
+    --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#050807;color:var(--fg);font-family:-apple-system,"Helvetica Neue",Segoe UI,sans-serif;overflow:hidden}
+  .deck{position:absolute;inset:0;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;overflow:hidden;background:var(--bg)}
+  .slide{position:absolute;inset:0;padding:64px 72px;display:none;flex-direction:column;justify-content:center}
+  .slide.active{display:flex}
+  .kicker{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:14px}
+  h1{font-size:64px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  h2{font-size:40px;font-weight:700;letter-spacing:-.015em;line-height:1.1;margin-bottom:26px}
+  p{font-size:19px;line-height:1.5;color:var(--dim)}
+  strong{color:var(--fg);font-weight:600}
+  .num{font-family:var(--mono)}
+  .foot{position:absolute;left:72px;right:72px;bottom:26px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:36px;flex:1;align-items:center;min-height:0}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+  .card h3{font-size:17px;margin-bottom:8px}
+  .card p{font-size:15px;line-height:1.45}
+  img,video{max-width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+  .big{font-family:var(--mono);font-weight:700;font-size:76px;letter-spacing:-.03em;color:var(--green)}
+  .unit{font-size:22px;color:var(--dim);font-weight:400}
+  .bar{height:26px;border-radius:6px;display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:13px;color:#04160a;font-weight:700;white-space:nowrap}
+  .lbl{font-family:var(--mono);font-size:13px;color:var(--dim);margin:14px 0 5px}
+  .pipe{display:flex;align-items:center;gap:0;margin:34px 0}
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;flex:1}
+  .stage b{display:block;font-size:16.5px;margin-bottom:5px}
+  .stage span{font-size:13.5px;color:var(--dim);line-height:1.35;display:block}
+  .arrow{font-family:var(--mono);color:var(--green);padding:0 12px;font-size:20px;flex:0 0 auto}
+  .tick{color:var(--green);font-family:var(--mono);margin-right:9px}
+  ul.clean{list-style:none}
+  ul.clean li{font-size:18px;line-height:1.75;color:var(--dim)}
+  ul.clean li strong{color:var(--fg)}
+  table{border-collapse:collapse;width:100%;font-size:16.5px}
+  th{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);color:var(--dim)}
+  td:first-child{color:var(--fg)}
+  .hl td{color:var(--green);font-weight:600}
+  .navui{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;z-index:10;font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .pbar{position:fixed;top:0;left:0;height:2px;background:var(--green);z-index:10;transition:width .25s}
+  .caption{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="pbar" id="pbar"></div>
+<div class="deck">
+
+<!-- 1 · title -->
+<section class="slide active">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="kicker">Kathmandu · traffic signal control</div>
+    <h1>R.E.L.A.Y.</h1>
+    <p style="font-size:24px;margin-top:16px;max-width:820px"><strong>Real-time Evaluation of Lane Activity for Yield-control.</strong><br>
+    Adaptive traffic signals from a single camera — never waste a green on an empty lane.</p>
+    <p style="margin-top:34px;font-family:var(--mono);font-size:14px;color:var(--faint)">one camera · one small computer · existing signals</p>
+  </div>
+  <div class="foot"><span>relay</span><span>Niraj Kafle · July 2026</span></div>
+</section>
+
+<!-- 2 · problem -->
+<section class="slide">
+  <div class="kicker">The problem</div>
+  <h2>Kathmandu's junctions run on blind timers —<br>or on a police officer's arm</h2>
+  <div class="grid2">
+    <ul class="clean">
+      <li><span class="tick">▸</span><strong>Fixed timers ignore reality.</strong> A lane holding 2 motorbikes gets the same green as a lane holding 40 — while everyone else waits up to <span class="num">200 s</span>.</li>
+      <li><span class="tick">▸</span><strong>Most installed lights are dead.</strong> The city's signals have sat dark for years; traffic police direct flows by hand at peak hours.</li>
+      <li><span class="tick">▸</span><strong>Ambulances get no priority.</strong> There is no mechanism — sirens sit in the same queue as everything else.</li>
+      <li><span class="tick">▸</span><strong>Commercial adaptive systems cost <span class="num">$20k–80k</span> per intersection</strong> (SCATS, SCOOT, Surtrac) — priced for cities that are not ours.</li>
+    </ul>
+    <div>
+      <div class="lbl">a real cycle at a fixed-timer junction</div>
+      <div class="bar" style="width:96%;background:var(--red)">loaded lane — waits 200 s</div>
+      <div style="height:8px"></div>
+      <div class="bar" style="width:34%;background:var(--amber)">empty lane — full green anyway</div>
+      <p style="margin-top:22px;font-size:16px">Green time is the scarcest resource at a junction. Fixed timers spend it without looking.</p>
+    </div>
+  </div>
+  <div class="foot"><span>relay</span><span>02</span></div>
+</section>
+
+<!-- 3 · solution / pipeline -->
+<section class="slide">
+  <div class="kicker">The system</div>
+  <h2>Camera → counts → decision → lights. A closed loop.</h2>
+  <div class="pipe">
+    <div class="stage"><b>See</b><span>One CCTV camera per junction. YOLO detects every vehicle class — bikes, cars, buses, trucks, ambulances.</span></div>
+    <div class="arrow">→</div>
+    <div class="stage"><b>Weigh</b><span>Per-approach counts, PCU-weighted (a bus ≠ a motorbike). Smoothed against detector flicker.</span></div>
+    <div class="arrow">→</div>
+    <div class="stage"><b>Decide</b><span>Max-pressure control: serve the heaviest demand, skip empty approaches, age waiting lanes so nobody starves.</span></div>
+    <div class="arrow">→</div>
+    <div class="stage"><b>Actuate</b><span>Signal heads follow the decision — with yellow + all-red clearance, minimum greens, emergency preemption.</span></div>
+  </div>
+  <div class="grid3">
+    <div class="card"><h3>Empty-skip</h3><p>An approach with nothing on it never gets a green. The core waste, gone by construction.</p></div>
+    <div class="card"><h3>Ambulance preemption</h3><p>Detected visually and by transponder; its arm goes green, bounded so the junction can never be held hostage.</p></div>
+    <div class="card"><h3>Pedestrian fairness</h3><p>Waiting pedestrians build pressure too — bounded walk windows, held while anyone is on the zebra.</p></div>
+  </div>
+  <div class="foot"><span>relay</span><span>03</span></div>
+</section>
+
+<!-- 4 · live sim proof -->
+<section class="slide">
+  <div class="kicker">Proof · live closed loop</div>
+  <h2>A living junction the detector reads like real CCTV</h2>
+  <div class="grid2">
+    <div>
+      <img src="img/live_loop.jpg" alt="live loop">
+      <div class="caption">the same YOLO model reads this synthetic camera — boxes, counts and the signal decision, live</div>
+    </div>
+    <div>
+      <p>We built a physically honest 3-D junction — turning arcs, queue discharge, pedestrians, collisions impossible — and pointed the <strong>same detection pipeline</strong> at it that reads real cameras.</p>
+      <p style="margin-top:14px">That gives us <strong>infinite labelled CCTV</strong>: every scene change re-trains the detector overnight with free, pixel-perfect labels.</p>
+      <ul class="clean" style="margin-top:16px">
+        <li><span class="tick">✓</span>Live inference <strong class="num">~27 ms</strong> per frame on a laptop</li>
+        <li><span class="tick">✓</span>Controller enforces <strong class="num">13</strong> self-checked safety invariants</li>
+        <li><span class="tick">✓</span><strong class="num">85</strong> handled edge cases, each written down</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>relay</span><span>04</span></div>
+</section>
+
+<!-- 5 · real footage -->
+<section class="slide">
+  <div class="kicker">Proof · real cameras</div>
+  <h2>The same pipeline on real junction footage</h2>
+  <div class="grid2">
+    <div>
+      <video src="clips/levanhien_analyzed.mp4" poster="img/clip_levanhien.jpg" muted autoplay loop playsinline></video>
+      <div class="caption">signalized boulevard, survey camera — per-zone counts and the live signal decision</div>
+    </div>
+    <div>
+      <video src="clips/hcmc_analyzed.mp4" poster="img/clip_hcmc.jpg" muted autoplay loop playsinline></video>
+      <div class="caption">dense mixed traffic — motorcycle-dominant flow, detected and PCU-weighted</div>
+    </div>
+  </div>
+  <p style="margin-top:18px">No staging: every frame runs camera → detection → counts → decision, the identical code path the junction controller uses. Detectors fine-tune <strong>per site</strong> — each camera gets a model trained on its own view.</p>
+  <div class="foot"><span>relay</span><span>05</span></div>
+</section>
+
+<!-- 6 · measured results -->
+<section class="slide">
+  <div class="kicker">Measured</div>
+  <h2>Typical wait, halved</h2>
+  <div class="grid2">
+    <div>
+      <div class="lbl">median wait per vehicle — identical arrivals, seeded A/B</div>
+      <div class="bar" style="width:46%;background:var(--green)">RELAY — 6 s</div>
+      <div style="height:8px"></div>
+      <div class="bar" style="width:92%;background:var(--red)">fixed timer — 12 s</div>
+      <div class="lbl" style="margin-top:20px">95th percentile</div>
+      <div class="bar" style="width:44%;background:var(--green)">RELAY — 21 s</div>
+      <div style="height:8px"></div>
+      <div class="bar" style="width:90%;background:var(--red)">fixed timer — 43 s</div>
+    </div>
+    <div>
+      <div class="big">▼ 44<span class="unit">% avg queue</span></div>
+      <p style="margin-top:10px">measured live in side-by-side A/B — two identical junctions, identical arrivals, one adaptive, one fixed. Range <span class="num">19–59%</span> across demand levels.</p>
+      <p style="margin-top:14px"><strong class="num">−32%</strong> queues across a 3-junction corridor with green-wave coordination.</p>
+      <p style="margin-top:14px;font-size:15px">External anchor: a 2023 SIDRA study of Kathmandu junctions projects <span class="num">33–49%</span> delay reduction from adaptive control — our numbers land inside the published envelope.</p>
+    </div>
+  </div>
+  <div class="foot"><span>relay</span><span>06</span></div>
+</section>
+
+<!-- 7 · why nobody else -->
+<section class="slide">
+  <div class="kicker">Landscape</div>
+  <h2>Built for roads the incumbents weren't priced for</h2>
+  <table>
+    <tr><th>system</th><th>cost / intersection</th><th>senses</th><th>pedestrians</th><th>emergency priority</th></tr>
+    <tr><td>SCATS / SCOOT</td><td class="num">$20k–80k</td><td>inductive loops (cut the road)</td><td>push-button</td><td>extra hardware</td></tr>
+    <tr><td>Surtrac</td><td class="num">$20k+</td><td>radar + camera rack</td><td>partial</td><td>partial</td></tr>
+    <tr><td>Lalitpur AI lights (2024)</td><td>—</td><td>camera, vehicle density only</td><td>none</td><td>none</td></tr>
+    <tr class="hl"><td>R.E.L.A.Y.</td><td class="num">~$250–400</td><td>one existing CCTV camera</td><td>counted &amp; served</td><td>visual + transponder, bounded</td></tr>
+  </table>
+  <p style="margin-top:22px">Nepal already proved the demand: Lalitpur's camera-based lights (Dec 2024) still run today. They read density only — no pedestrian service, no ambulance priority, no per-lane skip. That's the gap we occupy.</p>
+  <div class="foot"><span>relay</span><span>07</span></div>
+</section>
+
+<!-- 8 · engineering honesty -->
+<section class="slide">
+  <div class="kicker">Under the hood</div>
+  <h2>Small, inspectable, hard to kill</h2>
+  <div class="grid3">
+    <div class="card"><h3>Detector</h3><p>YOLO11s fine-tuned per site on auto-labelled frames — <span class="num" id="map50">0.95</span> mAP@50 on our junctions. Stock weights for unseen cameras, tuned weights after a day on site.</p></div>
+    <div class="card"><h3>Controller</h3><p>~400 lines of max-pressure Python. Every safety property is an executable assertion: no conflicting greens, bounded waits, bounded preemption, clearance always.</p></div>
+    <div class="card"><h3>Degrades safely</h3><p>Camera drops → last counts age out → falls back to fixed cycling. Bad frames, fog, night: the controller never sees raw pixels, only smoothed counts.</p></div>
+    <div class="card"><h3>Edge cases as a register</h3><p><span class="num">85</span> documented cases — dropped RTSP, stuck detections, phantom boxes, saturated gridlock, dual ambulances on crossing axes — each handled in code.</p></div>
+    <div class="card"><h3>Runs on anything</h3><p>Laptop-class inference at <span class="num">27 ms</span>/frame. A $250 edge box handles a junction; no cloud, no connectivity requirement.</p></div>
+    <div class="card"><h3>Honest A/B</h3><p>Every headline number comes from seeded, identical-arrival comparisons — the demo shows both panels live, and the verdict is computed from what's on screen.</p></div>
+  </div>
+  <div class="foot"><span>relay</span><span>08</span></div>
+</section>
+
+<!-- 9 · network -->
+<section class="slide">
+  <div class="kicker">Beyond one junction</div>
+  <h2>Coordination is software, not hardware</h2>
+  <div class="grid2">
+    <div>
+      <img src="img/network.jpg" alt="3-junction network">
+      <div class="caption">three junctions, green-wave: an ambulance's corridor clears ahead of it, junction by junction</div>
+    </div>
+    <div>
+      <p>Junctions share their queue state. A downstream jam lowers the score of feeding it; an ambulance triggers a <strong>sequential green wave</strong> along its route.</p>
+      <ul class="clean" style="margin-top:16px">
+        <li><span class="tick">✓</span><strong class="num">−32%</strong> average queue vs fixed timers</li>
+        <li><span class="tick">✓</span>Green wave verified junction-by-junction</li>
+        <li><span class="tick">✓</span>Zero gridlocks across 45 sim-minutes of saturation</li>
+      </ul>
+      <p style="margin-top:16px">Scaling to a corridor is a config change — the per-junction unit stays identical.</p>
+    </div>
+  </div>
+  <div class="foot"><span>relay</span><span>09</span></div>
+</section>
+
+<!-- 10 · roadmap / ask -->
+<section class="slide">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <div class="kicker">Next</div>
+    <h2>One junction. Ninety days. Measured.</h2>
+    <div class="grid3" style="margin-top:8px">
+      <div class="card"><h3>1 · Pilot site</h3><p>One Kathmandu junction with existing CCTV. Fine-tune on its camera for a day, shadow-mode first — decisions logged, not actuated.</p></div>
+      <div class="card"><h3>2 · Actuate</h3><p>Interface to the signal cabinet, police-override always available. Publish before/after waits from the camera itself.</p></div>
+      <div class="card"><h3>3 · Corridor</h3><p>Extend along one arterial; ambulance green-wave from ring road to the nearest hospital.</p></div>
+    </div>
+    <p style="margin-top:30px;font-size:21px">We're looking for a pilot partner and the funding to run it.<br><strong>The software is done and measured — the road is the missing piece.</strong></p>
+  </div>
+  <div class="foot"><span>relay</span><span>10 · github.com/kafle1/relay</span></div>
+</section>
+
+</div>
+<div class="navui"><span>←</span><span id="pos">1 / 10</span><span>→</span></div>
+<script>
+  const slides=[...document.querySelectorAll('.slide')];let cur=0;
+  function show(n){cur=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach((s,i)=>s.classList.toggle('active',i===cur));
+    document.getElementById('pos').textContent=(cur+1)+' / '+slides.length;
+    document.getElementById('pbar').style.width=((cur+1)/slides.length*100)+'%';
+    slides[cur].querySelectorAll('video').forEach(v=>v.play().catch(()=>{}));}
+  addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();show(cur+1)}
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(cur-1)}
+    if(e.key==='Home')show(0); if(e.key==='End')show(slides.length-1);});
+  addEventListener('click',e=>{if(e.clientX>innerWidth*.7)show(cur+1);if(e.clientX<innerWidth*.3)show(cur-1)});
+  document.querySelectorAll('video').forEach(v=>{v.onerror=()=>{const p=v.getAttribute('poster');if(p){const i=new Image();i.src=p;i.alt='clip';v.replaceWith(i);}};});
+  show(0);
+</script>
+</body>
+</html>
