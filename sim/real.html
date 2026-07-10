@@ -58,22 +58,36 @@
 
   <footer>
     <span id="pipe">—</span>
-    <span class="chip">LEFT APPROACH <b id="cL">—</b> <span class="sig" id="sL">—</span></span>
-    <span class="chip">RIGHT APPROACH <b id="cR">—</b> <span class="sig" id="sR">—</span></span>
+    <span class="chip">BOULEVARD (near) <b id="cL">—</b> <span class="sig" id="sL">—</span></span>
+    <span class="chip">CROSS ST (far) <b id="cR">—</b> <span class="sig" id="sR">—</span></span>
     <span class="note">signal chips = the decision R.E.L.A.Y. would set at this junction, computed live from the boxes above</span>
   </footer>
 
 <script>
 // Real footage through the exact live pipeline: video frames stream over the same /ws the sim
-// uses, the same YOLO + controller answer back. Frame split: left half vs right half = the two
-// conflicting streams one corner CCTV sees (labeled N/E server-side so they compete for green).
+// uses, the same YOLO + controller answer back.
+//
+// This clip (levanhien_suvanhanh_intersection_cctv.mp4) is a pole camera looking straight down a
+// divided boulevard at a real signalized junction, NOT a corner view of two mirrored streams — a
+// plain left/right split does not match reality here:
+//   - right half of frame, near lanes (x 0.52-0.98, y 0.28-0.99, key "N" below) is the actual
+//     queuing approach: vehicles inbound to the stop line, verified to build up under red (peak
+//     ~10-11 detected boxes) and discharge under green (falls to ~4-5) over sampled cycles.
+//   - left half (x<0.5) is the *outbound* carriageway of the same boulevard, on the far side of
+//     the median — same phase as the right half, not competing, and stays near-empty throughout.
+//     It's intentionally excluded from both zones rather than folded into "N", since mixing it in
+//     would just dilute the queue signal with a lane that never queues.
+//   - the real competing stream (key "E" below) is the cross street, visible as the band where
+//     the perpendicular crosswalk cuts across the frame (y 0.14-0.29) — cars/trucks/motorbikes
+//     crossing laterally. Keys are kept as N/E (not renamed to match compass reality) so the rest
+//     of this file's n.N / sL-N wiring doesn't need touching.
 const P = new URLSearchParams(location.search);
 const SRC = P.get('src') || 'footage/real.mp4';
 const ZONES = {
-  N: [[0.02, 0.10], [0.49, 0.10], [0.49, 0.98], [0.02, 0.98]],   // left half
-  E: [[0.51, 0.10], [0.98, 0.10], [0.98, 0.98], [0.51, 0.98]],   // right half
+  N: [[0.52, 0.28], [0.98, 0.28], [0.98, 0.99], [0.52, 0.99]],   // near boulevard approach (queues+discharges)
+  E: [[0.02, 0.14], [0.98, 0.14], [0.98, 0.29], [0.02, 0.29]],   // far cross street (competing phase)
 };
-const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
+const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bicycle: '#ffd60a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
 
 const cam = document.getElementById('cam');
 const overlay = document.getElementById('overlay');
@@ -84,10 +98,12 @@ cam.src = SRC;
 cam.onerror = () => { $('status').textContent = '✗ footage missing — put a clip at sim/' + SRC + ' (or pass ?src=)'; };
 cam.onplaying = () => { $('status').textContent = ''; $('status').style.display = 'none'; };
 
-// stream pump — same shape as the sim's: ~6.7Hz, skip frames when the socket backs up
+// stream pump — same shape as the sim's, paced to the detector's measured latency: a fixed-rate
+// pump piles unread frames server-side and every result lags seconds behind the video.
 const feed = document.createElement('canvas');
 const fctx = feed.getContext('2d');
-let ws = null, wsOpen = false, last = null;
+let ws = null, wsOpen = false, last = null, lastSend = 0;
+const trk = new Map();                     // id → last box position + screen velocity
 
 function connectWS() {
   ws = new WebSocket(`ws://${location.host}/ws`);
@@ -98,6 +114,19 @@ function connectWS() {
   ws.onmessage = e => {
     last = JSON.parse(e.data);
     last.at = performance.now();
+    // per-id screen velocity: draw() places each box where the vehicle is NOW, not where it
+    // was when the frame was captured (a result arrives inference-time behind the video)
+    for (const b of (last.boxes || [])) {
+      if (b.id == null) continue;
+      const p = trk.get(b.id);
+      let vx = 0, vy = 0;
+      if (p) {
+        const s = (last.at - p.at) / 1000;
+        if (s > 0.02 && s < 1) { vx = (b.x - p.x) / s; vy = (b.y - p.y) / s; }
+      }
+      trk.set(b.id, { x: b.x, y: b.y, at: last.at, vx, vy });
+    }
+    for (const [id, p] of trk) if (last.at - p.at > 2000) trk.delete(id);
     const t = last.telemetry || {};
     $('tel').textContent = `${t.model || ''} · ${t.infer_ms} ms/frame`;
     const n = last.counts || {};
@@ -113,11 +142,14 @@ function connectWS() {
 }
 setInterval(() => {
   if (!wsOpen || cam.videoWidth === 0 || cam.paused || ws.bufferedAmount > 200000) return;
+  const gap = Math.max(150, (((last || {}).telemetry || {}).infer_ms || 0) * 1.2);
+  if (performance.now() - lastSend < gap) return;         // one frame in flight per inference slot
+  lastSend = performance.now();
   feed.width = 720;
   feed.height = Math.round(cam.videoHeight / cam.videoWidth * 720);
   fctx.drawImage(cam, 0, 0, feed.width, feed.height);
   ws.send(JSON.stringify({ type: 'frame', image: feed.toDataURL('image/jpeg', 0.7) }));
-}, 150);
+}, 50);
 
 // overlay: boxes + zone split, mapped onto the displayed (object-fit) video rect
 function draw() {
@@ -134,23 +166,48 @@ function draw() {
   octx.setLineDash([7, 5]);
   octx.lineWidth = 1;
   for (const [dir, poly] of Object.entries(ZONES)) {
-    octx.strokeStyle = (last.signals || {})[dir] === 'green' ? 'rgba(134,239,172,.7)' : 'rgba(255,107,98,.45)';
+    const green = (last.signals || {})[dir] === 'green';
+    octx.strokeStyle = green ? 'rgba(134,239,172,.7)' : 'rgba(255,107,98,.45)';
     octx.beginPath();
     poly.forEach(([x, y], i) => i ? octx.lineTo(x * W, y * H) : octx.moveTo(x * W, y * H));
     octx.closePath(); octx.stroke();
+    // count + would-be signal painted ON the zone: the camera→count→decision chain in one glance
+    const n = (last.counts || {})[dir] ?? 0;
+    const tag = `${n} ${green ? '● GREEN' : '● RED'}`;
+    const tx = (poly[0][0] + poly[1][0]) / 2 * W, ty = poly[0][1] * H + 16;
+    octx.setLineDash([]);
+    octx.font = '700 13px ui-monospace, monospace';
+    octx.fillStyle = 'rgba(11,13,16,.78)';
+    const tw = octx.measureText(tag).width;
+    octx.fillRect(tx - tw / 2 - 6, ty - 12, tw + 12, 18);
+    octx.fillStyle = green ? '#86efac' : '#ff6b62';
+    octx.textAlign = 'center';
+    octx.fillText(tag, tx, ty + 2);
+    octx.textAlign = 'left';
+    octx.setLineDash([7, 5]);
   }
   octx.setLineDash([]);
 
   octx.lineWidth = 1.6;
   octx.font = '600 11px ui-monospace, monospace';
+  // dead-reckon each box forward by its own screen velocity over (result age + inference time);
+  // clamped so an id swap's velocity spike can't fling a box across the frame
+  const lead = Math.min(0.5, (performance.now() - last.at + ((last.telemetry || {}).infer_ms || 0)) / 1000);
+  const cl = v => Math.max(-0.05, Math.min(0.05, v));
   for (const b of (last.boxes || [])) {
+    const p = b.id != null ? trk.get(b.id) : null;
+    const bx = b.x + (p ? cl(p.vx * lead) : 0), by = b.y + (p ? cl(p.vy * lead) : 0);
     const col = BOX_COLORS[b.cls] || '#34c759';
     octx.globalAlpha = Math.min(1, Math.max(0.25, (b.conf - 0.2) * 2.2));
     octx.strokeStyle = col;
-    octx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+    octx.strokeRect(bx * W, by * H, b.w * W, b.h * H);
     if (b.conf >= 0.35) {
+      const label = `${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`;
+      const lx = bx * W, ly = Math.max(11, by * H - 3);
+      octx.fillStyle = 'rgba(11,13,16,.72)';
+      octx.fillRect(lx - 2, ly - 10, octx.measureText(label).width + 5, 13);
       octx.fillStyle = col;
-      octx.fillText(`${b.cls} ${b.conf}`, b.x * W, Math.max(11, b.y * H - 3));
+      octx.fillText(label, lx, ly);
     }
   }
   octx.globalAlpha = 1;
