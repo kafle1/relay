@@ -145,6 +145,8 @@ async def ws(sock: WebSocket):
     await sock.accept()
     ctrl = Controller(four_way(), Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4,
                                           ped_max_wait=45))
+    mdl, names = model, NAMES        # per-connection detector; the zones message may swap it
+    mdl_path = MODEL_PATH
     zones = None
     last = time.monotonic()
     tracks, next_id = {}, 1     # per-connection identity: id -> {box, miss, still}
@@ -155,6 +157,9 @@ async def ws(sock: WebSocket):
         while True:
             msg = await sock.receive_json()
             if msg.get("type") == "zones":
+                if msg.get("model") in MODELS:   # load on the inference thread — YOLO() blocks ~1s
+                    mdl, names = await asyncio.get_running_loop().run_in_executor(INFER, get_model, msg["model"])
+                    mdl_path = MODELS[msg["model"]]
                 zs = msg.get("zones") or {}
                 try:
                     ctrl = Controller(junction_from_dirs(zs.keys()),
@@ -181,13 +186,13 @@ async def ws(sock: WebSocket):
                 imgsz = 960
             _t0 = time.monotonic()
 
-            def _detect(payload=msg["image"], size=imgsz):
+            def _detect(payload=msg["image"], size=imgsz, m=mdl):
                 raw = base64.b64decode(payload.split(",", 1)[1])
                 img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
                 if img is None:
                     return None, None
-                return img, model.predict(img, conf=0.2, iou=0.5, imgsz=size, agnostic_nms=True,
-                                          device=DEVICE, verbose=False)[0]
+                return img, m.predict(img, conf=0.2, iou=0.5, imgsz=size, agnostic_nms=True,
+                                      device=DEVICE, verbose=False)[0]
             try:
                 img, res = await asyncio.get_running_loop().run_in_executor(INFER, _detect)
             except Exception:
@@ -205,7 +210,7 @@ async def ws(sock: WebSocket):
             for b in (res.boxes or []):
                 # PCU classes only — with the stock 80-class model a pedestrian on the zebra must
                 # not be counted (let alone as a car) and inflate that approach's demand.
-                cls = NAMES.get(int(b.cls), "")
+                cls = names.get(int(b.cls), "")
                 if cls not in PCU:
                     continue
                 if float(b.conf) < CONF.get(cls, CONF["default"]):
@@ -294,7 +299,7 @@ async def ws(sock: WebSocket):
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
                 "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),
-                "telemetry": {"infer_ms": infer_ms, "imgsz": imgsz, "model": os.path.basename(MODEL_PATH)},
+                "telemetry": {"infer_ms": infer_ms, "imgsz": imgsz, "model": os.path.basename(mdl_path)},
                 "metrics": True,   # client-side numbers are measured on the client; /metrics has the benchmark
             })
     except Exception as e:

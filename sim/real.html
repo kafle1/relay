@@ -45,7 +45,7 @@
   <header>
     <div class="brand">
       <b><span class="dot"></span>R.E.L.A.Y. · REAL CCTV</b>
-      <span>same detector, same controller as the sim — nothing pre-scripted</span>
+      <span>same server, same pipeline, same controller as the sim — stock YOLO11s (each deployment site gets its own fine-tune)</span>
     </div>
     <div id="tel">connecting…</div>
   </header>
@@ -91,7 +91,9 @@ let ws = null, wsOpen = false, last = null;
 
 function connectWS() {
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: ZONES })); };
+  // stock model: this footage is an unseen junction — our fine-tune knows the sim + its own
+  // training cameras, stock COCO generalizes to fresh real-world scenes (measured, not vibes)
+  ws.onopen = () => { wsOpen = true; ws.send(JSON.stringify({ type: 'zones', zones: ZONES, model: 'stock' })); };
   ws.onclose = () => { wsOpen = false; last = null; $('tel').textContent = 'reconnecting…'; setTimeout(connectWS, 800); };
   ws.onmessage = e => {
     last = JSON.parse(e.data);
