@@ -104,7 +104,7 @@
 | 5 | "priority mapping, abulance school bus vip" | ambulance: visual detect + preempt ✅; school-bus/VIP: same `emergency_boost` mechanism, needs only a class + weight (no free 3D/visual signature — documented, not faked) | ◐ |
 | 6 | "lanes are bad in kathmandu consider everything" | approach polygons not lane lines; PCU weights | ✅ |
 | 7 | "if there is 2 in other then we send other but … we cant let 2 old ones keep waiting" | aging weight + max-wait force-serve; asserted by self-check | ✅ |
-| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (78 cases) + in-code handling | ✅ |
+| 8 | "consider every edge cases" (×3) | docs/edge-cases.md (85 cases) + in-code handling | ✅ |
 | 9 | "re validate everything that i said" | premise re-validation (baseline, VIP politics, claim honesty) | ✅ |
 | 10 | "lane that needs to wait for 200 seconds even if there is 2 bikes and the empty lane is given green" | empty-phase-skip invariant, asserted by self-check | ✅ |
 | 11 | "footages must be like top view of junction, or 4 different cameras for 4 different direction all cameras synced" | Mode A/B in spec; sim provides both; AI City noted for real 4-cam | ✅ |
@@ -148,6 +148,11 @@
 | 49 | "add a flexible control in comparative view alsop" | the same traffic dial in the compare header, broadcast to both panels equally; reloaded embeds self-resync; Reset returns the dial to ×1 | ✅ |
 | 50 | "whole codebase has so much shits clean all … dont overcomplicate" | cruft audit applied: dead junction factories, self-check leftovers, duplicated helper, pid-file cruft, 4 unreferenced vehicle models, orphan doc — audit verdict on the rest: "unusually tight" | ✅ |
 | 51 | "see line by one from every pov … make insanely good that will drop their jaws … make it perfect" | adversarial judge fleet over all three surfaces; 4 HIGH demo-killers found+fixed+re-verified (silent 🚑/surge no-ops, organic-siren hijack, benchmark-over-losing-panel verdict, multi-tab server starvation); every screenshot re-shot; tagged v1.0-hackathon | ✅ |
+| 52 | "such small issues lots of them are there, check all one by one and fix it all, also fixed times have issue why are vehicles stuck ther its green still its not moving also computer vision must be shown everywhere detecting vehicle and all dont simulate" | 32-agent review fleet → 7 confirmed findings, all fixed same morning (edge cases 79–85); green-but-stuck root-caused twice (ped walling + box gate counting its own green's traffic) and measured at 0 stalls after; live CV boxes on every camera surface: BOTH compare panels, solo live, real.html. network.html stays the coordination story — its wide 3-junction shot puts vehicles at ~15 px where detection would be theater, not proof | ◐ |
+| 53 | "compeltely rethink from 0 level if you were given to solve this how would you do and present and make it in same way you are sent to a hackathon" | first-principles re-verdict: architecture confirmed (camera → YOLO → max-pressure → lights, A/B proof); the gap was believability on real pixels → real.html shipped and the runbook re-sequenced around it (beat 4b) | ✅ |
+| 54 | "everything looks fake right now find real cc tv footages also and do it on real also" | 3 verified static-camera junction clips found + downloaded (HCMC/Dhaka/Hanoi, sources in footage/, not redistributed); sim/real.html runs the HCMC clip through the SAME server/YOLO/controller — live boxes, per-side counts, signal decision chips; measured finding: stock YOLO beats our fine-tune on unseen real junctions → per-connection model choice, framed honestly as "per-site fine-tune by design" | ✅ |
+| 55 | "till 10 am we have time" | demo-day gate passed on the final build: all 5 surfaces green on a fresh server, `make check` 36.0% / p50 6s-vs-12s (matches the numbers card), runbook says reboot before demo | ✅ |
+| 56 | "continue until we reach goal" | this audit: registers trued up (66/67 wording, 78→85 cases, README count), no orphan scripts found, working tree clean, everything pushed | ✅ |
 
 ◐ = mechanism built and honest about the remaining piece (documented above), not silently skipped.
 
@@ -829,3 +834,49 @@
   <status>completed</status>
   <summary>Background command "Wait for divergence recorder" completed (exit code 0)</summary>
   </task-notification>
+
+- http://127.0.0.1:8000/?live=1 i see no boxes detecting
+
+- continue until we reach goal
+
+- ● CCTV 1 — what the system reads
+  
+  dont show it in this way thats you are showing there show all thos vehicle detectoin all there
+
+- <task-notification>
+  <task-id>b8lkdlso5</task-id>
+  <tool-use-id>toolu_01BAcSiTYUDiQyJy7ZsEFboc</tool-use-id>
+  <output-file>/private/tmp/claude-501/-Users-nirajkafle-Desktop-niraj-dev-projects-trafficmgmt/d87df45c-07f0-4abe-8b33-66669438922f/tasks/b8lkdlso5.output</output-file>
+  <status>killed</status>
+  <summary>Background command "Restart via make dev with full batch" was stopped</summary>
+  </task-notification>
+
+- in junction vehicles are colliding with each other causing jam fix that, vehicles must never ever collide because of that we have traffic light, also the boxes of detecting vehicle has issue make it properly detect in real time and show which vehicle is that also box must be properly perfect 
+  
+  
+  Goal: Identify and fix bugs or edge cases.
+  
+  Rules:
+  - Understand the root cause of the bug before fixing (not just symptoms).
+  - Write minimal, targeted fixes — don’t introduce new complexity.
+  - Add/adjust tests to cover the fixed bug and edge cases.
+  - Double-check that fixes don’t break other parts of the system.
+  - this will be your flow: understand, plan, fix, test, cleanup
+  - Clean up any temporary or redundant code after fixing.
+  - rather than fixing and ptaching things later do not let that thing happen in the first place so that later patch thing is not needed and we can remove it completely
+  every line must be written by senior human developer, not by ai by just adding random lines even if its not that necessary, ai does over complicating things i dont need that
+  also make sure there is no runtime and build issues at the end
+  YOU ARE NOT STOPPING AT ANY COST UNTIL EVERYTHING IS DONE COMPLETELY 
+  you have access to litterally everything you need
+  completey fix this issue from the whole system i should never get this error, fix it permanently
+  your fixes must not be temporary patches, it must be robust solution to wider range of that issue covering all cases
+  while fixing whatever i say, think from your brain too what are the edge cases and what other bugs can be there and fix it
+  
+  in the name of fixing dont overcomplicate things it must be simplified
+  at the end recheck is 100% done from your side if not do it and do not stop until then
+  do all and do not stop until all done idc 50k line is changed
+  make max use of subagents
+  
+  if you feel stuck then do more deep dive research on the internet and everywhere possible,what are making is made by someone already what every single problem we facing is fixed by other keep research ing keep improving and keep testing until we hit rockbottom
+
+- ● CCTV 1 — what the system reads still there when i roate view of that 3d

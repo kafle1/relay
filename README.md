@@ -115,7 +115,7 @@ tools/
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
   camera_demo.py, draw_zones.py, verify_labels.py   webcam demo · zone setup · label QA
-docs/               research synthesis · design spec · 78-case edge-case register
+docs/               research synthesis · design spec · 85-case edge-case register
 ```
 
 ## Deploying on a new junction — no training required
