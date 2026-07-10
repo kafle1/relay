@@ -20,5 +20,3 @@ sim/frames/
 .DS_Store
 .agent-browser/
 
-# claude tooling
-.claudeignore

@@ -2,7 +2,7 @@
 
 *One rule: never claim a number this sheet doesn't back. Every beat below is live, not a video.*
 
-## Pre-demo checklist (do this BEFORE judges arrive)
+## Pre-demo checklist (do this BEFORE the audience arrives)
 - [ ] `make dev` — wait for "live server →" line + junction visible at http://127.0.0.1:8000/?live=1
 - [ ] Open a second tab: http://127.0.0.1:8000/compare.html (leave it warming — its charts accumulate)
 - [ ] Check http://127.0.0.1:8000/real.html plays with boxes (needs `sim/footage/real.mp4` on this machine — not in the repo)

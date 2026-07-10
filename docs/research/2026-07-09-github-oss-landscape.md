@@ -19,7 +19,7 @@ congestion-monitoring dashboard with ByteTrack + Jetson guide) both stop at dete
 
 ## The crowd we must not be confused with
 
-Hundreds of near-identical student/hackathon clones: YOLO count → weighted green-time formula,
+Hundreds of near-identical student clones: YOLO count → weighted green-time formula,
 maybe ambulance class, no fairness, no safety bounds, no closed loop, mostly dead repos, mostly
 unlicensed. Best-of-breed reference: mihir-m-gandhi/Adaptive-Traffic-Signal-Timer (202★, IEEE
 ICRAIE 2020) — per-class weighted counts (a PCU table like ours) + Pygame sim, still images only.
@@ -51,7 +51,7 @@ Ours can, and proves it with a runnable self-check."*
 5. Prior-art honesty: "max-pressure is proven theory (Varaiya 2013); pedestrian-aware max-pressure
    was published in 2024 without code; we're the first to run either on a live camera."
 
-## Deferred — post-hackathon only (documented so we don't forget; NOT build items now)
+## Deferred — later phase only (documented so we don't forget; NOT build items now)
 
 - **Downstream-pressure term**: textbook max-pressure subtracts downstream queue (spillback
   prevention): weight = upstream − turn-ratio-weighted downstream (Varaiya 2013; sumo-rl
