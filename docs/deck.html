@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>R.E.L.A.Y. — traffic lights that can see</title>
+<title>R.E.L.A.Y. — adaptive traffic signals</title>
 <style>
   :root{
     --bg:#fcfbf9; --ink:#141618; --mut:#68716c; --faint:#a3aaa5; --line:#e9e7e1;
@@ -33,7 +33,6 @@
   img,video{width:100%;border-radius:14px;border:1px solid var(--line);display:block;box-shadow:0 3px 14px rgba(20,24,20,.09)}
   .cap{font-size:17px;color:var(--mut);margin-top:11px;line-height:1.35}
   .cap b{color:var(--ink)}
-  .quip{font-size:17px;color:var(--faint);margin-top:22px}
   .bar{height:42px;border-radius:10px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:700;color:#fff;white-space:nowrap}
   .lbl{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 9px;font-weight:700}
   .step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;flex:1;box-shadow:0 1px 3px rgba(20,24,20,.05)}
@@ -68,109 +67,107 @@
   <div class="kicker">Kathmandu</div>
   <h1>R.E.L.A.Y.</h1>
   <p class="sub" style="font-size:34px;margin-top:22px"><b>Traffic lights that can see.</b></p>
-  <p class="sub" style="margin-top:-6px">Green goes where the traffic is.</p>
-  <p class="cap" style="margin-top:-10px;margin-bottom:14px">R.E.L.A.Y. = Real-time Evaluation of Lane Activity for Yield-control</p>
-  <div style="margin-top:8px">
-    <span class="pill">one camera</span><span class="pill">one small computer</span><span class="pill">the lights you already have</span>
+  <p class="sub" style="margin-top:-6px">One camera per junction. Green goes to the road that needs it.</p>
+  <p class="cap" style="margin-top:-10px;margin-bottom:16px">R.E.L.A.Y. stands for Real-time Evaluation of Lane Activity for Yield-control</p>
+  <div style="margin-top:6px">
+    <span class="pill">one camera</span><span class="pill">one small computer</span><span class="pill">the existing lights</span>
   </div>
-  <p class="quip">The camera was already there. It was just bored.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>Niraj Kafle · July 2026</span><span>01</span></div>
 </section>
 
 <!-- 2 · problem -->
 <section class="slide">
   <div class="kicker">The problem</div>
-  <h2>Today's lights are timers.<br>Timers can't see.</h2>
-  <div class="grid4" style="margin-top:12px">
-    <div class="stat"><div class="v r">200 s</div><div class="k">everyone waits while 2 bikes hold a green</div></div>
-    <div class="stat"><div class="v r">90%</div><div class="k">of the city's signals sat dark for years</div></div>
-    <div class="stat"><div class="v r">0</div><div class="k">ambulance priority today</div></div>
-    <div class="stat"><div class="v a">$20&ndash;80k</div><div class="k">twenty to eighty thousand dollars per junction for the big commercial systems</div></div>
+  <h2>Our traffic lights run on<br>fixed timers</h2>
+  <p class="sub">The timer gives every road the same green, whether 40 vehicles are waiting or none.</p>
+  <div class="grid4" style="margin-top:4px">
+    <div class="stat"><div class="v r">200 s</div><div class="k">a full road can wait while 2 bikes hold the green</div></div>
+    <div class="stat"><div class="v r">90%</div><div class="k">of the city's installed signals stopped working years ago</div></div>
+    <div class="stat"><div class="v r">0</div><div class="k">ambulances get no priority at any junction</div></div>
+    <div class="stat"><div class="v a">$20&ndash;80k</div><div class="k">what foreign adaptive systems cost, per junction</div></div>
   </div>
-  <div class="lbl">one cycle at a fixed-timer junction</div>
-  <div class="bar" style="width:92%;background:var(--red)">loaded lane. waits 200 seconds.</div>
+  <div class="lbl">one signal cycle today</div>
+  <div class="bar" style="width:92%;background:var(--red)">40 vehicles wait 200 seconds</div>
   <div style="height:9px"></div>
-  <div class="bar" style="width:30%;background:var(--amber)">empty lane. full green anyway.</div>
+  <div class="bar" style="width:30%;background:var(--amber)">empty road gets its full green</div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>02</span></div>
 </section>
 
 <!-- 3 · idea -->
 <section class="slide">
-  <div class="kicker">The idea</div>
-  <h2>An eye, a brain, a light switch</h2>
+  <div class="kicker">What we built</div>
+  <h2>The camera counts.<br>The light follows.</h2>
   <div class="steps" style="margin-top:16px">
-    <div class="step"><div class="n">1</div><b>See</b><span>Camera finds every vehicle.</span></div>
+    <div class="step"><div class="n">1</div><b>See</b><span>The camera detects every vehicle on each road.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Count</b><span>Each road gets a score. Bus &gt; bike.</span></div>
+    <div class="step"><div class="n">2</div><b>Count</b><span>Each road gets a score. A bus counts more than a bike.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>Decide</b><span>Biggest score gets green. Empty roads skipped.</span></div>
+    <div class="step"><div class="n">3</div><b>Decide</b><span>The road with the highest score gets the green.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">4</div><b>Switch</b><span>Yellow, all-red, next green.</span></div>
+    <div class="step"><div class="n">4</div><b>Switch</b><span>Yellow first, then all red for a moment, then the next green.</span></div>
   </div>
   <div class="grid3" style="margin-top:20px">
-    <div class="card"><p><b>Ambulances jump the queue.</b> Time-limited, nothing freezes.</p></div>
-    <div class="card"><p><b>Pedestrians count too.</b> Walk light holds while anyone is on the zebra.</p></div>
-    <div class="card"><p><b>No black box.</b> The rulebook is a page of readable math.</p></div>
+    <div class="card"><p><b>Ambulances get green before they arrive,</b> for a limited time.</p></div>
+    <div class="card"><p><b>Pedestrians are counted too.</b> The walk light stays on while someone is crossing.</p></div>
+    <div class="card"><p><b>The decision logic is one page of published math.</b> Anyone can check it.</p></div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>03</span></div>
 </section>
 
 <!-- 4 · how it decides -->
 <section class="slide">
-  <div class="kicker">How it decides</div>
-  <h2>Every road gets a score.<br>Biggest score gets green.</h2>
-  <p class="sub">Score = traffic waiting × time waited. One real moment:</p>
+  <div class="kicker">The decision, step by step</div>
+  <h2>Each road gets a score.<br>Highest score gets the green.</h2>
+  <p class="sub">The score is how much traffic is waiting, and for how long. Here is one moment from a real run:</p>
   <div class="grid4">
     <div class="stat" style="border:2px solid var(--green);background:var(--greenbg)">
       <div class="lbl" style="margin-top:0;color:var(--green)">North</div>
       <div class="v g">8.6</div>
-      <div class="k">8 bikes, 2 cars, 1 bus. <b>Wins.</b></div>
+      <div class="k">8 bikes, 2 cars, 1 bus. Highest score, <b>so it gets the green.</b></div>
     </div>
     <div class="stat">
       <div class="lbl" style="margin-top:0">South</div>
       <div class="v">3.8</div>
-      <div class="k">3 cars. Score keeps growing.</div>
+      <div class="k">3 cars. Still waiting, so its score keeps growing.</div>
     </div>
     <div class="stat">
       <div class="lbl" style="margin-top:0">East</div>
       <div class="v">0</div>
-      <div class="k">Empty. <b>Skipped.</b></div>
+      <div class="k">Nothing is waiting here. <b>It gets no green at all.</b></div>
     </div>
     <div class="stat" style="border:2px solid var(--amber)">
       <div class="lbl" style="margin-top:0;color:var(--amber)">West</div>
       <div class="v a">1 car</div>
-      <div class="k">Waiting 85 s. <b>Guaranteed next.</b></div>
+      <div class="k">Has waited 85 seconds already, <b>so it will be served next.</b></div>
     </div>
   </div>
-  <div class="lbl" style="margin-top:22px">four rules no score can break</div>
+  <div class="lbl" style="margin-top:22px">fixed rules that always apply</div>
   <div class="grid4">
-    <div class="card"><p><b>Nobody waits past 90 s.</b></p></div>
-    <div class="card"><p><b>Ambulance beats all.</b> Briefly.</p></div>
-    <div class="card"><p><b>Green lasts 5 to 45 seconds.</b></p></div>
-    <div class="card"><p><b>Queue gone? Move on.</b></p></div>
+    <div class="card"><p>No one waits more than <b>90 seconds.</b></p></div>
+    <div class="card"><p>An ambulance goes first, <b>for a limited time.</b></p></div>
+    <div class="card"><p>Every green lasts <b>5 to 45 seconds.</b></p></div>
+    <div class="card"><p>When a lane empties, <b>the green moves on.</b></p></div>
   </div>
-  <p class="quip">That's the whole brain. Your bank's login form is more complicated.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>04</span></div>
 </section>
 
 <!-- 5 · demo: simulated city -->
 <section class="slide">
-  <div class="kicker">Demo 1 · the simulated city</div>
-  <h2>We built a small city<br>so it could practice</h2>
+  <div class="kicker">Demo 1 · training ground</div>
+  <h2>We trained it in a simulator<br>we built ourselves</h2>
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/live_loop.jpg" alt="live simulated junction">
-      <div class="cap"><b>Live, not a recording.</b> The detector reads this like a real street camera.</div>
+      <div class="cap">This runs live in a browser. The detector reads it the same way it reads a real camera.</div>
     </div>
     <div>
       <div class="grid2" style="gap:18px">
-        <div class="stat"><div class="v g">∞</div><div class="k">free, perfect training footage</div></div>
-        <div class="stat"><div class="v g">61</div><div class="k">frames per second. Turns, buses, pedestrians, physics.</div></div>
-        <div class="stat"><div class="v g">1 click</div><div class="k">rush hour on demand</div></div>
-        <div class="stat"><div class="v g">0</div><div class="k">collisions possible</div></div>
+        <div class="stat"><div class="v g">∞</div><div class="k">training images, labelled automatically by the simulator</div></div>
+        <div class="stat"><div class="v g">61</div><div class="k">frames per second, with turns, buses and pedestrians</div></div>
+        <div class="stat"><div class="v g">1 click</div><div class="k">to create rush hour, or send an ambulance through</div></div>
+        <div class="stat"><div class="v g">0</div><div class="k">collisions are possible inside the simulation</div></div>
       </div>
-      <p class="sub" style="margin-top:20px;font-size:21px">Real footage here is police-only. So we built our own city. <b>Same brain, both worlds.</b></p>
-      <p class="quip">No pedestrians were harmed.</p>
+      <p class="sub" style="margin-top:20px;font-size:21px">Junction camera footage in Kathmandu is police-only. The simulator gave us unlimited footage to train on. <b>The same model then reads real cameras.</b></p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>05</span></div>
@@ -178,42 +175,42 @@
 
 <!-- 6 · demo: real streets -->
 <section class="slide">
-  <div class="kicker">Demo 2 · real streets</div>
-  <h2>Same brain, real traffic</h2>
+  <div class="kicker">Demo 2 · real footage</div>
+  <h2>The same model on real streets</h2>
   <div class="grid2" style="margin-top:8px">
     <div>
       <video src="clips/levanhien_analyzed.mp4" poster="img/clip_levanhien.jpg" muted autoplay loop playsinline></video>
-      <div class="cap"><b>Signalized boulevard.</b> Live counts and the signal decision.</div>
+      <div class="cap">A signalized road. The system counts each zone and shows which signal it would give, live on the footage.</div>
     </div>
     <div>
       <video src="clips/hanoi_analyzed.mp4" poster="img/clip_hanoi.jpg" muted autoplay loop playsinline></video>
-      <div class="cap"><b>Hanoi roundabout.</b> Every vehicle counted, live.</div>
+      <div class="cap">A roundabout in Hanoi. Around 40 vehicles found and counted in every frame.</div>
     </div>
   </div>
-  <p class="sub" style="margin-top:18px;font-size:21px">Nothing staged. Accuracy 0.95 on cameras it was tuned for.</p>
+  <p class="sub" style="margin-top:18px;font-size:21px">Detection accuracy is 0.95 out of 1 on cameras the model was trained for.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
 </section>
 
 <!-- 7 · demo: the race -->
 <section class="slide">
-  <div class="kicker">Demo 3 · the race</div>
-  <h2>Twin junctions, same cars</h2>
+  <div class="kicker">Demo 3 · the measurement</div>
+  <h2>Tested against a fixed timer,<br>same traffic on both</h2>
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/compare.jpg" alt="side by side comparison">
-      <div class="cap"><b>The fair test.</b> Left runs R.E.L.A.Y., right runs a timer. Verdict computed live.</div>
+      <div class="cap">Two copies of the same junction receive identical traffic. The left one runs R.E.L.A.Y., the right one runs a fixed timer. The result is measured live on screen.</div>
     </div>
     <div>
       <div class="big">▼44%<small> queue</small></div>
-      <div class="lbl">typical wait</div>
-      <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. · 6 s</div>
+      <div class="lbl">typical wait per vehicle</div>
+      <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. · 6 seconds</div>
       <div style="height:8px"></div>
-      <div class="bar" style="width:88%;background:var(--red)">timer · 12 s</div>
-      <div class="lbl">worst waits</div>
-      <div class="bar" style="width:42%;background:var(--green)">R.E.L.A.Y. · 21 s</div>
+      <div class="bar" style="width:88%;background:var(--red)">fixed timer · 12 seconds</div>
+      <div class="lbl">longest waits</div>
+      <div class="bar" style="width:42%;background:var(--green)">R.E.L.A.Y. · 21 seconds</div>
       <div style="height:8px"></div>
-      <div class="bar" style="width:86%;background:var(--red)">timer · 43 s</div>
-      <p class="cap" style="margin-top:14px">A 2023 Kathmandu study predicts 33 to 49%. We measure inside that range.</p>
+      <div class="bar" style="width:86%;background:var(--red)">fixed timer · 43 seconds</div>
+      <p class="cap" style="margin-top:14px">A 2023 engineering study of Kathmandu junctions estimated 33 to 49% improvement from adaptive signals. Our result sits inside that range.</p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>07</span></div>
@@ -221,19 +218,19 @@
 
 <!-- 8 · demo: network -->
 <section class="slide">
-  <div class="kicker">Demo 4 · junctions that talk</div>
-  <h2>The ambulance rides a green wave</h2>
+  <div class="kicker">Demo 4 · several junctions</div>
+  <h2>Junctions share what they see</h2>
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/network.jpg" alt="three junction network">
-      <div class="cap"><b>Three junctions, one conversation.</b> The route turns green ahead of the siren.</div>
+      <div class="cap">Three junctions in a row. When an ambulance enters, each junction turns its road green before the ambulance reaches it.</div>
     </div>
     <div>
       <div class="grid2" style="gap:18px">
-        <div class="stat"><div class="v g">−32%</div><div class="k">queues vs fixed timers</div></div>
-        <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 min of worst case</div></div>
+        <div class="stat"><div class="v g">−32%</div><div class="k">less queueing than fixed timers, across all three</div></div>
+        <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 minutes of maximum traffic</div></div>
       </div>
-      <p class="sub" style="margin-top:20px;font-size:21px">A jam calms the junction feeding it. <b>Scaling is a settings change.</b></p>
+      <p class="sub" style="margin-top:20px;font-size:21px">When one junction gets congested, the junction before it sends fewer cars. <b>Adding a junction is a configuration change, not new hardware.</b></p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>08</span></div>
@@ -241,52 +238,52 @@
 
 <!-- 9 · cost -->
 <section class="slide">
-  <div class="kicker">The economics</div>
-  <h2>Costs less than the phone<br>in your pocket</h2>
+  <div class="kicker">Cost</div>
+  <h2>A fraction of what cities<br>usually pay</h2>
   <table style="margin-top:12px">
     <tr><th>system</th><th>cost / junction</th><th>needs</th><th>pedestrians</th><th>ambulances</th></tr>
     <tr><td>SCATS / SCOOT<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive systems from Australia and the UK</span></td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
-    <tr><td>Surtrac<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar rack</td><td>partial</td><td>partial</td></tr>
-    <tr><td>Lalitpur AI lights</td><td>&mdash;</td><td>camera, density only</td><td>none</td><td>none</td></tr>
-    <tr class="win"><td>R.E.L.A.Y.</td><td>~$250&ndash;400</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, bounded</td></tr>
+    <tr><td>Surtrac<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar on every arm</td><td>partial</td><td>partial</td></tr>
+    <tr><td>Lalitpur AI lights<br><span style="font-size:13px;color:var(--faint);font-weight:400">running since December 2024</span></td><td>&mdash;</td><td>camera, reads density only</td><td>none</td><td>none</td></tr>
+    <tr class="win"><td>R.E.L.A.Y.</td><td>~$250&ndash;400</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
   </table>
-  <p class="sub" style="margin-top:22px;font-size:21px">Nobody digs up a single road.</p>
+  <p class="sub" style="margin-top:22px;font-size:21px">No road is dug up. The camera is usually already installed.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
 </section>
 
 <!-- 10 · trust -->
 <section class="slide">
-  <div class="kicker">Can we trust it?</div>
-  <h2>Its worst day is<br>a normal traffic light</h2>
+  <div class="kicker">Safety</div>
+  <h2>What happens when<br>something goes wrong</h2>
   <div class="grid3" style="margin-top:16px">
-    <div class="card"><p><b>Fails safe.</b> Camera dies? It becomes a plain timer.</p></div>
-    <div class="card"><p><b>13 safety rules,</b> checked by the code itself.</p></div>
-    <div class="card"><p><b>85 failure cases</b> written down and handled.</p></div>
-    <div class="card"><p><b>Shadow mode first.</b> It watches before it touches.</p></div>
-    <div class="card"><p><b>Police keep the override.</b> Always.</p></div>
-    <div class="card"><p><b>Readable brain.</b> AI only counts. Math decides.</p></div>
+    <div class="card"><p><b>If the camera fails,</b> the junction goes back to a normal fixed timer.</p></div>
+    <div class="card"><p><b>13 safety rules are checked by the software itself.</b> Crossing greens are impossible.</p></div>
+    <div class="card"><p><b>85 failure situations are documented and handled</b> in the code.</p></div>
+    <div class="card"><p><b>It runs in watch-only mode first.</b> It controls nothing until the logs prove it works.</p></div>
+    <div class="card"><p><b>Traffic police keep a manual override</b> at all times.</p></div>
+    <div class="card"><p><b>The AI only counts vehicles.</b> The signal decision comes from readable math.</p></div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>10</span></div>
 </section>
 
 <!-- 11 · pros & cons -->
 <section class="slide">
-  <div class="kicker">The honest slide</div>
-  <h2>Pros and cons.<br>Yes, we wrote the cons down.</h2>
+  <div class="kicker">Honest assessment</div>
+  <h2>Strengths and weaknesses</h2>
   <div class="grid2" style="gap:26px;margin-top:10px">
     <div>
-      <div class="lbl" style="color:var(--green);margin-top:0">for</div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> 50 to 300× cheaper. Camera already there.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Vehicles, pedestrians, ambulances. All served.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Measured, not promised.</p></div>
-      <div class="card"><p><b style="color:var(--green)">✓</b> Worst case = today's timer.</p></div>
+      <div class="lbl" style="color:var(--green);margin-top:0">strengths</div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> 50 to 300 times cheaper than existing systems.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Serves vehicles, pedestrians and ambulances.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Every number here was measured, not estimated.</p></div>
+      <div class="card"><p><b style="color:var(--green)">✓</b> At worst, it behaves like today's fixed timer.</p></div>
     </div>
     <div>
-      <div class="lbl" style="color:var(--red);margin-top:0">against, with our answer</div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Cameras have bad nights. <b>Train on them; else fall back to timer.</b></p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Each site needs a tune-up day. <b>Automatic. A day, not a project.</b></p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Total gridlock beats everyone. <b>We win everywhere below it.</b></p></div>
-      <div class="card"><p><b style="color:var(--red)">✕</b> Kathmandu's lights died of neglect. <b>Ordinary parts, remote checks, shadow mode.</b></p></div>
+      <div class="lbl" style="color:var(--red);margin-top:0">weaknesses, and what we do about them</div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Night and heavy rain reduce camera accuracy. <b>We train on that footage, and the fallback is the fixed timer.</b></p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Every junction needs one day of training on its own camera. <b>The labelling is automatic.</b></p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> In total gridlock, no signal system helps. <b>Below that point, the numbers above hold.</b></p></div>
+      <div class="card"><p><b style="color:var(--red)">✕</b> Kathmandu's old lights died from poor maintenance. <b>We use ordinary parts and remote monitoring, and start in watch-only mode.</b></p></div>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>11</span></div>
@@ -294,28 +291,27 @@
 
 <!-- 12 · kathmandu rollout -->
 <section class="slide">
-  <div class="kicker">Kathmandu, concretely</div>
-  <h2>Lalitpur opened the door.<br>We walk through it.</h2>
+  <div class="kicker">The plan for Kathmandu</div>
+  <h2>Lalitpur showed cameras work here.<br>We take the next step.</h2>
   <div class="grid2" style="gap:26px;margin-top:10px">
     <div>
-      <div class="lbl" style="margin-top:0">the rollout</div>
-      <div class="card" style="margin-bottom:13px"><p><b>1 · One junction,</b> existing police camera.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b>2 · One day of footage</b> tunes the detector.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b>3 · Thirty days watching only.</b> Public dashboard, zero risk.</p></div>
-      <div class="card"><p><b>4 · Then it drives.</b> Police keep the override. Numbers published.</p></div>
+      <div class="lbl" style="margin-top:0">rollout</div>
+      <div class="card" style="margin-bottom:13px"><p><b>1.</b> One junction that already has a police camera.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b>2.</b> One day of that camera's footage trains the detector.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b>3.</b> Thirty days in watch-only mode, results on a public dashboard.</p></div>
+      <div class="card"><p><b>4.</b> Then it controls the lights. Police keep the override.</p></div>
     </div>
     <div>
-      <div class="lbl" style="margin-top:0">beyond Lalitpur's AI lights</div>
+      <div class="lbl" style="margin-top:0">compared with Lalitpur's system</div>
       <table>
         <tr><th></th><th>Lalitpur</th><th>R.E.L.A.Y.</th></tr>
-        <tr><td>reads</td><td>density only</td><td>every vehicle, weighed</td></tr>
+        <tr><td>reads</td><td>traffic density only</td><td>every vehicle, weighed by size</td></tr>
         <tr><td>pedestrians</td><td>not sensed</td><td>counted &amp; served</td></tr>
-        <tr><td>ambulances</td><td>no priority</td><td>priority, bounded</td></tr>
-        <tr><td>empty lanes</td><td>still get greens</td><td>skipped</td></tr>
-        <tr><td>junctions</td><td>each alone</td><td>green waves</td></tr>
-        <tr><td>results</td><td>not published</td><td>public, by design</td></tr>
+        <tr><td>ambulances</td><td>no priority</td><td>green before arrival</td></tr>
+        <tr><td>empty roads</td><td>still get green</td><td>get none</td></tr>
+        <tr><td>junctions</td><td>work alone</td><td>coordinate</td></tr>
+        <tr><td>results</td><td>not published</td><td>public dashboard</td></tr>
       </table>
-      <p class="cap" style="margin-top:12px">They proved cameras survive the valley. We finish the job.</p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>12</span></div>
@@ -323,17 +319,16 @@
 
 <!-- 13 · ask -->
 <section class="slide">
-  <div class="kicker">The ask</div>
-  <h2>One junction. Ninety days.<br>Measured in public.</h2>
+  <div class="kicker">What we need</div>
+  <h2>One junction, ninety days,<br>results in public</h2>
   <div class="steps" style="margin-top:18px">
-    <div class="step"><div class="n">1</div><b>Pilot</b><span>Existing cameras. Watching only. Zero risk.</span></div>
+    <div class="step"><div class="n">1</div><b>Pilot</b><span>An existing camera, watch-only mode. No risk to traffic.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Drive</b><span>Police keep the override. Numbers published.</span></div>
+    <div class="step"><div class="n">2</div><b>Control</b><span>It runs the lights. Police keep the override. Results published.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>Corridor</b><span>Green wave to the nearest hospital.</span></div>
+    <div class="step"><div class="n">3</div><b>Extend</b><span>One main road, with ambulance priority to the nearest hospital.</span></div>
   </div>
-  <p class="sub" style="margin-top:34px;font-size:30px"><b>The software is built and measured.<br>The road is the missing piece.</b></p>
-  <p class="quip">Green lights for everyone. Well, everyone who's actually there.</p>
+  <p class="sub" style="margin-top:34px;font-size:30px"><b>The software is built and measured.<br>We need a junction and a partner to prove it on the road.</b></p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>github.com/kafle1/relay</span><span>13</span></div>
 </section>
 
