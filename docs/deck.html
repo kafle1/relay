@@ -10,7 +10,28 @@
     --green:#0c8a45; --greenbg:#e9f6ee; --red:#d23b31; --amber:#b26a00;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#edece7;color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  body{background:#0d120f;color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .slide.active>*{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+  .slide.active>*:nth-child(2){animation-delay:.06s}.slide.active>*:nth-child(3){animation-delay:.12s}
+  .slide.active>*:nth-child(4){animation-delay:.18s}.slide.active>*:nth-child(5){animation-delay:.24s}
+  .slide.active>*:nth-child(6){animation-delay:.3s}.slide.active>*:nth-child(7){animation-delay:.36s}
+  .slide.active>*:nth-child(8){animation-delay:.42s}
+  .slide.active .grid2>*,.slide.active .grid3>*,.slide.active .grid4>*,.slide.active .steps>*{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+  .slide.active .grid3>*:nth-child(2),.slide.active .grid4>*:nth-child(2),.slide.active .steps>*:nth-child(3){animation-delay:.3s}
+  .slide.active .grid3>*:nth-child(3),.slide.active .grid4>*:nth-child(3),.slide.active .steps>*:nth-child(5){animation-delay:.4s}
+  .slide.active .grid4>*:nth-child(4),.slide.active .steps>*:nth-child(7){animation-delay:.5s}
+  .foot{animation:none !important}
+  .dots{display:flex;gap:12px;margin-bottom:26px}
+  .dots i{width:17px;height:17px;border-radius:50%}
+  .dots i:nth-child(1){background:#ff5348;box-shadow:0 0 18px rgba(255,83,72,.55)}
+  .dots i:nth-child(2){background:#ffb340;box-shadow:0 0 18px rgba(255,179,64,.5)}
+  .dots i:nth-child(3){background:#38d97a;box-shadow:0 0 22px rgba(56,217,122,.65)}
+  .dark{background:#0e1411;color:#f2f6f2}
+  .dark .sub{color:#a7bcae}.dark .sub b{color:#fff}
+  .dark .cap{color:#7f9488}.dark .foot{color:#5d6f63}
+  .dark .kicker{color:#4fdd8d}
+  .dark .pill{background:#17342566;color:#7ee2a8;border:1px solid #23503a}
   .deck{position:absolute;inset:0;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;overflow:hidden;background:var(--bg);font-size:calc(min(100vw, 177.78vh)/100)}
   .slide{position:absolute;inset:0;padding:56px 76px 66px;display:none;flex-direction:column;justify-content:center}
   .slide.active{display:flex}
@@ -57,13 +78,55 @@
   .big{font-size:9.4em;font-weight:700;letter-spacing:-.045em;color:var(--green);line-height:1}
   .big small{font-size:0.23em;color:var(--mut);font-weight:400;letter-spacing:0}
 </style>
+<style id="theme-blue">
+  /* blue theme skin: chrome goes blue, signal colors stay semantic */
+  :root{
+    --bg:#f6f9fd; --ink:#0e1b2e; --mut:#5b6b80; --faint:#93a2b5; --line:#e2e9f4;
+    --blue:#2563eb; --bluedeep:#1d4ed8; --bluebg:#e8f0fe;
+  }
+  body{background:#0a1220}
+  .deck{background:var(--bg)}
+  .slide::before{content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(37,99,235,.055) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(37,99,235,.055) 1px,transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(130% 110% at 50% 0%,#000 35%,transparent 95%);
+    mask-image:radial-gradient(130% 110% at 50% 0%,#000 35%,transparent 95%)}
+  .slide>*:not(.foot):not(.wm){position:relative;z-index:1}
+  .wm{position:absolute;right:20px;bottom:-14px;font-size:13em;font-weight:800;letter-spacing:-.05em;
+      color:rgba(37,99,235,.055);z-index:0;pointer-events:none;user-select:none;white-space:nowrap;line-height:1}
+  .kicker{color:var(--blue)}
+  .pill{background:var(--bluebg);color:var(--bluedeep)}
+  .pbar{background:linear-gradient(90deg,#2563eb,#38bdf8)}
+  .card,.stat,.step{border-color:var(--line);
+    box-shadow:0 1px 2px rgba(13,27,46,.05),0 14px 34px -20px rgba(37,99,235,.35)}
+  img,video{box-shadow:0 22px 48px -22px rgba(13,27,46,.5);border-color:#d8e2f2}
+  .step .n{background:var(--bluebg);color:var(--bluedeep)}
+  .arr{color:var(--blue)}
+  .stat .v{color:var(--ink)}
+  .stat .v.g{color:var(--green)}.stat .v.r{color:var(--red)}.stat .v.a{color:var(--amber)}
+  .big{background:linear-gradient(115deg,#0c8a45,#2dd4bf);-webkit-background-clip:text;background-clip:text;
+       -webkit-text-fill-color:transparent}
+  .win td{background:var(--bluebg);color:#1e3a8a}.win td:first-child{color:var(--bluedeep)}
+  th{background:#f2f6fc}
+  .dark{background:radial-gradient(120% 140% at 20% 0%,#12244a 0%,#0b1526 55%,#091120 100%);color:#f0f5fb}
+  .dark::before{background-image:linear-gradient(rgba(120,170,255,.09) 1px,transparent 1px),
+                                 linear-gradient(90deg,rgba(120,170,255,.09) 1px,transparent 1px)}
+  .dark .kicker{color:#6ea8ff}
+  .dark .sub{color:#a8bad2}.dark .sub b{color:#fff}
+  .dark .cap{color:#7e91ab}.dark .foot{color:#5b6d87}
+  .dark .pill{background:rgba(37,99,235,.16);color:#8fbaff;border:1px solid #24406e}
+  .dark .wm{color:rgba(120,170,255,.07)}
+  .dark h1{text-shadow:0 0 60px rgba(56,130,246,.35)}
+</style>
 </head>
 <body>
 <div class="pbar" id="pbar"></div>
 <div class="deck">
 
 <!-- 1 · title -->
-<section class="slide active">
+<section class="slide dark active">
+  <div class="dots"><i></i><i></i><i></i></div>
   <div class="kicker">Kathmandu</div>
   <h1>R.E.L.A.Y.</h1>
   <p class="sub" style="font-size:2.1em;margin-top:22px"><b>Traffic lights that can see.</b></p>
@@ -368,7 +431,8 @@
 </section>
 
 <!-- 13 · closing -->
-<section class="slide">
+<section class="slide dark">
+  <div class="dots"><i></i><i></i><i></i></div>
   <div class="kicker">Kathmandu</div>
   <h1 style="font-size:6em">R.E.L.A.Y.</h1>
   <p class="sub" style="font-size:2.1em;margin-top:18px"><b>Traffic lights that can see.</b></p>
@@ -392,6 +456,8 @@
   addEventListener('click',e=>{if(e.clientX>innerWidth*.7)show(cur+1);if(e.clientX<innerWidth*.3)show(cur-1)});
   document.querySelectorAll('video').forEach(v=>{v.onerror=()=>{const p=v.getAttribute('poster');if(p){const i=new Image();i.src=p;i.alt='clip';v.replaceWith(i);}};});
   slides.forEach((s,i)=>{const f=s.querySelector('.foot span:last-child');if(f)f.textContent=String(i+1).padStart(2,'0');});
+  slides.forEach(s=>{const k=s.querySelector('.kicker');const w=document.createElement('div');w.className='wm';
+    w.textContent=(k?k.textContent.replace(/^the /i,'').split(/[ ,·]/)[0]:'RELAY').toUpperCase();s.appendChild(w);});
   show(0);
 </script>
 </body>
