@@ -72,6 +72,11 @@
     .left  .strip b{ color:var(--red); } .right .strip b{ color:var(--grn); }
     .strip .u{ font-size:11px; }
 
+    #orbit-hint{ position:absolute; left:12px; bottom:12px; z-index:7; pointer-events:none;
+      font-size:11px; color:var(--muted); background:var(--panel2); border:1px solid var(--line);
+      border-radius:8px; padding:6px 10px; animation:hintfade 1s ease 14s forwards; }
+    @keyframes hintfade{ to{ opacity:0; } }
+
     /* ── chart ── */
     #chartwrap{ border-top:1px solid var(--line); background:rgba(9,11,14,.5); padding:9px 16px 8px; display:flex; flex-direction:column; }
     .chead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
@@ -107,21 +112,26 @@
 
   <main id="stage">
     <section class="panel left">
-      <iframe id="fL" title="fixed timer" src="/?embed=1&lockfixed=1&live=1"></iframe>
-      <div class="label"><b>TODAY</b><span>fixed timer · blind 20s cycle</span></div>
+      <!-- no live=1: the blind panel showing detector boxes was a story contradiction AND its
+           frames queued on the single YOLO worker, halving the adaptive panel's reaction rate.
+           src is set by the script below: both panels share one ?seed so their arrivals are
+           IDENTICAL (common random numbers) — the A/B compares control, not luck. -->
+      <iframe id="fL" title="fixed timer"></iframe>
+      <div class="label"><b>TODAY</b><span>fixed timer · blind cycle</span></div>
       <div class="strip">queued <b id="qL">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wL">—</span> <span class="u">avg queued · 30s</span></div>
     </section>
     <section class="panel right">
-      <iframe id="fR" title="relay adaptive" src="/?embed=1&live=1"></iframe>
+      <iframe id="fR" title="relay adaptive"></iframe>
       <div class="label"><b>WITH R.E.L.A.Y.</b><span>adaptive · reads the camera</span></div>
       <div class="strip">queued <b id="qR">—</b> <span class="u">now</span> &nbsp;·&nbsp; <span id="wR">—</span> <span class="u">avg queued · 30s</span></div>
     </section>
     <div id="divider"></div>
+    <div id="orbit-hint">🖱 drag / scroll inside a panel to move its camera</div>
   </main>
 
   <footer id="chartwrap">
     <div class="chead">
-      <div class="t"><b>vehicles queued</b> — last 120s · same demand (busy N–S, quiet E–W)</div>
+      <div class="t"><b>vehicles queued</b> — last 120s · identical arrivals, same seed (busy N–S, quiet E–W)</div>
       <div class="legend"><span><i class="lf"></i>fixed timer</span><span><i class="lr"></i>R.E.L.A.Y.</span></div>
     </div>
     <canvas id="chart"></canvas>
@@ -271,12 +281,21 @@
 
     // ── scenario controls: broadcast into both sims ──
     const fL = $('fL'), fR = $('fR');
+    // one seed, two panels: identical arrival sequences (common random numbers) — same vehicle,
+    // same second, same arm, in both. Reset deals a fresh hand, still shared.
+    let seed = (Math.random() * 0x7fffffff) | 0;
+    const loadPanels = () => {
+      fL.src = `/?embed=1&lockfixed=1&seed=${seed}`;
+      fR.src = `/?embed=1&live=1&seed=${seed}`;
+    };
+    loadPanels();
     const sendBoth = cmd => { for (const f of [fL, fR]) { try { f.contentWindow.postMessage({ cmd }, '*'); } catch {} } };
     $('b-amb').onclick   = () => sendBoth('amb');
     $('b-surge').onclick = () => sendBoth('surge');
     $('b-reset').onclick = () => {
       S.L = { q: null, hist: [] }; S.R = { q: null, hist: [] };
-      sendBoth('reset');
+      seed = (Math.random() * 0x7fffffff) | 0;
+      loadPanels();
       setDial(1);                                   // reloaded embeds restart at ×1 — keep the readout honest
     };
 

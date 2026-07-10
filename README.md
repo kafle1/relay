@@ -38,8 +38,8 @@ ambulance button preempts each junction in sequence: a green wave down the corri
 
 - **Perception:** one YOLO model reads a fixed junction camera → per-approach, per-class vehicle
   counts (PCU-weighted, so a bus ≠ a motorcycle).
-- **Control:** weighted **max-pressure** — `score(phase) = PCU-demand + w_wait · oldest-wait +
-  emergency-boost` — with empty-phase skip, gap-out, min/max-green, yellow + all-red clearance,
+- **Control:** queue-weighted **max-pressure** — `score(phase) = PCU-demand × (1 + wait/max_wait)
+  + ped-pressure + emergency-boost` — with empty-phase skip, gap-out, min/max-green, yellow + all-red clearance,
   hard anti-starvation, and emergency preemption. Every safety invariant is asserted by a runnable
   self-check (`src/controller.py`).
 - **Pedestrians are demand, not decoration:** people waiting to cross add pressure to the phase
@@ -115,7 +115,7 @@ tools/
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
   camera_demo.py, draw_zones.py, verify_labels.py   webcam demo · zone setup · label QA
-docs/               research synthesis · design spec · 85-case edge-case register
+docs/               research synthesis · design spec · 96-case edge-case register
 ```
 
 ## Deploying on a new junction — no training required

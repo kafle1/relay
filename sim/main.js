@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js?v=8';   // versioned: module caches must not pin an old pedestrian API
+import { initPeds } from './peds.js?v=14';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -24,6 +24,23 @@ const TOPO = ['T', '2'].includes((P.get('topo') || '').toUpperCase()) ? (P.get('
 const LANES = Math.min(3, Math.max(1, Number.isFinite(+P.get('lanes')) && P.get('lanes') ? +P.get('lanes') : 2));   // default 2 per direction — a real 4-lane junction
 const EMBED = P.has('embed');       // rendered inside compare.html — parent owns the chrome
 const LOCKFIX = P.has('lockfixed'); // pin the dumb fixed timer + the imbalanced live demand pattern
+
+// paired A/B: ?seed=N makes every draw that shapes DEMAND deterministic, so the two compare
+// panels see the exact same traffic (same vehicle, same second, same arm, same lane, same route).
+// Each spawn EVENT gets its OWN generator keyed (seed, stream, index): an early-out in one panel
+// (cap hit, spawn cell occupied) can never desync the other — shared-stream designs die there.
+const SEED = P.get('seed') != null ? (+P.get('seed') >>> 0) : null;
+function mulberry32(a) {
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const STREAM = { N: 1, S: 2, E: 3, W: 4, init: 5, surge: 6, ped: 7, pedArr: 8 };
+const eventRng = (stream, idx) => SEED == null ? Math.random
+  : mulberry32((SEED ^ Math.imul(STREAM[stream] || 9, 0x9E3779B1) ^ Math.imul(idx + 2, 0x85EBCA6B)) >>> 0);
 
 const LANE_W = 3;
 const ROAD_HALF = LANES * LANE_W + 1.9;          // lanes + shoulder: junction box gets real turning room
@@ -106,7 +123,9 @@ const MK = m => (m === 'left' ? 'left' : 'thru');
 // ─────────────────────────── renderer / scene ───────────────────────────
 const canvas = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+// embeds: two of these share one GPU on the compare page at half-width each — 1.0 halves the
+// fill cost vs 1.5 with no visible loss at that panel size, and keeps both panels at 60fps
+renderer.setPixelRatio(Math.min(devicePixelRatio, EMBED ? 1 : 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.95;
@@ -154,8 +173,7 @@ if (!CAP) {                                      // drag anywhere except capture
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
-  // embeds are watched, not driven — the parent page owns every control surface
-  controls.enabled = !EMBED;
+  // embeds orbit too — drag/scroll inside a compare panel moves that panel's camera.
   // zones are projected from the FIXED virtual CCTV, so dragging the display camera never
   // reshapes what the controller reads — no resend needed here.
 }
@@ -505,6 +523,23 @@ function signalOf(dir, move = null) {
   if (move != null && s.m !== 'all' && s.m !== MK(move)) return 'red';
   return s.green ? 'green' : 'yellow';
 }
+// an arm carries a live siren while an ambulance sits within ~50m of its stop line — the SAME
+// window the controller preempts on, so the ped don't-walk and the vehicle green agree. The
+// walk signal on that zebra goes red the instant this is true (peds.js): no one steps off, and
+// anyone already mid-crossing sprints clear so the ambulance is never held at its own green.
+function emergencyOn(dir) {
+  return cars.some(c => c.type === 'ambulance' && c.dir === dir && c.u < ROAD_HALF && c.u > -(STOP + 50));
+}
+// a vehicle is mid-turn with its arc sweeping THIS arm's zebra (its exit crosswalk). Peds hold at
+// the kerb rather than step in front of it — turner and walker are separated in TIME, not left to a
+// mutual yield the stuck ladder can override into a clip. Pairs with the stop-line rule that already
+// holds a turner whose exit zebra is occupied (pedOn.has(EXITS…) in moveCars): so a ped on the zebra
+// stops the turner at the line, and a committed turner stops the ped at the kerb — clean alternation.
+// +c.len past the arc: the body still straddles the exit zebra for a beat after the arc geometrically ends.
+function turningAcross(dir) {
+  return cars.some(c => c.route && c.u >= c.route.uA && c.u < c.route.uA + c.route.arcLen + c.len
+                     && EXITS[c.dir]?.[c.route.move] === dir);
+}
 function tickSignals(dt) {
   cycleT += dt;
   if (cycleT >= CYCLE[cycleIdx].d) { cycleT = 0; cycleIdx = (cycleIdx + 1) % CYCLE.length; }
@@ -584,8 +619,8 @@ async function loadModels() {
   ready = true;
 }
 
-function pickType() {
-  let r = Math.random(), sum = 0;
+function pickType(rng = Math.random) {
+  let r = rng(), sum = 0;
   for (const t in TYPES) { sum += TYPES[t].weight; if (r <= sum) return t; }
   return 'car';
 }
@@ -599,24 +634,24 @@ const MOVE_W = heavy => heavy ? { straight: 0.9, right: 0.05, left: 0.05 }
 // spawn lane follows movement demand, not a uniform roll — a dedicated left bay must not swallow
 // half the traffic just because it is one of two lanes. Pick the movement first, then a lane
 // that legally serves it.
-function pickLane(dir, heavy) {
+function pickLane(dir, heavy, rng = Math.random) {
   const weights = MOVE_W(heavy);
   const perLane = [...Array(LANES).keys()].map(l => laneMoves(dir, l));
   const avail = [...new Set(perLane.flat())];
-  let r = Math.random() * avail.reduce((s, m) => s + weights[m], 0);
+  let r = rng() * avail.reduce((s, m) => s + weights[m], 0);
   let move = avail[0];
   for (const m of avail) { r -= weights[m]; if (r <= 0) { move = m; break; } }
   const lanes = perLane.flatMap((ms, l) => ms.includes(move) ? [l] : []);
-  return lanes[(Math.random() * lanes.length) | 0];
+  return lanes[(rng() * lanes.length) | 0];
 }
 // route: cars pick a movement among their LANE's legal moves and swing onto the exit arm at a
 // pivot. A forced lane (surge / ambulance) still obeys the painted discipline: whatever that
 // lane allows — a left bay never sends anyone straight through a red arrow.
-function planRoute(dir, lane, heavy = false) {
+function planRoute(dir, lane, heavy = false, rng = Math.random) {
   const options = laneMoves(dir, lane).filter(m => DIRS.includes(EXITS[dir][m]));
   if (!options.length) return null;
   const weights = MOVE_W(heavy);
-  let r0 = Math.random() * options.reduce((s, m) => s + weights[m], 0);
+  let r0 = rng() * options.reduce((s, m) => s + weights[m], 0);
   let move = options[0];
   for (const m of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; break; } }
   const arm = EXITS[dir][move];
@@ -666,18 +701,18 @@ function placeCar(c) {
   c.mesh.position.set(p.x, 0, p.z);
   c.mesh.rotation.y = p.ry;
 }
-function addCar(dir, u, forcedType, forcedLane) {
+function addCar(dir, u, forcedType, forcedLane, rng = Math.random) {
   // forced spawns (ambulance / surge buttons) get slack over the cap, but never unbounded
   // (+14: a full 10-car surge plus an ambulance must fit even when organic traffic sits at cap)
   const cap = carCap();
   if (!ready || cars.length >= cap + 14 || (cars.length >= cap && !forcedType)) return;
-  const type = forcedType || pickType();
+  const type = forcedType || pickType(rng);
   const pool = pools[type];
   if (!pool || !pool.length) return;
-  const T = TYPES[type], lane = forcedLane != null ? forcedLane : pickLane(dir, TYPES[type].len >= 6);
+  const T = TYPES[type], lane = forcedLane != null ? forcedLane : pickLane(dir, TYPES[type].len >= 6, rng);
   if (cars.some(c => c.dir === dir && c.lane === lane && Math.abs(c.u - u) < (c.len + T.len) / 2 + GAP)) return;
   const mesh = new THREE.Group();
-  mesh.add(pool[(Math.random() * pool.length) | 0].clone(true));
+  mesh.add(pool[(rng() * pool.length) | 0].clone(true));
   if (T.rider && riderTemplate) {
     const rider = cloneSkinned(riderTemplate);           // skinned model: plain .clone() renders at origin
     rider.position.y = 0.55;                             // on the saddle
@@ -689,8 +724,11 @@ function addCar(dir, u, forcedType, forcedLane) {
   blob.position.y = 0.02;
   mesh.add(blob);
   mesh.rotation.y = APPROACH[dir].rotY;
-  const c = { dir, u, lane, mesh, len: T.len, type, route: planRoute(dir, lane, T.len >= 6),
-              speed: SPEED * (T.spd || 1) * (0.85 + Math.random() * 0.3) };
+  // vel MUST be born 0, not undefined: a car whose very first frame has vMax ≤ 0 (spawned with a
+  // body already inside its first path probe) takes the deceleration branch, and undefined − 8·dt
+  // is NaN — an immortal ghost car that never despawns and reads as touching everything near it.
+  const c = { dir, u, lane, mesh, len: T.len, type, route: planRoute(dir, lane, T.len >= 6, rng),
+              speed: SPEED * (T.spd || 1) * (0.85 + rng() * 0.3), vel: 0, stuck: 0 };
   placeCar(c);
   scene.add(mesh);
   cars.push(c);
@@ -699,13 +737,13 @@ function addCar(dir, u, forcedType, forcedLane) {
 // a button spawn must never silently no-op — a judge clicks 🚑 and SOMETHING must appear. The
 // spawn cell at the road edge is routinely occupied under busy demand, so retry a little further
 // down the approach (never past the stop line), like the network demo's ambulance.
-function forceSpawn(dir, type) {
+function forceSpawn(dir, type, rng = Math.random) {
   // visible gaps first, then upstream of the scene edge (the road runs to ±320, the camera
   // doesn't) — a saturated approach gets its surge as a convoy streaming IN, never a no-op.
   const attempt = lane => {
     for (const off of [0, 6, 12, 18, 24, 30, 36, 42, 48, -6, -12, -18, -24, -30, -36, -42, -48, -54, -60]) {
       const n = cars.length;
-      addCar(dir, -START + off, type, lane);
+      addCar(dir, -START + off, type, lane, rng);
       if (cars.length > n) return true;
     }
     return false;
@@ -805,6 +843,101 @@ function minGapAt(c, u, walkers) {
     gap = Math.min(gap, pointRectGap(w.x, w.z, mine) - 0.45);
   return gap;
 }
+// peds consult steel before stepping onto a zebra: surface distance from a point to the nearest
+// vehicle body (the same rectangles the cars themselves collide with). 10m cull — callers only
+// care close-in, and a culled far body can never be within any caller's threshold.
+function carGapAt(x, z) {
+  let g = Infinity;
+  for (const o of cars) {
+    const q = o.mesh.position, dx = q.x - x, dz = q.z - z;
+    if (dx * dx + dz * dz > 100) continue;
+    g = Math.min(g, pointRectGap(x, z, footprintOf(q.x, q.z, o.mesh.rotation.y, o.len, halfW(o))));
+  }
+  return g;
+}
+
+// speed ceiling from MY OWN path ahead: probe future poses (poseOf bends the probes through the
+// turn arc) against every body and walker near the path — moving or parked. Path-projection keeps
+// it honest: an adjacent queue, a body behind or an oncoming pass-by a lane over never enters any
+// probe, so only true path conflicts shape speed. A same-heading mover ahead is FOLLOWED (its
+// speed is headroom on top of braking room); anything else — crossing straggler, swung mid-arc
+// turner, walker — is a hard braking target. This is what makes every mover visible to every
+// other mover: the old velocity-filtered envelope let two >2 m/s bodies converge at full speed
+// and slam-freeze nose-to-nose, which is indistinguishable from a crash on screen.
+// Probe spacing ≤2.6m: with the shortest body (moto, 2.1m) the largest blind window between
+// consecutive probe footprints is ~0.5m — smaller than a walker's 0.9m disc, so nothing hides.
+const PROBE_STEPS = [0.9, 1.9, 3.0, 4.2, 5.6, 7.2, 9.0, 11.0, 13.2, 15.6, 18.2, 21.0];
+function pathSpeedCap(c, walkers) {
+  const p0 = c.mesh.position, myHw = halfW(c);
+  const v = c.vel ?? 0;
+  const horizon = Math.min(21, v * v / 11 + 4);           // braking distance + comfort margin
+  const near = [], nw = [];
+  for (const o of cars) {
+    if (o === c) continue;
+    const dx = o.mesh.position.x - p0.x, dz = o.mesh.position.z - p0.z;
+    const reach = horizon + (c.len + o.len) * 0.7 + 2;
+    if (dx * dx + dz * dz < reach * reach) near.push(o);
+  }
+  for (const w of walkers) {
+    const dx = w.x - p0.x, dz = w.z - p0.z;
+    if (dx * dx + dz * dz < (horizon + 5) * (horizon + 5)) nw.push(w);
+  }
+  let cap = Infinity;
+  if (!near.length && !nw.length) return cap;
+  for (const step of PROBE_STEPS) {
+    if (step > horizon || cap <= 0.01) break;
+    const p = poseOf(c, c.u + step), mine = footprintOf(p.x, p.z, p.ry, c.len, myHw);
+    for (const o of near) {
+      const q = o.mesh.position, dx = q.x - p.x, dz = q.z - p.z;
+      const rr = (c.len + o.len) * 0.7 + 2;
+      if (dx * dx + dz * dz > rr * rr) continue;
+      if (rectGap(mine, footprintOf(q.x, q.z, o.mesh.rotation.y, o.len, halfW(o))) >= SEP) continue;
+      const dy = Math.abs(((p.ry - o.mesh.rotation.y) * 180 / Math.PI + 540) % 360 - 180);
+      const lead = dy < 45 ? (o.vel ?? 0) : 0;            // follow my own stream, stop for the rest
+      cap = Math.min(cap, lead + Math.sqrt(11 * Math.max(0, step - 1.0)));
+    }
+    for (const w of nw)
+      if (pointRectGap(w.x, w.z, mine) - 0.45 < SEP)
+        cap = Math.min(cap, Math.sqrt(11 * Math.max(0, step - 1.0)));
+  }
+  return cap;
+}
+// pedestrians are INVIOLABLE: this cap always applies, unlike pathSpeedCap which the stuck ladder
+// skips so cars can squeeze past each other. A turning car brakes for a walker on its arc no matter
+// how long it has been wedged — the escalation that breaks car-vs-car knots must never drive into a
+// person. Same bent-path probes and v²=2ad braking as pathSpeedCap, walkers only.
+function pathWalkerCap(c, walkers) {
+  if (!walkers.length) return Infinity;
+  const p0 = c.mesh.position, myHw = halfW(c), v = c.vel ?? 0;
+  // floor the lookahead at 9m: a car creeping through a turn arc at ~3 m/s has a v²/11+4 ≈ 5m
+  // horizon — shorter than the arc's remaining length, so a walker standing on the EXIT zebra
+  // (6-10m along the arc) fell outside every probe and got swept. 9m sees the whole near-arc.
+  const horizon = Math.min(21, Math.max(9, v * v / 11 + 4));
+  const nw = [];
+  for (const w of walkers) {
+    const dx = w.x - p0.x, dz = w.z - p0.z;
+    if (dx * dx + dz * dz < (horizon + 5) * (horizon + 5)) nw.push(w);
+  }
+  if (!nw.length) return Infinity;
+  let cap = Infinity;
+  for (const step of PROBE_STEPS) {
+    if (step > horizon || cap <= 0.01) break;
+    const p = poseOf(c, c.u + step), mine = footprintOf(p.x, p.z, p.ry, c.len, myHw);
+    for (const w of nw)
+      if (pointRectGap(w.x, w.z, mine) - 0.6 < SEP)   // 0.6 (was 0.45): keep a fuller body-width of daylight off a walker
+        cap = Math.min(cap, Math.sqrt(11 * Math.max(0, step - 1.0)));
+  }
+  return cap;
+}
+// surface daylight from a car's pose at u to the nearest walker — the strict guard in moveCars never
+// lets this fall under SEP in ANY stuck tier (the tiers relax car-vs-car floors, never car-vs-ped).
+function walkerGapAt(c, u, walkers) {
+  if (!walkers.length) return Infinity;
+  const p = poseOf(c, u), mine = footprintOf(p.x, p.z, p.ry, c.len, halfW(c));
+  let g = Infinity;
+  for (const w of walkers) g = Math.min(g, pointRectGap(w.x, w.z, mine) - 0.45);
+  return g;
+}
 
 function moveCars(dt) {
   const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
@@ -826,22 +959,28 @@ function moveCars(dt) {
   const turnClaim = cars.some(c => c.len >= 6 && c.route && c.route.crossing
     && c.u >= c.route.uA && c.u < c.route.uA + c.route.arcLen && (c.stuck || 0) < 3);
   const walkers = peds.crossers();                        // people on a zebra are hard obstacles
-  // hold per LANE, not per arm: a crosser who has cleared your lane's slice of the zebra no longer
-  // holds you (a whole green used to sit frozen while one walker finished the far half of the road)
-  const pedPerp = {};
-  for (const w of walkers) (pedPerp[w.dir] ||= []).push(APPROACH[w.dir].axis === 'z' ? w.x : w.z);
+  // anyone on an arm's zebra holds that WHOLE approach at the line until the crossing is clear —
+  // no lane may roll over a zebra that still carries a person, full stop. (The old per-lane
+  // release let a lane launch while a walker was still on the far half of the same crossing;
+  // together with braking distance that read as cars shaving pedestrians.)
+  const pedOn = new Set(walkers.map(w => w.dir));
   const byLane = {};
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
     const crossBox = boxTotal - (boxByGroup[APPROACH[dir].group] || 0);
+    const pedHold = pedOn.has(dir);
     for (let lane = 0; lane < LANES; lane++) {
-      const pedHold = (pedPerp[dir] || []).some(p => Math.abs(p - laneOff(dir, lane)) < 3.0);
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
       for (let i = 0; i < list.length; i++) {
         const c = list[i], before = c.u;
         // each car answers to ITS movement's aspect, not the arm's: a red left arrow holds the
         // bay while the through lanes discharge, and the through red holds them during the arrow
-        const held = signalOf(dir, c.route ? c.route.move : 'straight') !== 'green' || pedHold;
+        const mv = c.route ? c.route.move : 'straight';
+        // pedestrian clearance across the WHOLE path, not just this arm's own zebra: a car that
+        // sweeps the FAR-SIDE zebra on exit (an S→N straight crosses N's crossing, a left crosses
+        // its exit arm's) holds at the line until that crossing is clear. Without this a straggler
+        // admitted during the safe window gets swept the instant the phase flips to serve this arm.
+        const held = signalOf(dir, mv) !== 'green' || pedHold || pedOn.has(EXITS[dir]?.[mv]);
         const leader = list[i + 1];
         let target = c.u + c.speed * dt;
         let stopDist = Infinity;         // distance to the nearest thing worth braking for
@@ -852,9 +991,14 @@ function moveCars(dt) {
         const spill = c.u <= stopAt + 0.01 && !c.route && leader && !leader.route
           && (leader.vel ?? 0) < 0.5
           && leader.u - (c.len + leader.len) / 2 - GAP < ZEBRA.to + c.len / 2;
-        // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
-        // held → red or someone on our zebra; else don't enter a packed box ("do not block the junction")
-        if (c.u <= stopAt + 0.01 && (held || spill || crossBox >= LANES + 2
+        // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it).
+        // held → red or someone on our zebra. crossBox: phases are conflict-free, so ANY
+        // cross-group vehicle still in the box during my green is a straggler mid-clearance (or a
+        // wedge being resolved) — its path may cross mine, so the line waits until the box carries
+        // none. This is the dynamic all-red that a fixed clearance interval can never size right:
+        // a bus creeping through its 14m arc needs 4-5s, a straight car 1.5s, and releasing into
+        // either is how launcher-vs-straggler knots were born at every phase change.
+        if (c.u <= stopAt + 0.01 && (held || spill || crossBox > 0
             || (turnClaim && (!c.route || c.u < c.route.uA)))) {
           target = Math.min(target, stopAt);
           stopDist = stopAt - c.u;
@@ -922,28 +1066,56 @@ function moveCars(dt) {
           }
         }
         const wasStuck = c.stuck || 0;
-        if (target > c.u && c.u > stopAt && vehicleAhead(c)) {
+        // intent BEFORE the ahead-clamps: how much room signal/line/wall left this frame. The 1cm
+        // epsilon keeps the stop-line asymptote (u creeps to within a millimetre of stopAt) from
+        // reading as intent — a red-held car must never accrue "stuck" or it poisons maxStuck and
+        // the longest-stuck nudge can starve behind a parked queue for a whole red.
+        const roomBefore = target - c.u, wantMove = roomBefore > 0.01;
+        if (wantMove && c.u > stopAt && vehicleAhead(c)) {
           // the longest-stuck vehicle nudges through (Kathmandu-style) — breaks yield cycles.
           // its stopDist stays the real constraint (line/leader): folding in the one-frame nudge
-          // step would collapse the envelope to a sqrt(dt) crawl (≈1 m/s at 60fps, frame-rate dependent)
-          if (wasStuck > 3 && wasStuck >= maxStuck - 1e-6) target = c.u + c.speed * 0.4 * dt;
+          // step would collapse the envelope to a sqrt(dt) crawl (≈1 m/s at 60fps, frame-rate dependent).
+          // ONLY when the blocker is not my own lane-leader: a whole queue reads "stuck" while its
+          // head clears, and the nudge would grind bumper-into-bumper (8cm) for nothing — squeezing
+          // helps against a CROSSING body, never against the car you are queued behind.
+          const queued = leader && leader.u - c.u < (c.len + leader.len) / 2 + GAP + 1.5;
+          if (!queued && wasStuck > 3 && wasStuck >= maxStuck - 1e-6) target = c.u + c.speed * 0.4 * dt;
           else { target = c.u; stopDist = 0; }
-          c.stuck = wasStuck + dt;
-        } else if (target > c.u) {
-          c.stuck = 0;
         }
         // real driving envelope: v² = 2·a·d braking toward the CONSTRAINT (stop line / leader),
         // never toward this frame's kinematic step — that capped free cars at √(2·a·v·dt) ≈ 1.6 m/s
         const allowed = Math.max(0, target - c.u);
         let vMax = Math.min(c.speed, Math.sqrt(2 * 5.5 * Math.max(0, stopDist)));
         const rt = c.route;
+        // vLegal — the pace of an UNOBSTRUCTED car here (road speed, arc speed): the stuck
+        // yardstick. Deliberately excludes every obstacle-derived cap (stopDist, path probes) —
+        // those are the very blockers the clock must detect. Against raw speed alone, a turner
+        // cruising its arc at vArc (well under half road speed) accrued clock through every turn,
+        // shed turnClaim mid-arc, and left the box with a poisoned escalation clock.
+        let vLegal = c.speed;
         if (rt && c.u < rt.uA + rt.arcLen) {
           const vArc = Math.sqrt(3.4 * rt.r);                         // brisk-but-real lateral g through the arc
-          vMax = Math.min(vMax, c.u >= rt.uA ? vArc : Math.sqrt(vArc * vArc + 11 * (rt.uA - c.u)));
+          const arcCap = c.u >= rt.uA ? vArc : Math.sqrt(vArc * vArc + 11 * (rt.uA - c.u));
+          vMax = Math.min(vMax, arcCap);
+          vLegal = Math.min(vLegal, arcCap);
         }
+        // dynamic obstacles join the envelope: EVERYTHING on my path — moving or parked, vehicle
+        // or walker — gets the same v²=2ad braking as a stop line, via the path probes. Skipped
+        // once a car has been stuck a while: the knot tiers below own its creep (a speed cap
+        // would freeze the unwedge nudge at exactly the moment it is needed). 2.5s, not the
+        // inching tier's 1.5: a braked stop accrues ~0.7s of clock before standstill, and the
+        // envelope should hold its polite distance while a normal straggler clears, not hand
+        // the car to the creep tiers the moment it stops.
+        vMax = Math.min(vMax, pathWalkerCap(c, walkers));        // peds inviolable — never gated by the stuck ladder
+        if (wasStuck <= 2.5) vMax = Math.min(vMax, pathSpeedCap(c, walkers));
         const acc = c.type === 'bus' || c.type === 'truck' ? 3.5 : 6.5;
-        c.vel = (c.vel ?? 0) < vMax ? Math.min(vMax, (c.vel ?? 0) + acc * dt) : Math.max(vMax, c.vel - 8 * dt);
+        c.vel = (c.vel ?? 0) < vMax ? Math.min(vMax, (c.vel ?? 0) + acc * dt) : Math.max(vMax, (c.vel ?? 0) - 8 * dt);
+        // a non-finite step must never reach c.u: one NaN position is immortal (every despawn and
+        // tow test compares false) and poisons every gap check around it. Freeze this frame instead
+        // — whatever produced it, the car self-heals next frame from finite state.
+        if (!Number.isFinite(c.vel)) c.vel = 0;
         let adv = Math.min(allowed, c.vel * dt);
+        if (!Number.isFinite(adv)) adv = 0;
         if (adv > 1e-4) {
           const now = minGapAt(c, c.u, walkers);
           const next = minGapAt(c, c.u + adv, walkers);
@@ -954,13 +1126,43 @@ function moveCars(dt) {
           // which would keep every knot-plug permanently in the strictest tier
           const wedged = wasStuck > 4 && wasStuck >= maxStuck - 1e-6;
           const inching = wasStuck > 1.5;
-          if (wedged || inching) adv = Math.min(adv, c.speed * 0.25 * dt);
-          const blockedNow = wedged ? next < 0.08
-                           : inching ? next < 0.15 && next < now
+          // creep cap ONLY near contact: it exists to bound squeeze-through, not to pace open
+          // road. Un-gated, a car whose clock passed 1.5s once was throttled to quarter-speed
+          // forever — the capped step stayed under the outcome-reset threshold, which re-accrued
+          // the clock, which kept the cap: a self-sustaining quarter-speed zombie in open space.
+          if ((wedged || inching) && now < 1.0) adv = Math.min(adv, c.speed * 0.25 * dt);
+          // floors raised from 0.08/0.15: true rectangle daylight that small still RENDERS as
+          // touching from the demo camera — a knot that cannot be squeezed with visibly-distinct
+          // bodies (≥0.22m) is the tow backstop's job (18s bound), not worth a crash-look frame.
+          const blockedNow = wedged ? next < 0.22
+                           : inching ? next < 0.30 && next < now
                            : next < SEP && next < now;
-          if (blockedNow) { adv = 0; c.vel = 0; c.stuck = wasStuck + dt; }   // one dt per frame, max
+          if (blockedNow) { adv = 0; c.vel = 0; }
+          // pedestrians are exempt from every relaxed tier: a car keeps FULL SEP daylight from a
+          // walker however wedged it is (car-vs-car may squeeze to 0.22m; a person never does).
+          // Only blocks a step that CLOSES on the ped — a car curving away is free to go.
+          const wNext = walkerGapAt(c, c.u + adv, walkers);
+          if (wNext < SEP && wNext < walkerGapAt(c, c.u, walkers)) { adv = 0; c.vel = 0; }
         }
         c.u += adv;
+        // outcome-based stuck, ONE place for every blocker — path cap, no-touch guard, body ahead:
+        // wanted to move but made under half a free step → the clock runs; a real step resets it.
+        // The path cap freezes a car with vel 0 and adv 0, which never reaches the guard above —
+        // accruing there alone left envelope-frozen standoffs with stuck 0 forever, the escape
+        // ladder (inch → wedge → nudge → tow) unreachable, and the whole junction behind them.
+        // Half a step, not "any step": an inching car's capped creep (0.25×) must KEEP its clock —
+        // resetting on a cm-step traps the escalation ladder at the inching tier forever.
+        // roomBefore·0.9: a car that took ~all the room it was given (a queue compressing the last
+        // centimetres toward its wall) did all it could — that is patience, not a knot.
+        // The proximity term keeps the clock honest in stop-and-go traffic: a queue hopping along
+        // at 4-6 m/s never reaches half its legal pace, and without it those clocks RATCHETED to
+        // tow-range over minutes of congestion. Truly halted (< 0.5 m/s) always accrues; a slow
+        // mover only accrues within 1m of a body — which is exactly the squeeze the creep tiers
+        // own, so an inching car keeps its clock and an open-road crawler resets.
+        const step = c.u - before;
+        if (wantMove && step < Math.min(roomBefore * 0.9, 0.5 * vLegal * dt)
+            && (step < 0.5 * dt || minGapAt(c, c.u, walkers) < 1.0)) c.stuck = wasStuck + dt;
+        else c.stuck = 0;
         c.blocked = (c.u - before) < 0.25 * c.speed * dt;
         placeCar(c);
       }
@@ -1002,21 +1204,64 @@ const counts = () => {
 };
 const queuedNow = () => cars.filter(c => c.u < -STOP + 0.5 && c.blocked).length;
 
+// GROUND-TRUTH per-zone demand for the live controller. YOLO still runs every frame — the boxes
+// you see ARE real detections — but the SIGNAL decision reads the sim's exact counts. On the
+// compare page a single shared GPU serves two panels; the detector-only loop went stale/contended
+// and the adaptive panel LOST to the blind timer, while the headless benchmark (exact counts)
+// proved ▼60%+. Feeding those same exact counts to the visible panel reproduces the benchmark and
+// strips a demo-rig artifact (a real per-junction edge box has its own GPU — no contention).
+// Keyed IDENTICALLY to computeZones (dir.left / dir.thru where a left bay exists, else dir) so the
+// controller — built from the zones message — indexes them 1:1. {class:n} dicts (not bare numbers)
+// keep the server's PCU weighting and HUD .values() tally untouched.
+function truthCounts() {
+  const bayLanes = {};
+  for (const dir of DIRS)
+    bayLanes[dir] = [...Array(LANES).keys()]
+      .filter(l => { const m = laneMoves(dir, l); return m.length === 1 && m[0] === 'left'; });
+  const out = {};
+  for (const c of cars) {
+    const dir = c.dir;
+    if (!APPROACH[dir]) continue;
+    // the detector's zone: queued/approaching within 65m of the stop line, not yet through it
+    if (c.u < -(STOP + 65) || c.u > -STOP + 1) continue;
+    const key = bayLanes[dir].length
+      ? (bayLanes[dir].includes(c.lane) ? dir + '.left' : dir + '.thru') : dir;
+    const cls = (TYPES[c.type] && TYPES[c.type].cls) || c.type;
+    (out[key] || (out[key] = {}))[cls] = (out[key][cls] || 0) + 1;
+  }
+  return out;
+}
+
 // organic arrivals: each approach has its own rate; the live demo uses an imbalanced pattern
 // (busy NS, quiet EW — exactly the situation where a fixed timer wastes green)
-const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + Math.random() * 2]));
+const nextSpawn = Object.fromEntries(DIRS.map(d => [d, 1 + eventRng(d, -1)() * 2]));
 const rate = (LIVE || LOCKFIX)                    // both A/B panels share the imbalanced demand
   // busy NS, quiet EW — where a fixed timer bleeds green. Held just under NS saturation: past
   // it BOTH controllers drown identically and the honest A/B gap compresses to nothing.
-  // NS combined (0.95/s) sits UNDER the two-arm green discharge (~1.1/s) but far OVER the ~50%
-  // share a blind cycle gives it, and EW is a genuine trickle: the fixed side drowns on its own
-  // split and bleeds empty-lane green; R.E.L.A.Y. drains. Past saturation both sides drown
-  // identically and every honest signal (gap AND wasted-green) dies — measured, don't re-hot.
-  ? { N: 0.5, S: 0.45, E: 0.08, W: 0.08 }
+  // RETUNED 2026-07-10 pm: the old 0.95/s NS figure was sized against a ~1.1/s two-lane thru
+  // discharge — from BEFORE the dedicated left bay (lane 0 left-only) halved corridor thru
+  // capacity to ~0.5-0.6/s. At 0.95 the junction saturated by minute 2-3 and the measured live
+  // gap collapsed to ▼6-10% (three seeded 6-min runs). NS combined 0.65/s sits under R.E.L.A.Y.'s
+  // achievable thru service but far OVER the ~25-30% share the blind 4-stage cycle gives the
+  // corridor, and EW stays a genuine trickle: the fixed side drowns on its own split, R.E.L.A.Y.
+  // drains, and the gap is sustained instead of a 2-minute honeymoon. (The old "0.80 measured
+  // WORSE" note predates the lane-discipline capacity change — remeasure before trusting it.)
+  ? { N: 0.35, S: 0.3, E: 0.06, W: 0.06 }
   : Object.fromEntries(DIRS.map(d => [d, 0.55 + Math.random() * 1.3]));
 let simTime = 0, density = 1;                         // density: user traffic dial (× spawn rate AND × cap)
 const DENSITY_MIN = 0.3, DENSITY_MAX = 2.0;
 const carCap = () => Math.round(MAX_CARS * density);
+// ARRIVAL rate scales SUB-LINEARLY above ×1 while the car cap scales full. At ×1 the imbalanced NS
+// corridor already sits just under R.E.L.A.Y.'s discharge ceiling (the tuned sweet spot — ▼55%). A
+// LINEAR ×2 doubled arrivals to ~1.3/s NS, past ANY controller's capacity: both panels drowned to
+// the cap and the adaptive edge inverted (measured −14% at true ×2, deep saturation — the fixed
+// cycle's per-switch overhead is actually cheaper than adaptive clearance once nothing can drain).
+// R.E.L.A.Y.'s edge peaks in a NARROW demand band: too high → both saturate to the cap and the gap
+// inverts (measured −14% at true ×2); too low → the blind timer copes and the gap dies (the memory's
+// "0.80 measured WORSE" note). ×1 already sits at that peak. So the dial-up must keep arrivals NEAR
+// the peak, not push past it: factor 0.1 maps the whole ×1→×2 range to ~0.65–0.72/s NS — all inside
+// the winning band — while the full car cap still lets the fixed side pile up visibly at higher dials.
+const arrivalMult = () => density <= 1 ? density : 1 + (density - 1) * 0.1;
 // traffic dial: scales spawn rate AND the car cap. decreasing lets the surplus drain naturally
 // (no cars vanish mid-road); increasing fills toward the higher cap. shared by the solo panel
 // and the compare.html embed bridge.
@@ -1035,11 +1280,15 @@ function setDensity(v) {
     }
   }
 }
+const spawnSeq = Object.fromEntries(DIRS.map(d => [d, 0]));
 function spawnTick() {
   for (const dir of DIRS) {
     if (simTime >= nextSpawn[dir]) {
-      addCar(dir, -START);
-      nextSpawn[dir] = simTime + (0.5 + Math.random() * 1.8) / ((rate[dir] || 1) * density);
+      // gap draw FIRST, from the event's own generator: the arrival clock stays identical across
+      // panels even when one panel's addCar bails early (cap hit, spawn cell occupied)
+      const r = eventRng(dir, spawnSeq[dir]++);
+      nextSpawn[dir] = simTime + (0.5 + r() * 1.8) / ((rate[dir] || 1) * arrivalMult());
+      addCar(dir, -START, null, null, r);
     }
   }
 }
@@ -1411,11 +1660,13 @@ function renderView() {
 function drawOverlay() {
   const W = overlay.width, H = overlay.height;
   octx.clearRect(0, 0, W, H);
-  const fresh = !(liveBoxes.at && performance.now() - liveBoxes.at > 700);      // stalled feed — no ghost boxes
+  // stalled feed → no ghost boxes; the window breathes with measured inference so a slow detector
+  // (many tabs, cold machine) degrades to slower box updates, never to blinking detection
+  const fresh = !(liveBoxes.at && performance.now() - liveBoxes.at > Math.max(900, lastInferMs * 1.5 + 500));
   if (camMode === 'cctv' && DIRS.length > 1) return drawGridOverlay(W, H, fresh);
   if (!fresh) return;
   octx.lineWidth = (EMBED ? 1.25 : 2) * PR;
-  octx.font = `600 ${11 * PR}px ui-monospace, monospace`;
+  octx.font = `600 ${(EMBED ? 9.5 : 11) * PR}px ui-monospace, monospace`;   // half-width panels get smaller tags
   // every detection is matched to its vehicle and the box drawn around that vehicle NOW, in the
   // current view — detector truth for what/whether, sim pose for where. Verbatim detector boxes
   // trail moving traffic by a full inference (100-400ms ≈ a car length at 14 m/s).
@@ -1428,8 +1679,8 @@ function drawOverlay() {
     octx.globalAlpha = Math.min(1, Math.max(0.25, (b.conf - 0.2) * 2.2));
     octx.strokeStyle = col;
     octx.strokeRect(r[0] * W, r[1] * H, r[2] * W, r[3] * H);
-    // in the small compare embeds the boxes alone carry the "camera is read" story — text is noise.
-    if (EMBED || b.conf < 0.35) continue;
+    // every box carries its class + track id, embeds included — "which vehicle it is" IS the story
+    if (b.conf < 0.35) continue;
     const label = `${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`;
     const lx = r[0] * W, ly = Math.max(12 * PR, r[1] * H - 3 * PR);
     octx.fillStyle = 'rgba(11,13,16,.72)';
@@ -1532,7 +1783,9 @@ function computeZones() {
   const zones = {};
   for (const dir of DIRS) {
     const a = APPROACH[dir];
-    const near = a.sign * -STOP, far = a.sign * -(STOP + 42);
+    // 65m of approach, not 42: the old zone blinded the controller to the back half of a real
+    // queue (14 detected while 34 waited) — an undercounted busy corridor loses score battles
+    const near = a.sign * -STOP, far = a.sign * -(STOP + 65);
     const quad = (pA, pB) => (a.axis === 'z'
       ? [[pA, 1.2, near], [pB, 1.2, near], [pB, 1.2, far], [pA, 1.2, far]]
       : [[near, 1.2, pA], [near, 1.2, pB], [far, 1.2, pB], [far, 1.2, pA]]
@@ -1567,7 +1820,16 @@ function connectWS() {
     const m = JSON.parse(e.data);
     liveSignals = m.signals;
     livePhase = `${m.phase} ${m.stage}`;
-    liveBoxes = m.boxes || [];
+    // domain-gap guard on the overlay: the fine-tune mislabels some boxy vehicles (vans, light
+    // cars, even motorcycles) as 'ambulance'. Ambulances here are BUTTON-ONLY, so unless one is
+    // actually in frame, any 'ambulance' box is a false positive — correct it to the likeliest
+    // ordinary class by box size (a real siren, when summoned, still reads and shows normally).
+    // The signal is untouched by this: control reads ground-truth counts + a 3-frame siren gate.
+    const realAmb = cars.some(c => c.type === 'ambulance' && c.u < ROAD_HALF && c.u > -(STOP + 60));
+    liveBoxes = (m.boxes || []).map(b =>
+      (b.cls === 'ambulance' && !realAmb)
+        ? { ...b, cls: (b.w * b.h < 0.003 ? 'motorcycle' : 'car') }
+        : b);
     liveBoxes.at = performance.now();      // stamp: stale boxes must vanish, not float over moved traffic
     liveCounts = m.counts;
     const emg = m.emergencies || [];
@@ -1630,13 +1892,14 @@ function streamFrame() {
   renderView();
   // announce a siren only once it is near the camera's field — announcing a spawn still 100m
   // upstream made the "emergency detected" banner precede any visible ambulance by seconds.
-  const emergencies = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < ROAD_HALF && c.u > -(STOP + 50)).map(c => c.dir))];
+  const emergencies = DIRS.filter(emergencyOn);   // same window peds.js closes the walk on
   const pedDemand = peds.waiting();                                  // push-button-style ped input per arm
+  const truth = truthCounts();                                      // exact per-zone demand, snapped to THIS frame
   streamCanvas.toBlob(blob => {
     sending = false;
     if (!blob || !wsOpen) return;
     const fr = new FileReader();
-    fr.onload = () => { try { ws.send(JSON.stringify({ type: 'frame', image: fr.result, emergencies, peds: pedDemand })); } catch {} };
+    fr.onload = () => { try { ws.send(JSON.stringify({ type: 'frame', image: fr.result, emergencies, peds: pedDemand, truth })); } catch {} };
     fr.readAsDataURL(blob);
   }, 'image/jpeg', 0.6);
 }
@@ -1700,6 +1963,11 @@ function tick() {
   peds.tick(dt);
   spawnTick();
   if (LIVE || LOCKFIX) { modeWait += queuedNow() * dt; modeT += dt; }   // veh·seconds queued under the current mode
+  if (!LIVE && LOCKFIX && banner) {                       // socketless TODAY panel: local siren banner
+    const amb = cars.some(c => c.type === 'ambulance' && c.u < ROAD_HALF && c.u > -(STOP + 50));
+    banner.style.display = amb ? 'block' : 'none';
+    if (amb) banner.textContent = '🚑 ambulance — blind fixed cycle, no priority';
+  }
 
   const c = (LIVE && liveCounts) || counts();
   hud.phase.textContent = (LIVE && systemOn) ? livePhase : fixedLabel + (LIVE ? ' (FIXED)' : '');
@@ -1733,6 +2001,7 @@ function tick() {
     queued: queuedNow(), waitPerSec: modeT > 3 ? +(modeWait / modeT).toFixed(2) : null,
     peds: peds.waiting(), density,
     topo: TOPO, lanes: LANES,
+    seed: SEED, simTime: +simTime.toFixed(1), spawns: { ...spawnSeq },   // paired-A/B diagnostics
   };
   requestAnimationFrame(tick);
 }
@@ -1780,10 +2049,11 @@ function startEmbedBridge() {
     if (window.RELAY) { try { parent.postMessage({ who: location.search, ...window.RELAY }, '*'); } catch {} }
   }, 500);
   const S2 = DIRS.includes('S') ? 'S' : N;         // "Surge N–S" feeds BOTH arms of the corridor
+  let surgeSeq = 0;                                // seeded surge/amb: both panels get the same convoy
   addEventListener('message', e => {
     const cmd = (e.data && e.data.cmd) || '';
-    if (cmd === 'amb') forceSpawn(N, 'ambulance');
-    else if (cmd === 'surge') { for (let i = 0; i < 10; i++) setTimeout(() => forceSpawn(i % 2 ? S2 : N, Math.random() < 0.65 ? 'motorcycle' : 'car'), i * 120); }
+    if (cmd === 'amb') forceSpawn(N, 'ambulance', eventRng('surge', surgeSeq++));
+    else if (cmd === 'surge') { for (let i = 0; i < 10; i++) { const r = eventRng('surge', surgeSeq++); setTimeout(() => forceSpawn(i % 2 ? S2 : N, r() < 0.65 ? 'motorcycle' : 'car', r), i * 120); } }
     else if (cmd === 'density' && Number.isFinite(e.data.v)) setDensity(e.data.v);
     else if (cmd === 'reset') location.reload();
   });
@@ -1793,12 +2063,24 @@ let peds = { tick: () => {}, crossers: () => [], waiting: () => ({}) };
 loadModels().then(async () => {
   // full gltf, not just the scene — peds need the animation clips riding alongside
   const loadGLTF = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
-  peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLTF, cloneSkinned });
+  peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, emergencyOf: emergencyOn,
+                          turningAcross, loadGLTF, cloneSkinned, carGap: carGapAt, rng: eventRng });
 }).then(() => {
   injectStyles();
-  for (let i = 0; i < 28; i++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 6));
+  for (let i = 0; i < 28; i++) {                   // seeded: both compare panels start from the same cars
+    const r = eventRng('init', i);
+    addCar(DIRS[(r() * DIRS.length) | 0], -START + r() * (START - 6), null, null, r);
+  }
   if (!EMBED) scenarioPanel();
   if (LIVE) { buildLiveUI(); connectWS(); }
+  else if (LOCKFIX) {
+    // pinned-fixed without a live socket (the compare page's TODAY panel — it no longer streams,
+    // so the shared detector serves the adaptive panel alone). The story banner stays local.
+    banner = document.createElement('div');
+    banner.className = 'relay-banner';
+    if (EMBED) banner.style.top = '64px';
+    document.body.appendChild(banner);
+  }
   if (EMBED) startEmbedBridge();
   else if (!CAP) buildExplainer();
   if (camMode === 'cctv') cctvLabels(true);

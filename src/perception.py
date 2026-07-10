@@ -9,8 +9,17 @@ import time
 
 from controller import PCU  # single source of truth for PCU weights (controller.py owns it)
 
-# per-class confidence: lower for two-wheelers (small, easily missed — edge case A2)
-CONF = {"motorcycle": 0.24, "bicycle": 0.24, "default": 0.38}
+# per-class confidence: lower for two-wheelers (small, easily missed — edge case A2).
+# ambulance runs a HIGH gate: it is the one class that moves signals by itself (emergency
+# preempt), and a marginal read — a white motorcycle, a van roofline — as "ambulance" hijacks
+# the junction for tens of seconds. Real sirens measure ≥0.9 on the fine-tune; 0.68 costs
+# nothing there and silences the impostors (at 0.55, ~0.8% of boxes on an ambulance-free scene
+# still read "ambulance" — measured live). A below-gate ambulance still counts as traffic
+# demand via whatever its second-best read is on the next frame — never as an emergency.
+# truck runs 0.5: at the 0.38 default the live cross-check read ~5x the trucks actually present
+# (phantoms on cars/buses at conf 0.4-0.5; real trucks read 0.7-0.98) — and every phantom truck
+# injects 2.0 PCU of fake demand into the controller.
+CONF = {"motorcycle": 0.24, "bicycle": 0.24, "ambulance": 0.68, "truck": 0.5, "default": 0.38}
 EMERGENCY = {"ambulance"}
 
 

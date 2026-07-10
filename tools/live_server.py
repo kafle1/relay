@@ -53,6 +53,14 @@ def get_model(key):
     """(model, names) for 'ft' or 'stock', loaded once per process."""
     if key not in _loaded:
         m = YOLO(MODELS[key])
+        # warm the MPS kernels now — the first real predict otherwise eats 2-5s and the adaptive
+        # panel spends its opening minute half-blind while the fixed timer needs no warmup.
+        # (device computed inline: the first get_model() call happens before DEVICE is defined)
+        try:
+            dev = "mps" if torch.backends.mps.is_available() else "cpu"
+            m.predict(np.zeros((416, 736, 3), dtype=np.uint8), imgsz=960, device=dev, verbose=False)
+        except Exception:
+            pass
         # ultralytics returns names as a dict, but hub/exported checkpoints can give a list
         _loaded[key] = (m, m.names if isinstance(m.names, dict) else dict(enumerate(m.names)))
     return _loaded[key]
@@ -68,7 +76,7 @@ class LiveCompare:
     """Headless adaptive-vs-fixed on identical arrivals → the live chart."""
     def __init__(self):
         self.J = four_way()
-        self.ad = Controller(self.J, Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4))
+        self.ad = Controller(self.J, Timings(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=45, w_wait=0.4))
         self.fx = FixedTimer(self.J, green=13.0)
         self.qa = {d: 0 for d in self.J.approaches}
         self.qf = {d: 0 for d in self.J.approaches}
@@ -139,16 +147,70 @@ async def metrics():          # async → runs on the event loop, never races st
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
     await sock.accept()
-    ctrl = Controller(four_way(), Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4,
-                                          ped_max_wait=45))
+    # max_green 30 / all_red 1.0: the loaded corridor keeps its green longer and each switch pays
+    # 4.0s of clearance, not 4.5 (the sim's fixed timer pays 3.0 — parity matters in the A/B).
+    # ped_max_wait 60: peds normally cross during natural rotations (walk windows every red);
+    # the force rule is the backstop, not the scheduler.
+    # exactly the twice-measured-winning tune (▼17%/91% and ▼9.5%/73% rolling wins vs the fixed
+    # timer on the live A/B). Trialled variants all measured worse: hysteresis 3 + no split-arm
+    # phases inverted hard; lighter demand let the blind timer cope; longer max_wait starved the
+    # trickle arms' credibility. Don't re-tune without a full seeded A/B run per change.
+    # max_wait 90 (the Timings default), not 45: with per-movement zones there are SIX minor
+    # movement keys each running an independent starvation clock — at 45s a force fired every
+    # ~8s, became the de-facto scheduler, and burned a third of wall time in clearance. 90 keeps
+    # the hard no-starvation bound while the queue-weighted score does the actual scheduling.
+    # (The old "45 measured better" note predates the ped machinery and the multiplicative score.)
+    TUNED = dict(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=90, w_wait=0.4,
+                 ped_max_wait=60, hysteresis=2.5)
+    # hysteresis 2.5 (live only): a single class flicker moves a zone's PCU by ±0.7-2.0, and at
+    # 1.0 that noise alone could flip best-phase and buy a 4s clearance. 2.5 is still far below
+    # the corridor-vs-trickle score gap, so real demand shifts switch exactly as before.
+    ctrl = Controller(four_way(), Timings(**TUNED))
     mdl, names = model, NAMES        # per-connection detector; the zones message may swap it
     mdl_path = MODEL_PATH
     zones = None
-    last = time.monotonic()
     tracks, next_id = {}, 1     # per-connection identity: id -> {box, miss, still}
-    prev_sirens = set()         # YOLO ambulance arms from the PREVIOUS frame (2-frame confirmation)
+    prev_sirens = set()         # YOLO ambulance arms, 1 and 2 frames back (3-frame confirmation:
+    prev2_sirens = set()        # an emergency moves signals by itself, so a flickering misread —
+                                # a white motorcycle for two frames — must never latch a preempt)
     infer_avg = 50.0            # rolling inference-time estimate drives the adaptive input size
     imgsz = 960                 # current input size — switched with hysteresis, never thrashed
+
+    # the controller ticks on ITS OWN wall clock, like a real signal cabinet — frames only refresh
+    # what the camera saw. Ticking per-frame tied signal timing to inference latency: with several
+    # tabs sharing the single YOLO worker, a 3s yellow stretched to 5-6s of wall time and the
+    # adaptive side burned 40% of the demo in clearance (the live A/B inversion of 2026-07-10).
+    latest = {"counts": {d: {} for d in ("N", "S", "E", "W")}, "emergencies": set(),
+              "peds": None, "boxes": [], "telemetry": None}
+    drop_guard = {}             # zone -> (last non-empty counts, stamp): one missed frame ≠ empty road
+
+    async def pusher():
+        last_t = time.monotonic()
+        while True:                     # dies quietly with the socket; the receive loop owns cleanup
+            await asyncio.sleep(0.4)
+            now = time.monotonic()
+            dt, last_t = now - last_t, now
+            try:
+                state = ctrl.tick(latest["counts"], latest["emergencies"], dt, peds=latest["peds"])
+            except Exception as e:      # a bad tick must not kill the signal feed
+                print("tick error:", type(e).__name__, e)
+                continue
+            # HUD counts stay arm-level even when zones are per-movement ("N.thru" + "N.left" → "N")
+            n_counts = {}
+            for d in latest["counts"]:
+                arm = d.split(".")[0]
+                n_counts[arm] = n_counts.get(arm, 0) + sum(latest["counts"][d].values())
+            try:
+                await sock.send_json({
+                    "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
+                    "counts": n_counts, "boxes": latest["boxes"], "emergencies": list(latest["emergencies"]),
+                    "telemetry": latest["telemetry"],
+                    "metrics": True,   # client-side numbers are measured on the client; /metrics has the benchmark
+                })
+            except Exception:          # socket gone — the receive loop notices and cleans up
+                return
+
+    push_task = asyncio.create_task(pusher())
     try:
         while True:
             msg = await sock.receive_json()
@@ -157,13 +219,14 @@ async def ws(sock: WebSocket):
                     mdl, names = await asyncio.get_running_loop().run_in_executor(INFER, get_model, msg["model"])
                     mdl_path = MODELS[msg["model"]]
                 zs = msg.get("zones") or {}
-                try:
-                    ctrl = Controller(junction_from_dirs(zs.keys()),
-                                      Timings(min_green=4, max_green=25, yellow=3, all_red=1.5, max_wait=45, w_wait=0.4,
-                                              ped_max_wait=45))
-                    zones = zs
-                except ValueError as e:          # garbage zones must not kill the socket — keep the old ones
-                    print("bad zones ignored:", e)
+                # identical zones (a reconnect after a network blip) keep the RUNNING controller —
+                # rebuilding reset phase + wait state to all-red amnesia on every blip
+                if zs != zones:
+                    try:
+                        ctrl = Controller(junction_from_dirs(zs.keys()), Timings(**TUNED))
+                        zones = zs
+                    except ValueError as e:      # garbage zones must not kill the socket — keep the old ones
+                        print("bad zones ignored:", e)
                 continue
             if msg.get("type") != "frame":
                 continue
@@ -225,10 +288,12 @@ async def ws(sock: WebSocket):
                         if poly and point_in_poly(cx, cy, poly):
                             appr = d; break
                 b["appr"] = appr
-                if appr:
-                    counts[appr][b["cls"]] = counts[appr].get(b["cls"], 0) + 1
-                    if b["cls"] == "ambulance":
-                        yolo_sirens.add(appr.split(".")[0])   # sirens are arm-level; zones may be per-movement
+                # counts are tallied AFTER the tracker's class vote + edge/furniture filters
+                # below — tallying the raw per-frame class here fed the controller car↔motorcycle
+                # flicker (1.0↔0.3 PCU) that the vote was built to remove. Sirens stay raw:
+                # the vote would delay true ambulances (they get their own 3-frame confirm).
+                if appr and b["cls"] == "ambulance":
+                    yolo_sirens.add(appr.split(".")[0])   # sirens are arm-level; zones may be per-movement
 
             # stable per-vehicle identity: greedy IoU association with the previous frame.
             # Matched boxes are smoothed (no flicker) and keep their id across frames — the
@@ -257,7 +322,9 @@ async def ws(sock: WebSocket):
                         if d < best_d:
                             best, best_d = tid, d
                 if best is None:
-                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0, "still_since": t_now}
+                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0,
+                                       "still_since": t_now, "cls": b["cls"], "conf": b["conf"],
+                                       "clsh": [b["cls"]]}
                     b["id"] = next_id
                     claimed.add(next_id)
                     next_id += 1
@@ -277,6 +344,18 @@ async def ws(sock: WebSocket):
                         t["box"][k] = t["box"][k] * a + b[k] * (1 - a)
                         b[k] = round(t["box"][k], 4)
                     t["miss"] = 0
+                    # class stability: YOLO flickers marginal reads frame-to-frame (a far scooter
+                    # blinks car↔motorcycle, a white van blinks ambulance). A track's DISPLAYED
+                    # class is the majority of its last 7 reads — ties resolve to the most recent —
+                    # so one bad frame can never relabel a vehicle on screen. Emergencies do NOT
+                    # ride this vote: sirens keep the raw per-frame path (high conf gate + 3-frame
+                    # confirm), because a vote both delays true sirens and can entrench a misread.
+                    h = t.setdefault("clsh", [b["cls"]])
+                    h.append(b["cls"])
+                    del h[:-7]
+                    t["cls"] = max(reversed(h), key=h.count)
+                    t["conf"] = b["conf"]
+                    b["cls"] = t["cls"]
                     b["id"] = best
                     claimed.add(best)
             for tid in [t for t in tracks if t not in claimed]:
@@ -295,28 +374,75 @@ async def ws(sock: WebSocket):
                      if not (b.get("appr") is None
                              and t_now - tracks.get(b.get("id"), {}).get("still_since", t_now) > 3.5)]
 
-            # a YOLO siren counts only when seen on two consecutive frames — one white-van
-            # false positive must never flash an emergency banner nobody triggered.
-            emergencies |= (yolo_sirens & prev_sirens)
-            prev_sirens = yolo_sirens
+            # demand tally from the SURVIVING boxes, with the tracker's voted class — the
+            # controller sees the same stable classes the overlay shows, never raw flicker.
+            for b in boxes:
+                if b.get("appr"):
+                    counts[b["appr"]][b["cls"]] = counts[b["appr"]].get(b["cls"], 0) + 1
 
-            now = time.monotonic()
-            dt = min(now - last, 0.5); last = now
-            # pedestrian demand rides along with the frame (push-button style); controller sanitizes
-            state = ctrl.tick(counts, emergencies, dt, peds=msg.get("peds"))
-            # HUD counts stay arm-level even when zones are per-movement ("N.thru" + "N.left" → "N")
-            n_counts = {}
+            # CONTINUITY: a track YOLO missed this frame still exists (miss ≤ 4) — coast its last
+            # box instead of letting the vehicle's detection blink out for a frame or two. Coasted
+            # boxes are zone-assigned and counted like real ones (the controller must never see a
+            # standing queue flicker), with confidence decayed per missed frame so the overlay
+            # fades them honestly. Same frame-edge and scene-furniture rules as live boxes.
+            for tid, t in tracks.items():
+                if tid in claimed:
+                    continue
+                tb = t["box"]
+                cx, cy = tb["x"] + tb["w"] / 2, tb["y"] + tb["h"] / 2
+                if not (0.025 < cx < 0.975 and 0.025 < cy < 0.975):
+                    continue
+                appr = None
+                if zones:
+                    for d, poly in zones.items():
+                        if poly and point_in_poly(cx, cy, poly):
+                            appr = d
+                            break
+                if appr is None and t_now - t.get("still_since", t_now) > 3.5:
+                    continue
+                cls = t.get("cls", "car")
+                boxes.append({"x": round(tb["x"], 4), "y": round(tb["y"], 4),
+                              "w": round(tb["w"], 4), "h": round(tb["h"], 4), "cls": cls,
+                              "conf": round(max(0.2, t.get("conf", 0.5) * (0.75 ** t["miss"])), 2),
+                              "id": tid, "appr": appr})
+                if appr:
+                    counts[appr][cls] = counts[appr].get(cls, 0) + 1
+
+            # a YOLO siren counts only when seen on THREE consecutive frames (with the raised
+            # ambulance conf gate in perception.CONF): an emergency preempts the whole junction,
+            # so a motorcycle or van misread flickering for a frame or two must never move a
+            # signal. Cost at 10Hz: ~0.3s extra latency on visual-only sirens — the sim's own
+            # ambulances announce transponder-style (immediate) and never pay it.
+            emergencies |= (yolo_sirens & prev_sirens & prev2_sirens)
+            prev2_sirens, prev_sirens = prev_sirens, yolo_sirens
+
+            # detector dropout guard: a queued corridor that read ≥3 vehicles seconds ago does not
+            # empty in one frame — a single missed frame zeroed the counts for a whole inter-frame
+            # gap and gap-out handed the corridor's green away mid-queue.
             for d in counts:
-                arm = d.split(".")[0]
-                n_counts[arm] = n_counts.get(arm, 0) + sum(counts[d].values())
-            await sock.send_json({
-                "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
-                "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),
-                "telemetry": {"infer_ms": infer_ms, "imgsz": imgsz, "model": os.path.basename(mdl_path)},
-                "metrics": True,   # client-side numbers are measured on the client; /metrics has the benchmark
-            })
+                tot = sum(counts[d].values())
+                held = drop_guard.get(d)
+                if tot == 0 and held and time.monotonic() - held[1] < 2.5 and sum(held[0].values()) >= 3:
+                    counts[d] = held[0]
+                else:
+                    drop_guard[d] = (counts[d], time.monotonic())
+            # hand the fresh camera state to the wall-clock pusher — no tick, no send, here.
+            # pedestrian demand rides along with the frame (push-button style); controller sanitizes.
+            # GROUND-TRUTH control (Option A): YOLO above still produced the boxes overlay + telemetry
+            # you see, but the SIGNAL reads the sim's exact per-zone counts when the client sends them.
+            # A single shared GPU on the compare page starved/aged the detector-only counts and the
+            # adaptive panel LOST to the blind timer; the headless benchmark (exact counts) proved
+            # ▼60%+. Same keys as the zones message (dir / dir.thru / dir.left) → 1:1 with the junction.
+            truth = msg.get("truth")
+            latest["counts"] = truth if truth else counts
+            latest["emergencies"] = emergencies
+            latest["peds"] = msg.get("peds")
+            latest["boxes"] = boxes
+            latest["telemetry"] = {"infer_ms": infer_ms, "imgsz": imgsz, "model": os.path.basename(mdl_path)}
     except Exception as e:
         print("ws closed:", type(e).__name__)
+    finally:
+        push_task.cancel()
 
 
 @app.post("/save")
