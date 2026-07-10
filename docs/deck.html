@@ -6,58 +6,58 @@
 <title>R.E.L.A.Y. — traffic lights that can see</title>
 <style>
   :root{
-    --bg:#fbfaf8; --ink:#16181a; --mut:#6a7570; --faint:#9aa39e; --line:#e7e5df;
-    --green:#0a8a43; --greenbg:#e8f5ec; --red:#d5382e; --redbg:#fbeae8; --amber:#b26a00;
+    --bg:#fcfbf9; --ink:#141618; --mut:#68716c; --faint:#a3aaa5; --line:#e9e7e1;
+    --green:#0c8a45; --greenbg:#e9f6ee; --red:#d23b31; --amber:#b26a00;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#efeee9;color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;
-       -webkit-font-smoothing:antialiased}
+  body{background:#edece7;color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
   .deck{position:absolute;inset:0;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;overflow:hidden;background:var(--bg)}
-  .slide{position:absolute;inset:0;padding:58px 68px 64px;display:none;flex-direction:column;justify-content:center}
+  .slide{position:absolute;inset:0;padding:60px 76px 70px;display:none;flex-direction:column;justify-content:center}
   .slide.active{display:flex}
-  .kicker{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:12px}
-  h1{font-size:72px;font-weight:700;letter-spacing:-.03em;line-height:1.02}
-  h2{font-size:38px;font-weight:700;letter-spacing:-.02em;line-height:1.08;margin-bottom:8px}
-  .sub{font-size:17px;color:var(--mut);line-height:1.45;margin-bottom:22px;max-width:900px}
-  .sub b,.card p b,.cap b{color:var(--ink)}
-  .foot{position:absolute;left:68px;right:68px;bottom:22px;display:flex;justify-content:space-between;
-        font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+  .kicker{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:14px}
+  h1{font-size:96px;font-weight:700;letter-spacing:-.035em;line-height:1}
+  h2{font-size:54px;font-weight:700;letter-spacing:-.025em;line-height:1.05;margin-bottom:14px}
+  .sub{font-size:22px;color:var(--mut);line-height:1.4;margin-bottom:26px;max-width:1050px}
+  .sub b,.card p b{color:var(--ink)}
+  .foot{position:absolute;left:76px;right:76px;bottom:24px;display:flex;justify-content:space-between;
+        font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:start}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,24,20,.04)}
-  .card h3{font-size:16px;font-weight:700;margin-bottom:5px}
-  .card p{font-size:13.5px;line-height:1.45;color:var(--mut)}
-  .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,24,20,.04)}
-  .stat .v{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,24,20,.05)}
+  .card h3{font-size:19px;font-weight:700;margin-bottom:6px}
+  .card p{font-size:16px;line-height:1.45;color:var(--mut)}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,24,20,.05)}
+  .stat .v{font-size:56px;font-weight:700;letter-spacing:-.03em;line-height:1}
   .stat .v.g{color:var(--green)} .stat .v.r{color:var(--red)} .stat .v.a{color:var(--amber)}
-  .stat .k{font-size:12.5px;color:var(--mut);margin-top:7px;line-height:1.35}
-  img,video{width:100%;border-radius:12px;border:1px solid var(--line);display:block;box-shadow:0 2px 10px rgba(20,24,20,.08)}
-  .cap{font-size:12.5px;color:var(--mut);margin-top:8px;line-height:1.4}
-  .joke{font-size:14px;color:var(--faint);font-style:italic;margin-top:16px}
-  .bar{height:30px;border-radius:8px;display:flex;align-items:center;padding:0 12px;font-size:13.5px;font-weight:700;color:#fff;white-space:nowrap}
-  .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:14px 0 6px;font-weight:600}
-  .step{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;flex:1;box-shadow:0 1px 2px rgba(20,24,20,.04)}
-  .step .n{width:26px;height:26px;border-radius:50%;background:var(--greenbg);color:var(--green);font-weight:700;font-size:13px;
-           display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-  .step b{display:block;font-size:16px;margin-bottom:4px}
-  .step span{font-size:13px;color:var(--mut);line-height:1.4;display:block}
-  .steps{display:flex;gap:12px;align-items:stretch}
-  .arr{align-self:center;color:var(--green);font-size:20px;font-weight:700;flex:0 0 auto}
-  table{border-collapse:collapse;width:100%;font-size:14.5px;background:#fff;border-radius:14px;overflow:hidden;
-        border:1px solid var(--line);box-shadow:0 1px 2px rgba(20,24,20,.04)}
-  th{text-align:left;padding:11px 16px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  .stat .k{font-size:15px;color:var(--mut);margin-top:8px;line-height:1.4}
+  img,video{width:100%;border-radius:14px;border:1px solid var(--line);display:block;box-shadow:0 3px 14px rgba(20,24,20,.09)}
+  .cap{font-size:15px;color:var(--mut);margin-top:10px;line-height:1.4}
+  .cap b{color:var(--ink)}
+  .quip{font-size:16px;color:var(--faint);margin-top:20px}
+  .bar{height:34px;border-radius:9px;display:flex;align-items:center;padding:0 14px;font-size:15.5px;font-weight:700;color:#fff;white-space:nowrap}
+  .lbl{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:16px 0 8px;font-weight:700}
+  .step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;flex:1;box-shadow:0 1px 3px rgba(20,24,20,.05)}
+  .step .n{width:30px;height:30px;border-radius:50%;background:var(--greenbg);color:var(--green);font-weight:700;font-size:15px;
+           display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+  .step b{display:block;font-size:19px;margin-bottom:5px}
+  .step span{font-size:15px;color:var(--mut);line-height:1.4;display:block}
+  .steps{display:flex;gap:14px;align-items:stretch}
+  .arr{align-self:center;color:var(--green);font-size:24px;font-weight:700;flex:0 0 auto}
+  table{border-collapse:collapse;width:100%;font-size:17px;background:#fff;border-radius:16px;overflow:hidden;
+        border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,24,20,.05)}
+  th{text-align:left;padding:13px 18px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
      border-bottom:1px solid var(--line);background:#fcfbf9}
-  td{padding:11px 16px;border-bottom:1px solid var(--line);color:var(--mut)}
+  td{padding:13px 18px;border-bottom:1px solid var(--line);color:var(--mut)}
   tr:last-child td{border-bottom:none}
   td:first-child{color:var(--ink);font-weight:600}
   .win td{background:var(--greenbg);color:#14532d} .win td:first-child{color:var(--green)}
-  .pill{display:inline-block;background:var(--greenbg);color:var(--green);font-size:12px;font-weight:700;
-        padding:4px 10px;border-radius:999px;margin-right:6px}
-  .navui{position:fixed;top:14px;right:18px;font-size:12px;color:var(--faint);z-index:10}
+  .pill{display:inline-block;background:var(--greenbg);color:var(--green);font-size:15px;font-weight:700;
+        padding:7px 16px;border-radius:999px;margin-right:8px}
+  .navui{position:fixed;top:16px;right:20px;font-size:13px;color:var(--faint);z-index:10}
   .pbar{position:fixed;top:0;left:0;height:3px;background:var(--green);z-index:10;transition:width .25s}
-  .big{font-size:96px;font-weight:700;letter-spacing:-.04em;color:var(--green);line-height:1}
-  .big small{font-size:26px;color:var(--mut);font-weight:400;letter-spacing:0}
+  .big{font-size:120px;font-weight:700;letter-spacing:-.045em;color:var(--green);line-height:1}
+  .big small{font-size:30px;color:var(--mut);font-weight:400;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -66,54 +66,51 @@
 
 <!-- 1 · title -->
 <section class="slide active">
-  <div class="kicker">Kathmandu · traffic that moves</div>
+  <div class="kicker">Kathmandu</div>
   <h1>R.E.L.A.Y.</h1>
-  <p class="sub" style="font-size:24px;margin-top:14px"><b>Traffic lights that can see.</b><br>
-  One ordinary camera watches the junction. The light gives green where the traffic actually is —
-  and never wastes it on an empty lane.</p>
-  <div style="margin-top:10px">
+  <p class="sub" style="font-size:30px;margin-top:20px"><b>Traffic lights that can see.</b></p>
+  <p class="sub" style="margin-top:-8px">One camera watches the junction. Green goes where the traffic is.</p>
+  <div style="margin-top:6px">
     <span class="pill">one camera</span><span class="pill">one small computer</span><span class="pill">the lights you already have</span>
   </div>
-  <p class="joke">No new poles. No digging up roads. The camera was already there — it was just bored.</p>
+  <p class="quip">The camera was already there. It was just bored.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>Niraj Kafle · July 2026</span><span>01</span></div>
 </section>
 
 <!-- 2 · problem -->
 <section class="slide">
   <div class="kicker">The problem</div>
-  <h2>Today's lights are timers. Timers can't see.</h2>
-  <p class="sub">A fixed timer gives every lane its turn — even a lane with nobody on it. Somewhere right now, forty people are waiting for nobody.</p>
-  <div class="grid4">
-    <div class="stat"><div class="v r">200 s</div><div class="k">what everyone else waits while a lane holding <b>2 motorbikes</b> keeps its full green</div></div>
-    <div class="stat"><div class="v r">90%</div><div class="k">of Kathmandu's installed signals have sat dark for years — police direct traffic by hand</div></div>
-    <div class="stat"><div class="v r">0</div><div class="k">mechanisms that give an ambulance priority — sirens wait in the same queue as everyone</div></div>
-    <div class="stat"><div class="v a">$20–80k</div><div class="k">per intersection for commercial adaptive systems (SCATS, SCOOT) — priced for other cities</div></div>
+  <h2>Today's lights are timers.<br>Timers can't see.</h2>
+  <div class="grid4" style="margin-top:10px">
+    <div class="stat"><div class="v r">200 s</div><div class="k">everyone waits while 2 motorbikes hold a full green</div></div>
+    <div class="stat"><div class="v r">90%</div><div class="k">of Kathmandu's signals have sat dark for years</div></div>
+    <div class="stat"><div class="v r">0</div><div class="k">priority for ambulances today</div></div>
+    <div class="stat"><div class="v a">$20&ndash;80k</div><div class="k">per junction for SCATS or SCOOT</div></div>
   </div>
-  <div class="lbl">one real cycle at a fixed-timer junction</div>
-  <div class="bar" style="width:94%;background:var(--red)">loaded lane — waits the full 200 seconds</div>
-  <div style="height:7px"></div>
-  <div class="bar" style="width:32%;background:var(--amber);color:#3d2c00">empty lane — gets its full green anyway</div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>the timer doesn't care. it's a timer.</span><span>02</span></div>
+  <div class="lbl">one cycle at a fixed-timer junction</div>
+  <div class="bar" style="width:92%;background:var(--red)">loaded lane. waits 200 seconds.</div>
+  <div style="height:8px"></div>
+  <div class="bar" style="width:30%;background:var(--amber)">empty lane. full green anyway.</div>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>02</span></div>
 </section>
 
 <!-- 3 · idea -->
 <section class="slide">
   <div class="kicker">The idea</div>
-  <h2>An eye, a brain, and a light switch</h2>
-  <p class="sub">Four steps, forty times a second. Simple enough to explain to your grandmother, checked strictly enough to satisfy a traffic engineer.</p>
-  <div class="steps">
-    <div class="step"><div class="n">1</div><b>See</b><span>The camera spots every vehicle: bikes, cars, buses, trucks, ambulances. Each one gets a box.</span></div>
+  <h2>An eye, a brain, a light switch</h2>
+  <div class="steps" style="margin-top:14px">
+    <div class="step"><div class="n">1</div><b>See</b><span>The camera finds every vehicle. Bikes, cars, buses, ambulances.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Count</b><span>Each approach road gets a score. A bus counts more than a motorbike — because it is more.</span></div>
+    <div class="step"><div class="n">2</div><b>Count</b><span>Each road gets a score. A bus counts more than a bike.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>Decide</b><span>Green goes where the pressure is. Empty lanes get skipped. Nobody waits forever — that's a hard rule.</span></div>
+    <div class="step"><div class="n">3</div><b>Decide</b><span>Biggest score gets green. Empty roads are skipped.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">4</div><b>Switch</b><span>The lights follow — always with yellow and an all-clear pause. Two crossing greens are impossible.</span></div>
+    <div class="step"><div class="n">4</div><b>Switch</b><span>Lights follow. Always with yellow, then a moment of all-red.</span></div>
   </div>
-  <div class="grid3" style="margin-top:16px">
-    <div class="card"><h3>🚑 Ambulances jump the queue</h3><p>Seen by the camera or announced by a radio tag — their arm turns green before they arrive. Time-limited, so one ambulance can't hold a city hostage.</p></div>
-    <div class="card"><h3>🚶 People count too</h3><p>Waiting pedestrians build pressure like cars do, and the walk light holds while anyone is still on the zebra.</p></div>
-    <div class="card"><h3>🧠 The math is boring — on purpose</h3><p>"Max-pressure" control: a published method with stability proofs. An engineer can read our whole brain in an afternoon.</p></div>
+  <div class="grid3" style="margin-top:18px">
+    <div class="card"><h3>Ambulances jump the queue</h3><p>Their road turns green before they arrive. Time-limited, so nothing freezes.</p></div>
+    <div class="card"><h3>People count too</h3><p>Waiting pedestrians build pressure like cars do. The walk light holds while anyone is on the zebra.</p></div>
+    <div class="card"><h3>Simple math, on purpose</h3><p>An engineer can read the whole rulebook in an afternoon. No black box decides your commute.</p></div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>03</span></div>
 </section>
@@ -121,230 +118,227 @@
 <!-- 4 · how it decides -->
 <section class="slide">
   <div class="kicker">How it decides</div>
-  <h2>Every road gets a score. Biggest score gets green.</h2>
-  <p class="sub">Here's one real moment at a junction, exactly as the system sees it. Score = <b>how much is waiting × how long it's waited</b>. A bus counts as 3, a car as 1, a motorbike as 0.3 — because that's how much road they hold.</p>
+  <h2>Every road gets a score.<br>Biggest score gets green.</h2>
+  <p class="sub">Score = traffic waiting × time waited. A bus counts 3, a car 1, a bike 0.3. One real moment:</p>
   <div class="grid4">
     <div class="stat" style="border:2px solid var(--green);background:var(--greenbg)">
       <div class="lbl" style="margin-top:0;color:var(--green)">North</div>
-      <div class="v g" style="font-size:38px">8.6 pts</div>
-      <div class="k">8 bikes + 2 cars + 1 bus = 7.4, plus a small waiting bonus → <b>wins. GREEN.</b></div>
+      <div class="v g" style="font-size:44px">8.6</div>
+      <div class="k">8 bikes, 2 cars, 1 bus. <b>Wins. Green.</b></div>
     </div>
     <div class="stat">
       <div class="lbl" style="margin-top:0">South</div>
-      <div class="v" style="font-size:38px">3.8 pts</div>
-      <div class="k">3 cars, waiting 20 s → stays red, its score keeps growing while it waits</div>
+      <div class="v" style="font-size:44px">3.8</div>
+      <div class="k">3 cars. Stays red. Its score keeps growing.</div>
     </div>
     <div class="stat">
       <div class="lbl" style="margin-top:0">East</div>
-      <div class="v" style="font-size:38px">0 pts</div>
-      <div class="k">empty → <b>skipped entirely.</b> A timer would still give it 30 s of green. We give it nothing.</div>
+      <div class="v" style="font-size:44px">0</div>
+      <div class="k">Empty. <b>Skipped.</b> A timer would give it 30 s anyway.</div>
     </div>
     <div class="stat" style="border:2px solid var(--amber)">
       <div class="lbl" style="margin-top:0;color:var(--amber)">West</div>
-      <div class="v a" style="font-size:38px">1 car</div>
-      <div class="k">but it's waited 85 s — close to the 90 s cap, so it's <b>guaranteed next</b>, score or no score</div>
+      <div class="v a" style="font-size:44px">1 car</div>
+      <div class="k">Waiting 85 s. Near the 90 s cap. <b>Guaranteed next.</b></div>
     </div>
   </div>
-  <div class="lbl" style="margin-top:18px">house rules nobody can break — not even a big score</div>
+  <div class="lbl" style="margin-top:20px">four rules no score can break</div>
   <div class="grid4">
-    <div class="card"><p><b>Nobody waits past 90 s.</b> Hit the cap → you're served next, period. No lane can be starved.</p></div>
-    <div class="card"><p><b>Ambulance beats everything</b> — but only for a bounded time, so it can't freeze the junction.</p></div>
-    <div class="card"><p><b>No flicker, no hogging.</b> Every green lasts at least 5 s; none may hog past 45 s.</p></div>
-    <div class="card"><p><b>Queue drained? Move on.</b> If the served lanes sit empty a couple of seconds, green moves early.</p></div>
+    <div class="card"><p><b>Nobody waits past 90 s.</b> Hit the cap, you're next. Period.</p></div>
+    <div class="card"><p><b>Ambulance beats everything.</b> But only for a bounded time.</p></div>
+    <div class="card"><p><b>No flicker, no hogging.</b> Green lasts 5 s minimum, 45 s maximum.</p></div>
+    <div class="card"><p><b>Queue gone? Move on.</b> Green ends early when its lane runs empty.</p></div>
   </div>
-  <p class="joke">That's the whole brain: one score per road, four rules on top. Your bank's OTP form is more complicated.</p>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>score = traffic × patience · rules beat scores</span><span>04</span></div>
+  <p class="quip">That's the whole brain. Your bank's OTP form is more complicated.</p>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>04</span></div>
 </section>
 
 <!-- 5 · demo: simulated city -->
 <section class="slide">
   <div class="kicker">Demo 1 · the simulated city</div>
   <h2>We built a small city so it could practice</h2>
-  <div class="grid2">
+  <div class="grid2" style="margin-top:6px">
     <div>
-      <img src="img/live_loop.jpg" alt="live simulated junction with detections">
-      <div class="cap"><b>Live, not a recording:</b> the detector reads this synthetic camera exactly like real CCTV — boxes, counts and the signal decision update in real time.</div>
+      <img src="img/live_loop.jpg" alt="live simulated junction">
+      <div class="cap"><b>Live, not a recording.</b> The detector reads this synthetic camera like real CCTV.</div>
     </div>
     <div>
-      <div class="grid2" style="gap:14px">
-        <div class="stat"><div class="v g">∞</div><div class="k">labelled training footage, free — the city labels its own frames perfectly</div></div>
-        <div class="stat"><div class="v g">61 fps</div><div class="k">full junction with turning traffic, buses, pedestrians, physics</div></div>
-        <div class="stat"><div class="v g">1 click</div><div class="k">rush hour on demand: surge any lane, send an ambulance, watch it react</div></div>
-        <div class="stat"><div class="v g">0</div><div class="k">collisions possible — the safety rules are enforced in the world itself</div></div>
+      <div class="grid2" style="gap:16px">
+        <div class="stat"><div class="v g">∞</div><div class="k">perfectly labelled training footage, free</div></div>
+        <div class="stat"><div class="v g">61 fps</div><div class="k">full junction: turns, buses, pedestrians, physics</div></div>
+        <div class="stat"><div class="v g">1 click</div><div class="k">rush hour on demand. Surge a lane, send an ambulance.</div></div>
+        <div class="stat"><div class="v g">0</div><div class="k">collisions possible. Safety is built into the world.</div></div>
       </div>
-      <p class="sub" style="margin-top:16px;font-size:15px">Why simulate? Kathmandu junction footage is police-only, and you can't order a real rush hour at 2 a.m. The sim is our infinite training ground — <b>the same brain runs both worlds.</b></p>
-      <p class="joke">No pedestrians were harmed. Some virtual buses were mildly inconvenienced.</p>
+      <p class="sub" style="margin-top:18px;font-size:18px">Real Kathmandu junction footage is police-only. So we built our own junctions and trained there. <b>The same brain runs both worlds.</b></p>
+      <p class="quip">No pedestrians were harmed.</p>
     </div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>open live: 127.0.0.1:8000/?live=1</span><span>04</span></div>
-</section>
-
-<!-- 5 · demo: real streets -->
-<section class="slide">
-  <div class="kicker">Demo 2 · real streets</div>
-  <h2>Same brain, real traffic</h2>
-  <div class="grid2">
-    <div>
-      <video src="clips/levanhien_analyzed.mp4" poster="img/clip_levanhien.jpg" muted autoplay loop playsinline></video>
-      <div class="cap"><b>Signalized boulevard:</b> counts and the live signal decision painted on real footage — green zone is being served, red zone is queuing. Watch the queue drain.</div>
-    </div>
-    <div>
-      <video src="clips/hcmc_analyzed.mp4" poster="img/clip_hcmc.jpg" muted autoplay loop playsinline></video>
-      <div class="cap"><b>Dense mixed traffic:</b> motorcycle swarms, boxed and weighed one by one. This is the traffic Western systems weren't built for — and ours was.</div>
-    </div>
-  </div>
-  <p class="sub" style="margin-top:14px;font-size:15px">Nothing staged: every frame runs the identical camera → count → decide pipeline the junction uses. Each deployed camera gets a detector <b>fine-tuned on its own view</b> — accuracy 0.95 on cameras it knows.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>05</span></div>
 </section>
 
-<!-- 6 · demo: the race -->
+<!-- 6 · demo: real streets -->
 <section class="slide">
-  <div class="kicker">Demo 3 · the race</div>
-  <h2>Twin junctions, same cars. One watches, one guesses.</h2>
-  <div class="grid2">
+  <div class="kicker">Demo 2 · real streets</div>
+  <h2>Same brain, real traffic</h2>
+  <div class="grid2" style="margin-top:6px">
     <div>
-      <img src="img/compare.jpg" alt="side by side comparison">
-      <div class="cap"><b>The A/B rig:</b> identical junctions, identical arrivals — left runs R.E.L.A.Y., right runs a fixed timer. The verdict is computed live from what's on screen. You can crank the traffic dial yourself.</div>
+      <video src="clips/levanhien_analyzed.mp4" poster="img/clip_levanhien.jpg" muted autoplay loop playsinline></video>
+      <div class="cap"><b>Signalized boulevard.</b> Counts and the live signal decision, painted on real footage.</div>
     </div>
     <div>
-      <div class="big">▼44%<small> average queue</small></div>
-      <p class="sub" style="margin-top:8px;font-size:15px">range 19–59% depending on demand — measured live, same cars, same seconds</p>
-      <div class="lbl">median wait per vehicle</div>
-      <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. — 6 s</div>
-      <div style="height:6px"></div>
-      <div class="bar" style="width:88%;background:var(--red)">fixed timer — 12 s</div>
-      <div class="lbl">worst 5% of waits</div>
-      <div class="bar" style="width:42%;background:var(--green)">R.E.L.A.Y. — 21 s</div>
-      <div style="height:6px"></div>
-      <div class="bar" style="width:86%;background:var(--red)">fixed timer — 43 s</div>
-      <p class="cap" style="margin-top:12px">Independent check: a 2023 engineering study of Kathmandu junctions predicts 33–49% from adaptive control. We measure inside that envelope — no magic claimed.</p>
+      <video src="clips/hanoi_analyzed.mp4" poster="img/clip_hanoi.jpg" muted autoplay loop playsinline></video>
+      <div class="cap"><b>Hanoi roundabout.</b> Every vehicle found and counted, live.</div>
     </div>
   </div>
+  <p class="sub" style="margin-top:16px;font-size:18px">Nothing staged. Every frame runs the same pipeline the junction controller uses. Accuracy 0.95 on cameras it was tuned for.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
 </section>
 
-<!-- 7 · demo: teamwork -->
+<!-- 7 · demo: the race -->
 <section class="slide">
-  <div class="kicker">Demo 4 · junctions that talk</div>
-  <h2>The ambulance surfs a green wave</h2>
-  <div class="grid2">
+  <div class="kicker">Demo 3 · the race</div>
+  <h2>Twin junctions, same cars</h2>
+  <div class="grid2" style="margin-top:6px">
     <div>
-      <img src="img/network.jpg" alt="three junction network">
-      <div class="cap"><b>Three junctions, one conversation:</b> each light knows its neighbour's queues; an ambulance's whole route turns green ahead of it, junction by junction.</div>
+      <img src="img/compare.jpg" alt="side by side comparison">
+      <div class="cap"><b>The fair test.</b> Same cars, same seconds. Left runs R.E.L.A.Y., right runs a timer. The verdict is computed live from what's on screen.</div>
     </div>
     <div>
-      <div class="grid2" style="gap:14px">
-        <div class="stat"><div class="v g">−32%</div><div class="k">average queues across the 3-junction corridor vs fixed timers</div></div>
-        <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 minutes of deliberate worst-case traffic</div></div>
-      </div>
-      <p class="sub" style="margin-top:16px;font-size:15px">A jammed downstream junction automatically calms the one feeding it. Scaling from one junction to a corridor is <b>a settings change, not new hardware</b>.</p>
-      <p class="joke">The junctions gossip about traffic. It's the one kind of gossip that helps.</p>
+      <div class="big">▼44%<small> average queue</small></div>
+      <div class="lbl">typical wait per vehicle</div>
+      <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. · 6 s</div>
+      <div style="height:7px"></div>
+      <div class="bar" style="width:88%;background:var(--red)">fixed timer · 12 s</div>
+      <div class="lbl">worst waits</div>
+      <div class="bar" style="width:42%;background:var(--green)">R.E.L.A.Y. · 21 s</div>
+      <div style="height:7px"></div>
+      <div class="bar" style="width:86%;background:var(--red)">fixed timer · 43 s</div>
+      <p class="cap" style="margin-top:14px">A 2023 study of Kathmandu junctions predicts 33 to 49% from adaptive control. We measure inside that range.</p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>07</span></div>
 </section>
 
-<!-- 8 · cost -->
+<!-- 8 · demo: network -->
+<section class="slide">
+  <div class="kicker">Demo 4 · junctions that talk</div>
+  <h2>The ambulance rides a green wave</h2>
+  <div class="grid2" style="margin-top:6px">
+    <div>
+      <img src="img/network.jpg" alt="three junction network">
+      <div class="cap"><b>Three junctions, one conversation.</b> The ambulance's route turns green ahead of it, junction by junction.</div>
+    </div>
+    <div>
+      <div class="grid2" style="gap:16px">
+        <div class="stat"><div class="v g">−32%</div><div class="k">average queues across the corridor vs fixed timers</div></div>
+        <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 minutes of worst-case traffic</div></div>
+      </div>
+      <p class="sub" style="margin-top:18px;font-size:18px">A jammed junction automatically calms the one feeding it. Scaling up is <b>a settings change, not new hardware.</b></p>
+    </div>
+  </div>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>08</span></div>
+</section>
+
+<!-- 9 · cost -->
 <section class="slide">
   <div class="kicker">The economics</div>
   <h2>Costs less than the phone in your pocket</h2>
-  <table>
-    <tr><th>system</th><th>cost / intersection</th><th>needs</th><th>pedestrians</th><th>ambulances</th></tr>
-    <tr><td>SCATS / SCOOT</td><td>$20,000–80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
-    <tr><td>Surtrac</td><td>$20,000+</td><td>radar + camera rack</td><td>partial</td><td>partial</td></tr>
-    <tr><td>Lalitpur AI lights (2024)</td><td>—</td><td>camera, density only</td><td>none</td><td>none</td></tr>
-    <tr class="win"><td>R.E.L.A.Y.</td><td>~$250–400</td><td>the CCTV camera already on the pole</td><td>counted &amp; served</td><td>priority, time-bounded</td></tr>
+  <table style="margin-top:10px">
+    <tr><th>system</th><th>cost / junction</th><th>needs</th><th>pedestrians</th><th>ambulances</th></tr>
+    <tr><td>SCATS / SCOOT</td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
+    <tr><td>Surtrac</td><td>$20,000+</td><td>radar and camera rack</td><td>partial</td><td>partial</td></tr>
+    <tr><td>Lalitpur AI lights</td><td>&mdash;</td><td>camera, density only</td><td>none</td><td>none</td></tr>
+    <tr class="win"><td>R.E.L.A.Y.</td><td>~$250&ndash;400</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-bounded</td></tr>
   </table>
-  <p class="sub" style="margin-top:18px;font-size:15px">Lalitpur proved cameras survive here — its 2024 AI lights still run. They read density only. <b>Pedestrians, ambulances, empty-lane skipping and coordination are the gap</b> — that's us. And nobody digs up a single road.</p>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>hardware: roughly one decent phone per junction</span><span>08</span></div>
-</section>
-
-<!-- 9 · trust -->
-<section class="slide">
-  <div class="kicker">Can we trust it?</div>
-  <h2>Its worst day is a normal traffic light</h2>
-  <div class="grid3">
-    <div class="card"><h3>Fails safe, by design</h3><p>Camera dies, fog, chaos? Counts fade out and the junction becomes a plain fixed timer — exactly what it is today. That's the floor, not the ceiling.</p></div>
-    <div class="card"><h3>13 safety rules, machine-checked</h3><p>No crossing greens, ever. No one waits past the hard cap. Ambulance priority is time-bounded. Each rule is code that refuses to ship if broken.</p></div>
-    <div class="card"><h3>85 bad days, pre-handled</h3><p>Dropped cameras, ghost detections, saturated gridlock, two ambulances at once — every failure we could invent is written down and handled.</p></div>
-    <div class="card"><h3>Shadow mode first</h3><p>Phase one touches nothing: it watches a real junction and logs what it <i>would</i> have done next to what the timer did. Judge it on paper before it touches a light.</p></div>
-    <div class="card"><h3>Police stay in charge</h3><p>Manual override is always there. The system serves the traffic police; it doesn't replace them.</p></div>
-    <div class="card"><h3>Readable brain</h3><p>No black-box AI making signal decisions — the AI only counts vehicles. The decision logic is a page of published math anyone can audit.</p></div>
-  </div>
+  <p class="sub" style="margin-top:20px;font-size:18px">Nobody digs up a single road.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
 </section>
 
-<!-- 10 · pros & cons -->
+<!-- 10 · trust -->
 <section class="slide">
-  <div class="kicker">The honest slide</div>
-  <h2>Pros and cons — yes, we wrote the cons down too</h2>
-  <div class="grid2" style="gap:20px">
-    <div>
-      <div class="lbl" style="color:var(--green)">why this works</div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--green)">✓ 50–300× cheaper</b> — ~$250–400 per junction vs $20k–80k. No road cutting, no new poles: the camera is already there.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--green)">✓ Serves everyone</b> — vehicles by real demand, pedestrians counted and served, ambulances get bounded priority. Nobody waits forever, by hard rule.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--green)">✓ Measurable &amp; auditable</b> — every claim comes from side-by-side A/B; the decision logic is a page of published math, not a black box.</p></div>
-      <div class="card"><p><b style="color:var(--green)">✓ Fails safe</b> — worst case it becomes today's fixed timer. The floor is the status quo.</p></div>
-    </div>
-    <div>
-      <div class="lbl" style="color:var(--red)">what to watch (and our answer)</div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--red)">✕ Cameras have bad days</b> — night, fog, monsoon dust. <b>Answer:</b> tune on that camera's own night/rain frames; if vision degrades, fall back to fixed timing automatically.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--red)">✕ Each site needs a tune-up day</b> — one day of the junction's own footage before it's sharp. <b>Answer:</b> the labelling is automatic; it's a day, not a project.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b style="color:var(--red)">✕ Full gridlock beats everyone</b> — past total saturation no signal plan helps. <b>Answer:</b> we win everywhere below it, and coordination delays reaching it.</p></div>
-      <div class="card"><p><b style="color:var(--red)">✕ Tech wasn't why KTM's lights died</b> — maintenance and ownership were. <b>Answer:</b> commodity parts, remote diagnostics, and a shadow-mode adoption path that earns trust before touching a light.</p></div>
-    </div>
+  <div class="kicker">Can we trust it?</div>
+  <h2>Its worst day is a normal traffic light</h2>
+  <div class="grid3" style="margin-top:14px">
+    <div class="card"><h3>Fails safe</h3><p>Camera dies? It becomes a plain fixed timer. Exactly what's there today.</p></div>
+    <div class="card"><h3>13 safety rules</h3><p>Checked by the code itself. No crossing greens, ever. No endless waits.</p></div>
+    <div class="card"><h3>85 bad days, pre-handled</h3><p>Dropped cameras, ghost detections, two ambulances at once. Written down, handled.</p></div>
+    <div class="card"><h3>Shadow mode first</h3><p>It watches a real junction and logs what it would have done. Judge it on paper first.</p></div>
+    <div class="card"><h3>Police stay in charge</h3><p>Manual override is always there.</p></div>
+    <div class="card"><h3>Readable brain</h3><p>The AI only counts vehicles. The decisions come from a page of math anyone can audit.</p></div>
   </div>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>a plan with no listed cons is hiding them</span><span>10</span></div>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>10</span></div>
 </section>
 
-<!-- 11 · kathmandu rollout -->
+<!-- 11 · pros & cons -->
 <section class="slide">
-  <div class="kicker">Kathmandu, concretely</div>
-  <h2>Lalitpur opened the door. Here's how we walk through it.</h2>
-  <div class="grid2" style="gap:20px">
+  <div class="kicker">The honest slide</div>
+  <h2>Pros and cons. Yes, we wrote the cons down.</h2>
+  <div class="grid2" style="gap:24px;margin-top:8px">
     <div>
-      <div class="lbl">the rollout — no permission needed to start</div>
-      <div class="card" style="margin-bottom:10px"><p><b>1 · Pick one junction</b> with a working police CCTV camera and a signal cabinet — the feeds already flow to the traffic police control room.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b>2 · One day of its own footage</b> auto-tunes the detector to that exact view — its angles, its light, its motorbikes.</p></div>
-      <div class="card" style="margin-bottom:10px"><p><b>3 · Thirty days of shadow mode</b> — it only watches and logs "what I would have done" next to what the timer did. Zero risk, public dashboard.</p></div>
-      <div class="card"><p><b>4 · Actuate with police override</b>, publish before/after waits — then extend down one arterial to a hospital green-wave.</p></div>
+      <div class="lbl" style="color:var(--green);margin-top:0">works for us</div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--green)">✓</b> 50 to 300× cheaper. The camera is already there.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--green)">✓</b> Serves vehicles, pedestrians and ambulances. Nobody waits forever.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--green)">✓</b> Every claim measured in side-by-side tests, not promised.</p></div>
+      <div class="card"><p><b style="color:var(--green)">✓</b> Worst case: it becomes today's timer. The floor is the status quo.</p></div>
     </div>
     <div>
-      <div class="lbl">doing better than Lalitpur's AI lights</div>
-      <table>
-        <tr><th></th><th>Lalitpur (2024)</th><th>R.E.L.A.Y.</th></tr>
-        <tr><td>reads</td><td>vehicle density only</td><td>every vehicle, weighed by size</td></tr>
-        <tr><td>pedestrians</td><td>not sensed</td><td>counted &amp; served</td></tr>
-        <tr><td>ambulances</td><td>no priority</td><td>priority, time-bounded</td></tr>
-        <tr><td>empty lanes</td><td>still get greens</td><td>skipped, always</td></tr>
-        <tr><td>junctions</td><td>each alone</td><td>coordinated, green waves</td></tr>
-        <tr><td>results</td><td>not published</td><td>measured &amp; public, by design</td></tr>
-      </table>
-      <p class="cap" style="margin-top:10px"><b>Respect where due:</b> Lalitpur proved camera-based control survives Kathmandu valley conditions — dust, monsoon, power cuts. We stand on that proof and finish the job.</p>
+      <div class="lbl" style="color:var(--red);margin-top:0">works against us, and our answer</div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--red)">✕</b> Cameras have bad nights. <b>Answer:</b> train on them. If vision fails, fall back to fixed timing.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--red)">✕</b> Each site needs a tune-up day. <b>Answer:</b> the labelling is automatic. A day, not a project.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b style="color:var(--red)">✕</b> Total gridlock beats every signal plan. <b>Answer:</b> we win everywhere below it.</p></div>
+      <div class="card"><p><b style="color:var(--red)">✕</b> KTM's lights died of neglect, not tech. <b>Answer:</b> commodity parts, remote checks, trust earned in shadow mode.</p></div>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>11</span></div>
 </section>
 
-<!-- 12 · ask -->
+<!-- 12 · kathmandu rollout -->
+<section class="slide">
+  <div class="kicker">Kathmandu, concretely</div>
+  <h2>Lalitpur opened the door.<br>We walk through it.</h2>
+  <div class="grid2" style="gap:24px;margin-top:8px">
+    <div>
+      <div class="lbl" style="margin-top:0">the rollout</div>
+      <div class="card" style="margin-bottom:12px"><p><b>1 · Pick one junction</b> with a working police camera. The feeds already reach the control room.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b>2 · One day of its own footage</b> tunes the detector to that exact view.</p></div>
+      <div class="card" style="margin-bottom:12px"><p><b>3 · Thirty days watching only.</b> It logs what it would have done. Zero risk, public dashboard.</p></div>
+      <div class="card"><p><b>4 · Then let it drive.</b> Police keep the override. Publish before and after waits. Extend to a hospital green wave.</p></div>
+    </div>
+    <div>
+      <div class="lbl" style="margin-top:0">beyond Lalitpur's AI lights</div>
+      <table>
+        <tr><th></th><th>Lalitpur</th><th>R.E.L.A.Y.</th></tr>
+        <tr><td>reads</td><td>density only</td><td>every vehicle, weighed</td></tr>
+        <tr><td>pedestrians</td><td>not sensed</td><td>counted &amp; served</td></tr>
+        <tr><td>ambulances</td><td>no priority</td><td>priority, bounded</td></tr>
+        <tr><td>empty lanes</td><td>still get greens</td><td>skipped, always</td></tr>
+        <tr><td>junctions</td><td>each alone</td><td>green waves</td></tr>
+        <tr><td>results</td><td>not published</td><td>public, by design</td></tr>
+      </table>
+      <p class="cap" style="margin-top:12px">Lalitpur proved cameras survive valley conditions. We stand on that proof and finish the job.</p>
+    </div>
+  </div>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>12</span></div>
+</section>
+
+<!-- 13 · ask -->
 <section class="slide">
   <div class="kicker">The ask</div>
-  <h2>One junction. Ninety days. Measured in public.</h2>
-  <div class="steps" style="margin-top:8px">
-    <div class="step"><div class="n">1</div><b>Pilot</b><span>One Kathmandu junction with existing CCTV. A day of its own footage tunes the detector. Shadow mode — zero risk.</span></div>
+  <h2>One junction. Ninety days.<br>Measured in public.</h2>
+  <div class="steps" style="margin-top:16px">
+    <div class="step"><div class="n">1</div><b>Pilot</b><span>One junction, existing CCTV, watching only. Zero risk.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Actuate</b><span>Connect to the signal cabinet, police override in hand. Publish before/after waiting times, measured by the camera itself.</span></div>
+    <div class="step"><div class="n">2</div><b>Drive</b><span>Connect to the lights, police override in hand. Publish the numbers.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>Corridor</b><span>Extend along one arterial — ambulance green-wave from the ring road to the nearest hospital.</span></div>
+    <div class="step"><div class="n">3</div><b>Corridor</b><span>One main road. Ambulance green wave to the nearest hospital.</span></div>
   </div>
-  <p class="sub" style="margin-top:26px;font-size:20px"><b>The software is built and measured. The road is the missing piece.</b><br>
-  We're looking for a pilot partner and the funding to run it.</p>
-  <p class="joke">Green lights for everyone. Well — everyone who's actually there.</p>
-  <div class="foot"><span>R.E.L.A.Y.</span><span>github.com/kafle1/relay</span><span>12</span></div>
+  <p class="sub" style="margin-top:32px;font-size:26px"><b>The software is built and measured.<br>The road is the missing piece.</b></p>
+  <p class="quip">Green lights for everyone. Well, everyone who's actually there.</p>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>github.com/kafle1/relay</span><span>13</span></div>
 </section>
 
 </div>
-<div class="navui">← → to move · <span id="pos">1 / 10</span></div>
+<div class="navui">← → · <span id="pos">1 / 13</span></div>
 <script>
   const slides=[...document.querySelectorAll('.slide')];let cur=0;
   function show(n){cur=Math.max(0,Math.min(slides.length-1,n));
