@@ -46,21 +46,41 @@ def four_way():
 
 
 def junction_from_dirs(dirs):
-    """Build a conflict-free Junction from whichever approaches a camera can see (2/3/4-arm)."""
-    dirs = set(dirs)
+    """Build a conflict-free Junction from whichever zones a camera reports (2/3/4-arm).
+    Keys are arms ("N") or per-movement zones ("N.thru" / "N.left"). Movement keys get
+    movement-level phasing: paired thru phases, paired protected-left phases, PLUS one split
+    phase per arm serving both of that arm's movements together (never self-conflicting, and
+    an ambulance can be sitting in either lane)."""
+    def split(d):
+        parts = str(d).split(".", 1)
+        return parts[0], (parts[1] if len(parts) > 1 else "")
+    good = sorted(d for d in {str(d) for d in dirs}
+                  if split(d)[0] in ("N", "S", "E", "W") and split(d)[1] in ("", "thru", "left"))
     phases = {}
-    ns = [d for d in ("N", "S") if d in dirs]
-    ew = [d for d in ("E", "W") if d in dirs]
-    if ns:
-        phases["NS" if len(ns) == 2 else ns[0]] = ns
-    if ew:
-        phases["EW" if len(ew) == 2 else ew[0]] = ew
+    # paired thru phases first, paired lefts second, split-arm phases last: the starvation
+    # force-serve takes the FIRST phase containing the starved key — widest phase wins that tie.
+    # A plain arm key rides with its axis's thru phase (it has no separately controllable left).
+    for suf in ("thru", "left"):
+        sub = [d for d in good if (split(d)[1] or "thru") == suf]
+        for axis, grp in (("NS", [d for d in sub if d[0] in "NS"]),
+                          ("EW", [d for d in sub if d[0] in "EW"])):
+            if not grp:
+                continue
+            base = axis if len(grp) == 2 else split(grp[0])[0]
+            phases[base if all("." not in d for d in grp) else base + "." + suf] = grp
+    by_arm = {}
+    for d in good:
+        if "." in d:
+            by_arm.setdefault(split(d)[0], []).append(d)
+    for arm, keys in sorted(by_arm.items()):
+        if len(keys) > 1:
+            phases[arm] = sorted(keys)
     if not phases:
         raise ValueError(
             f"junction_from_dirs: no usable approaches in {sorted(dirs) or ['(empty)']} "
-            f"— accepted keys are N, S, E, W"
+            f"— accepted keys are N, S, E, W, optionally suffixed .thru / .left"
         )
-    return Junction(sorted(dirs), phases)
+    return Junction(good, phases)
 
 
 class Controller:
@@ -81,6 +101,11 @@ class Controller:
     # ── helpers ────────────────────────────────────────────────
     def _served(self, phase):
         return set(self.j.phases[phase])
+
+    def _arms(self, phase):
+        # physical arms this phase serves — approaches may be per-movement keys ("N.left"),
+        # while peds, zebras and ambulance announcements live at arm level ("N")
+        return {a.split(".")[0] for a in self._served(phase)}
 
     def _pcu(self, approach, counts):
         """counts[approach] may be a {class:n} dict or a plain number."""
@@ -111,9 +136,10 @@ class Controller:
     def _clean_peds(self, peds):
         if not isinstance(peds, dict):
             return {}
+        arms = {a.split(".")[0] for a in self.j.approaches}
         out = {}
         for a, p in peds.items():
-            if a not in self.j.approaches or not isinstance(p, dict):
+            if a not in arms or not isinstance(p, dict):
                 continue
             try:
                 n = min(max(int(p.get("n", 0)), 0), 200)
@@ -128,14 +154,14 @@ class Controller:
 
     def _ped_demand(self, phase, peds):
         # waiting + still-on-the-zebra people whose arm this phase holds red
-        return sum(p["n"] + p["crossing"] for a, p in peds.items() if a not in self._served(phase))
+        return sum(p["n"] + p["crossing"] for a, p in peds.items() if a not in self._arms(phase))
 
     def _ped_crossing(self, phase, peds):
         # people physically ON a zebra this phase holds red for them
-        return sum(p["crossing"] for a, p in peds.items() if a not in self._served(phase))
+        return sum(p["crossing"] for a, p in peds.items() if a not in self._arms(phase))
 
     def _ped_oldest(self, phase, peds):
-        return max((p["wait"] for a, p in peds.items() if a not in self._served(phase) and p["n"]),
+        return max((p["wait"] for a, p in peds.items() if a not in self._arms(phase) and p["n"]),
                    default=0.0)
 
     def _phase_for_ped_starved(self, peds):
@@ -145,21 +171,27 @@ class Controller:
         if not starved:
             return None
         worst = max(starved, key=lambda a: peds[a]["wait"])
-        cands = [n for n in self.j.phases if worst not in self._served(n)]
+        cands = [n for n in self.j.phases if worst not in self._arms(n)]
         return max(cands, key=lambda n: self._ped_demand(n, peds)) if cands else None
 
     def _score(self, phase, counts, emergencies, peds=None):
         peds = peds or {}
         demand = self._demand(phase, counts)
-        oldest = max((self.wait[a] for a in self._served(phase)), default=0.0)
+        # presence-gated, like starvation: an EMPTY movement's accrued wait must not drag its
+        # phase to the top (a vacant left bay was out-scoring a loaded through phase)
+        oldest = max((self.wait[a] for a in self._served(phase) if self._present(a, counts)),
+                     default=0.0)
         boost = self.t.emergency_boost if any(self._has_emergency(a, emergencies) for a in self._served(phase)) else 0.0
         ped = self.t.w_ped * self._ped_demand(phase, peds) + self.t.w_wait * self._ped_oldest(phase, peds)
         return demand + self.t.w_wait * oldest + boost + ped
 
     def _phase_for_emergency(self, emergencies):
-        # simultaneous emergencies on conflicting phases: serve the longest-waiting one,
-        # not whichever phase happens to come first in dict order
-        cands = [(max((self.wait[a] for a in self._served(n) if a in emergencies), default=0.0), n)
+        # simultaneous emergencies on conflicting phases: serve the longest-waiting one, not
+        # whichever phase happens to come first in dict order. Coverage first: on a movement
+        # junction the split-arm phase serves BOTH of the arm's latched keys — green whichever
+        # lane the ambulance is actually in.
+        cands = [((sum(a in emergencies for a in self._served(n)),
+                   max((self.wait[a] for a in self._served(n) if a in emergencies), default=0.0)), n)
                  for n in self.j.phases if any(a in emergencies for a in self._served(n))]
         return max(cands)[1] if cands else None
 
@@ -192,9 +224,11 @@ class Controller:
         pedestrian demand to CROSS that arm's road (served by any phase holding that arm red).
         Returns the signal state dict {approach: 'green'|'yellow'|'red'} plus phase/stage."""
         peds = self._clean_peds(peds)
-        seen = set(emergencies or ())
+        # announcements arrive at arm level ("N") — latch every movement key of that arm: the
+        # ambulance may be sitting in the turn bay OR the through lanes, and we can't tell which
+        seen = {str(e).split(".")[0] for e in (emergencies or ())}
         for a in self.j.approaches:
-            self.em_hold[a] = self.t.emergency_hold if a in seen else max(0.0, self.em_hold[a] - dt)
+            self.em_hold[a] = self.t.emergency_hold if a.split(".")[0] in seen else max(0.0, self.em_hold[a] - dt)
         emergencies = {a for a in self.j.approaches if self.em_hold[a] > 0}
         served_now = self._served(self.phase) if self.stage == self.GREEN else set()
 
