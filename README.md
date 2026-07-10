@@ -64,6 +64,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # → http://127.0.0.1:8000/?live=1&topo=T     3-arm T junction
 # → http://127.0.0.1:8000/compare.html         fixed-vs-adaptive split screen
 # → http://127.0.0.1:8000/network.html         3-signal arterial + ambulance green wave
+# → http://127.0.0.1:8000/real.html            real CCTV clip through the same pipeline
+#     (drop any static junction video at sim/footage/real.mp4 — clips aren't shipped)
 
 # checks
 .venv/bin/python src/controller.py    # safety + fairness invariants
@@ -99,6 +101,7 @@ sim/                the synthetic live junction (Three.js)
   peds.js           pedestrians: spawn, wait at the zebra, cross on walk
   compare.html      split-screen fixed-vs-adaptive: live verdict + controlled server benchmark
   network.html      three signals on one arterial — coordination + ambulance green wave
+  real.html         a real CCTV clip through the same WS/YOLO/controller pipeline (stock model)
   assets/models/    CC0 / CC-BY 3D vehicles
 src/
   controller.py     weighted max-pressure controller (+ invariant self-check)
