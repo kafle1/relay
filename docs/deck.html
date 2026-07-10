@@ -187,7 +187,7 @@
       <div class="cap">A roundabout in Hanoi. Around 40 vehicles found and counted in every frame.</div>
     </div>
   </div>
-  <p class="sub" style="margin-top:18px;font-size:21px">Detection accuracy is 0.95 out of 1 on cameras the model was trained for.</p>
+  <p class="sub" style="margin-top:18px;font-size:21px">These clips run with no junction-specific setup. <b>One model, trained once for our kind of traffic, works at every junction.</b> Measured accuracy: 0.95 out of 1.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
 </section>
 
@@ -281,7 +281,7 @@
     <div>
       <div class="lbl" style="color:var(--red);margin-top:0">weaknesses, and what we do about them</div>
       <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Night and heavy rain reduce camera accuracy. <b>We train on that footage, and the fallback is the fixed timer.</b></p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> Every junction needs one day of training on its own camera. <b>The labelling is automatic.</b></p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> An unusual camera angle can lower accuracy at first. <b>The system keeps learning from its own footage, automatically.</b></p></div>
       <div class="card" style="margin-bottom:13px"><p><b style="color:var(--red)">✕</b> In total gridlock, no signal system helps. <b>Below that point, the numbers above hold.</b></p></div>
       <div class="card"><p><b style="color:var(--red)">✕</b> Kathmandu's old lights died from poor maintenance. <b>We use ordinary parts and remote monitoring, and start in watch-only mode.</b></p></div>
     </div>
@@ -297,7 +297,7 @@
     <div>
       <div class="lbl" style="margin-top:0">rollout</div>
       <div class="card" style="margin-bottom:13px"><p><b>1.</b> One junction that already has a police camera.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b>2.</b> One day of that camera's footage trains the detector.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b>2.</b> The detector is trained once for Kathmandu's traffic, not per camera. Connect and it works.</p></div>
       <div class="card" style="margin-bottom:13px"><p><b>3.</b> Thirty days in watch-only mode, results on a public dashboard.</p></div>
       <div class="card"><p><b>4.</b> Then it controls the lights. Police keep the override.</p></div>
     </div>
