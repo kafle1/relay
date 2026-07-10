@@ -232,6 +232,7 @@ async def ws(sock: WebSocket):
             # stable per-vehicle identity: greedy IoU association with the previous frame.
             # Matched boxes are smoothed (no flicker) and keep their id across frames — the
             # overlay reads as tracking because it is. Misses expire after ~0.6s (4 frames).
+            t_now = time.monotonic()
             claimed = set()
             for b in sorted(boxes, key=lambda v: -v["conf"]):
                 best, best_iou = None, 0.25
@@ -255,7 +256,7 @@ async def ws(sock: WebSocket):
                         if d < best_d:
                             best, best_d = tid, d
                 if best is None:
-                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0, "still": 0}
+                    tracks[next_id] = {"box": {k: b[k] for k in ("x", "y", "w", "h")}, "miss": 0, "still_since": t_now}
                     b["id"] = next_id
                     claimed.add(next_id)
                     next_id += 1
@@ -263,8 +264,11 @@ async def ws(sock: WebSocket):
                     t = tracks[best]
                     # raw YOLO jitter on a static object runs a few pixels frame-to-frame — the
                     # stillness reset needs real motion (~9px at 720w), not detector noise.
+                    # Wall-clock, not frames: under multi-client contention the frame rate drops
+                    # and a frame counter would take 3x longer to fire exactly when it matters.
                     moved = abs(t["box"]["x"] - b["x"]) + abs(t["box"]["y"] - b["y"])
-                    t["still"] = 0 if moved > 0.012 else t.get("still", 0) + 1
+                    if moved > 0.012:
+                        t["still_since"] = t_now
                     for k in ("x", "y", "w", "h"):
                         t["box"][k] = t["box"][k] * 0.55 + b[k] * 0.45
                         b[k] = round(t["box"][k], 4)
@@ -284,7 +288,8 @@ async def ws(sock: WebSocket):
             # every approach zone is not traffic — queued vehicles live IN zones, crossing and
             # exiting vehicles move. (The recurring phantom "truck" on the far corner buildings.)
             boxes = [b for b in boxes
-                     if not (b.get("appr") is None and tracks.get(b.get("id"), {}).get("still", 0) > 24)]
+                     if not (b.get("appr") is None
+                             and t_now - tracks.get(b.get("id"), {}).get("still_since", t_now) > 3.5)]
 
             # a YOLO siren counts only when seen on two consecutive frames — one white-van
             # false positive must never flash an emergency banner nobody triggered.
