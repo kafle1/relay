@@ -11,51 +11,51 @@
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:#edece7;color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
-  .deck{position:absolute;inset:0;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;overflow:hidden;background:var(--bg)}
+  .deck{position:absolute;inset:0;max-width:calc(100vh*16/9);max-height:calc(100vw*9/16);margin:auto;overflow:hidden;background:var(--bg);font-size:calc(min(100vw, 177.78vh)/100)}
   .slide{position:absolute;inset:0;padding:56px 76px 66px;display:none;flex-direction:column;justify-content:center}
   .slide.active{display:flex}
-  .kicker{font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:14px}
-  h1{font-size:110px;font-weight:700;letter-spacing:-.035em;line-height:1}
-  h2{font-size:64px;font-weight:700;letter-spacing:-.025em;line-height:1.04;margin-bottom:16px}
-  .sub{font-size:25px;color:var(--mut);line-height:1.35;margin-bottom:26px;max-width:1100px}
+  .kicker{font-size:0.94em;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:14px}
+  h1{font-size:6.9em;font-weight:700;letter-spacing:-.035em;line-height:1}
+  h2{font-size:4em;font-weight:700;letter-spacing:-.025em;line-height:1.04;margin-bottom:16px}
+  .sub{font-size:1.56em;color:var(--mut);line-height:1.35;margin-bottom:26px;max-width:1100px}
   .sub b,.card p b{color:var(--ink)}
   .foot{position:absolute;left:76px;right:76px;bottom:24px;display:flex;justify-content:space-between;
-        font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+        font-size:0.75em;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
   .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 26px;box-shadow:0 1px 3px rgba(20,24,20,.05)}
-  .card p{font-size:19px;line-height:1.4;color:var(--mut)}
+  .card p{font-size:1.19em;line-height:1.4;color:var(--mut)}
   .stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 26px;box-shadow:0 1px 3px rgba(20,24,20,.05)}
-  .stat .v{font-size:66px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .stat .v{font-size:4.1em;font-weight:700;letter-spacing:-.03em;line-height:1}
   .stat .v.g{color:var(--green)} .stat .v.r{color:var(--red)} .stat .v.a{color:var(--amber)}
-  .stat .k{font-size:17px;color:var(--mut);margin-top:9px;line-height:1.35}
+  .stat .k{font-size:1.06em;color:var(--mut);margin-top:9px;line-height:1.35}
   img,video{width:100%;border-radius:14px;border:1px solid var(--line);display:block;box-shadow:0 3px 14px rgba(20,24,20,.09)}
-  .cap{font-size:17px;color:var(--mut);margin-top:11px;line-height:1.35}
+  .cap{font-size:1.06em;color:var(--mut);margin-top:11px;line-height:1.35}
   .cap b{color:var(--ink)}
-  .bar{height:42px;border-radius:10px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:700;color:#fff;white-space:nowrap}
-  .lbl{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 9px;font-weight:700}
+  .bar{height:42px;border-radius:10px;display:flex;align-items:center;padding:0 16px;font-size:1.13em;font-weight:700;color:#fff;white-space:nowrap}
+  .lbl{font-size:0.88em;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:18px 0 9px;font-weight:700}
   .step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;flex:1;box-shadow:0 1px 3px rgba(20,24,20,.05)}
-  .step .n{width:34px;height:34px;border-radius:50%;background:var(--greenbg);color:var(--green);font-weight:700;font-size:17px;
+  .step .n{width:34px;height:34px;border-radius:50%;background:var(--greenbg);color:var(--green);font-weight:700;font-size:1.06em;
            display:flex;align-items:center;justify-content:center;margin-bottom:12px}
-  .step b{display:block;font-size:22px;margin-bottom:6px}
-  .step span{font-size:17px;color:var(--mut);line-height:1.35;display:block}
+  .step b{display:block;font-size:1.38em;margin-bottom:6px}
+  .step span{font-size:1.06em;color:var(--mut);line-height:1.35;display:block}
   .steps{display:flex;gap:16px;align-items:stretch}
-  .arr{align-self:center;color:var(--green);font-size:26px;font-weight:700;flex:0 0 auto}
-  table{border-collapse:collapse;width:100%;font-size:19px;background:#fff;border-radius:16px;overflow:hidden;
+  .arr{align-self:center;color:var(--green);font-size:1.63em;font-weight:700;flex:0 0 auto}
+  table{border-collapse:collapse;width:100%;font-size:1.19em;background:#fff;border-radius:16px;overflow:hidden;
         border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,24,20,.05)}
-  th{text-align:left;padding:14px 20px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  th{text-align:left;padding:14px 20px;font-size:0.81em;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
      border-bottom:1px solid var(--line);background:#fcfbf9}
   td{padding:14px 20px;border-bottom:1px solid var(--line);color:var(--mut)}
   tr:last-child td{border-bottom:none}
   td:first-child{color:var(--ink);font-weight:600}
   .win td{background:var(--greenbg);color:#14532d} .win td:first-child{color:var(--green)}
-  .pill{display:inline-block;background:var(--greenbg);color:var(--green);font-size:17px;font-weight:700;
+  .pill{display:inline-block;background:var(--greenbg);color:var(--green);font-size:1.06em;font-weight:700;
         padding:9px 18px;border-radius:999px;margin-right:9px}
   .navui{position:fixed;top:16px;right:20px;font-size:13px;color:var(--faint);z-index:10}
   .pbar{position:fixed;top:0;left:0;height:3px;background:var(--green);z-index:10;transition:width .25s}
-  .big{font-size:150px;font-weight:700;letter-spacing:-.045em;color:var(--green);line-height:1}
-  .big small{font-size:34px;color:var(--mut);font-weight:400;letter-spacing:0}
+  .big{font-size:9.4em;font-weight:700;letter-spacing:-.045em;color:var(--green);line-height:1}
+  .big small{font-size:0.23em;color:var(--mut);font-weight:400;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -66,7 +66,7 @@
 <section class="slide active">
   <div class="kicker">Kathmandu</div>
   <h1>R.E.L.A.Y.</h1>
-  <p class="sub" style="font-size:34px;margin-top:22px"><b>Traffic lights that can see.</b></p>
+  <p class="sub" style="font-size:2.1em;margin-top:22px"><b>Traffic lights that can see.</b></p>
   <p class="sub" style="margin-top:-6px">The junction's cameras watch every approach. Green goes to the road that needs it.</p>
   <p class="cap" style="margin-top:-10px;margin-bottom:16px">R.E.L.A.Y. stands for Real-time Evaluation of Lane Activity for Yield-control</p>
   <div style="margin-top:6px">
@@ -167,7 +167,7 @@
         <div class="stat"><div class="v g">1 click</div><div class="k">to create rush hour, or send an ambulance through</div></div>
         <div class="stat"><div class="v g">0</div><div class="k">collisions are possible inside the simulation</div></div>
       </div>
-      <p class="sub" style="margin-top:20px;font-size:21px">Junction camera footage in Kathmandu is police-only. The simulator gave us unlimited footage to train on. <b>The same model then reads real cameras.</b></p>
+      <p class="sub" style="margin-top:20px;font-size:1.31em">Junction camera footage in Kathmandu is police-only. The simulator gave us unlimited footage to train on. <b>The same model then reads real cameras.</b></p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>05</span></div>
@@ -187,7 +187,7 @@
       <div class="cap">A roundabout in Hanoi. Around 40 vehicles found and counted in every frame.</div>
     </div>
   </div>
-  <p class="sub" style="margin-top:18px;font-size:21px">These clips run with no junction-specific setup: <b>one model, working on junctions it has never seen.</b> On our validation footage it scores 0.95 out of 1.</p>
+  <p class="sub" style="margin-top:18px;font-size:1.31em">These clips run with no junction-specific setup: <b>one model, working on junctions it has never seen.</b> On our validation footage it scores 0.95 out of 1.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
 </section>
 
@@ -198,10 +198,11 @@
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/compare.jpg" alt="side by side comparison">
-      <div class="cap">Two simulated copies of the same junction receive identical traffic. The left one runs R.E.L.A.Y., the right one runs a fixed timer. The result is measured live on screen.</div>
+      <div class="cap">Two simulated copies of one junction get identical traffic. Left runs R.E.L.A.Y., right runs a fixed timer.</div>
     </div>
     <div>
-      <div class="big">▼44%<small> queue, in simulation</small></div>
+      <div class="big">▼44%</div>
+      <div class="cap" style="margin-top:6px">average queue, in simulation</div>
       <div class="lbl">typical wait per vehicle</div>
       <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. · 6 seconds</div>
       <div style="height:8px"></div>
@@ -210,7 +211,7 @@
       <div class="bar" style="width:42%;background:var(--green)">R.E.L.A.Y. · 21 seconds</div>
       <div style="height:8px"></div>
       <div class="bar" style="width:86%;background:var(--red)">fixed timer · 43 seconds</div>
-      <p class="cap" style="margin-top:14px">A 2023 engineering study of Kathmandu junctions estimated 33 to 49% improvement from adaptive signals. Our result sits inside that range.</p>
+      <p class="cap" style="margin-top:14px">A 2023 study of Kathmandu junctions estimated 33 to 49% from adaptive signals. Ours sits inside that range.</p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>07</span></div>
@@ -230,7 +231,7 @@
         <div class="stat"><div class="v g">−32%</div><div class="k">less queueing than fixed timers across all three, in simulation</div></div>
         <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 minutes of maximum traffic</div></div>
       </div>
-      <p class="sub" style="margin-top:20px;font-size:21px">When one junction gets congested, the junction before it sends fewer cars. <b>Adding a junction is a configuration change, not new hardware.</b></p>
+      <p class="sub" style="margin-top:20px;font-size:1.31em">When one junction gets congested, the junction before it sends fewer cars. <b>Adding a junction is a configuration change, not new hardware.</b></p>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>08</span></div>
@@ -242,13 +243,13 @@
   <h2>A fraction of what cities<br>usually pay</h2>
   <table style="margin-top:12px">
     <tr><th>system</th><th>cost / junction</th><th>needs</th><th>pedestrians</th><th>ambulances</th></tr>
-    <tr><td>SCATS / SCOOT<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive systems from Australia and the UK</span></td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
-    <tr><td>Surtrac<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar on every arm</td><td>partial</td><td>partial</td></tr>
-    <tr><td>Lalitpur AI lights<br><span style="font-size:13px;color:var(--faint);font-weight:400">running since December 2024</span></td><td>&mdash;</td><td>camera, reads density only</td><td>none</td><td>none</td></tr>
-    <tr class="win"><td>R.E.L.A.Y. <span style="font-size:13px;font-weight:400">(prototype)</span></td><td>~$250&ndash;400 hardware</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
+    <tr><td>SCATS / SCOOT<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">adaptive systems from Australia and the UK</span></td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
+    <tr><td>Surtrac<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar on every arm</td><td>partial</td><td>partial</td></tr>
+    <tr><td>Lalitpur AI lights<br><span style="font-size:0.81em;color:var(--faint);font-weight:400">running since December 2024</span></td><td>&mdash;</td><td>camera, reads density only</td><td>none</td><td>none</td></tr>
+    <tr class="win"><td>R.E.L.A.Y. <span style="font-size:0.81em;font-weight:400">(prototype)</span></td><td>~$250&ndash;400 hardware</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
   </table>
   <p class="cap" style="margin-top:14px">Their prices are for complete installed systems. Ours is the hardware cost of a prototype; a real deployment adds installation and support.</p>
-  <p class="sub" style="margin-top:12px;font-size:21px">No road is dug up. The camera is usually already installed.</p>
+  <p class="sub" style="margin-top:12px;font-size:1.31em">No road is dug up. The camera is usually already installed.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
 </section>
 
