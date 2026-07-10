@@ -14,7 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { initPeds } from './peds.js?v=5';   // versioned: module caches must not pin an old pedestrian API
+import { initPeds } from './peds.js?v=8';   // versioned: module caches must not pin an old pedestrian API
 
 // ─────────────────────────── config ───────────────────────────
 const P = new URLSearchParams(location.search);
@@ -47,6 +47,14 @@ const TYPES = {
   // 30-90s stretches, starved the busy corridor, and stole the thunder from the judge's own click.
   ambulance:  { files: ['kenney_ambulance.glb'], len: 5, weight: 0, spd: 1.05 },
 };
+// capture mode trains the detector: flatten the mix so heavies aren't rare classes the model
+// rounds down to "car", and let ambulances spawn organically — 25 instances from the periodic
+// forceSpawn alone was too thin a class to learn. Demo keeps the Kathmandu-style weights above.
+if (CAP) {
+  TYPES.motorcycle.weight = 0.32; TYPES.car.weight = 0.19; TYPES.taxi.weight = 0.09;
+  TYPES.truck.weight = 0.19; TYPES.bus.weight = 0.15;
+  TYPES.ambulance.weight = 0.06;   // weights must sum to 1 — pickType rolls a plain Math.random()
+}
 
 // approaches: dir = the side traffic comes FROM. Progress u runs -START → -STOP (line) → 0 → +START.
 // side = which half of the road this approach occupies; lanes fan out from the centreline.
@@ -79,6 +87,22 @@ const ARM = {                                     // world-side data for exits (
   W: { axis: 'x', out: -1, side: -1, rotY: Math.PI / 2 },
 };
 
+// lane discipline, one source of truth (paint arrows, routes, signal heads, detector zones all
+// consult this): multi-lane approaches get a DEDICATED left bay — protected left arrows need one,
+// a shared straight+left lane cannot obey two aspects at once. Kerb lane: straight+right, middle
+// lanes: straight. Single lane: every legal move (permissive left, gap-acceptance yields).
+// T stem (no straight exit): kerb turns right, every other lane turns left.
+function laneMoves(dir, lane) {
+  const can = m => DIRS.includes(EXITS[dir][m]);
+  if (LANES === 1) return ['straight', 'left', 'right'].filter(can);
+  if (!can('straight'))
+    return lane === LANES - 1 && can('right') ? ['right'] : can('left') ? ['left'] : ['right'];
+  if (lane === 0 && can('left')) return ['left'];
+  return lane === LANES - 1 && can('right') ? ['straight', 'right'] : ['straight'];
+}
+// signal groups: protected lefts get their own aspect; straight and the near-side right share one
+const MK = m => (m === 'left' ? 'left' : 'thru');
+
 // ─────────────────────────── renderer / scene ───────────────────────────
 const canvas = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -102,12 +126,9 @@ camera.lookAt(0, -1, 2);
 const cctvCam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 800);
 cctvCam.position.set(26, 28, 38);
 cctvCam.lookAt(0, -1, 2);
-const CCTV_TGT = new THREE.Vector3(0, -1, 2);
-const atCCTVPose = () => !controls
-  || (camera.position.distanceTo(cctvCam.position) < 1.2 && controls.target.distanceTo(CCTV_TGT) < 3.5);
 
 // view modes: single overview, or one pole-mounted CCTV per approach (how a real deployment sees)
-let camMode = (P.get('cam') === 'cctv' && !CAP && !LIVE) ? 'cctv' : 'overview';   // capture/live are calibrated to the overview camera
+let camMode = (P.get('cam') === 'cctv' && !CAP && !EMBED) ? 'cctv' : 'overview'; // capture is calibrated to the overview camera; embeds are parent-framed
 const armMarkers = [];              // floating N/S/E/W sprites — hidden in CCTV (pole cams sit next to them: giant letters)
 const poleCams = {};
 function buildPoleCams() {
@@ -133,8 +154,7 @@ if (!CAP) {                                      // drag anywhere except capture
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
-  // embeds are watched, not driven: a stray drag would leave the calibrated CCTV pose and the
-  // detection boxes would vanish for good (the PiP inset and the reset chip only exist full-page)
+  // embeds are watched, not driven — the parent page owns every control surface
   controls.enabled = !EMBED;
   // zones are projected from the FIXED virtual CCTV, so dragging the display camera never
   // reshapes what the controller reads — no resend needed here.
@@ -251,15 +271,20 @@ function buildWorld() {
   for (const s of [-1, 1]) border.push([R * 2, t, 0.18, 0, y, s * (R - 0.1)], [0.18, t, R * 2, s * (R - 0.1), y, 0]);
   mergedBoxes(border, MAT.yellow);
 
-  // painted lane-discipline arrows before each stop line — mirrors planRoute's rules exactly
-  // (kerb lane: straight+right, inner lane: straight+left, middle: straight; single lane: all)
-  const arrowGeo = (left, right) => {
+  // painted lane-discipline arrows before each stop line — drawn straight from laneMoves, the
+  // same table the routes, signal heads and detector zones use
+  const arrowGeo = (straight, left, right) => {
     const glyph = [];
-    const straight = new THREE.Shape();
-    straight.moveTo(-0.13, 0); straight.lineTo(-0.13, 1.9); straight.lineTo(-0.45, 1.9);
-    straight.lineTo(0, 3.0); straight.lineTo(0.45, 1.9); straight.lineTo(0.13, 1.9);
-    straight.lineTo(0.13, 0); straight.closePath();
-    glyph.push(straight);
+    const shaft = new THREE.Shape();
+    if (straight) {
+      shaft.moveTo(-0.13, 0); shaft.lineTo(-0.13, 1.9); shaft.lineTo(-0.45, 1.9);
+      shaft.lineTo(0, 3.0); shaft.lineTo(0.45, 1.9); shaft.lineTo(0.13, 1.9);
+      shaft.lineTo(0.13, 0); shaft.closePath();
+    } else {                              // no straight exit (T stem): headless stub the branches grow from
+      shaft.moveTo(-0.13, 0); shaft.lineTo(-0.13, 1.3); shaft.lineTo(0.13, 1.3);
+      shaft.lineTo(0.13, 0); shaft.closePath();
+    }
+    glyph.push(shaft);
     const branch = sgn => {
       const b = new THREE.Shape();
       b.moveTo(sgn * 0.13, 0.5); b.lineTo(sgn * 1.0, 0.5); b.lineTo(sgn * 1.0, 0.2);
@@ -275,9 +300,10 @@ function buildWorld() {
   for (const dir of DIRS) {
     const a = APPROACH[dir];
     for (let ln = 0; ln < LANES; ln++) {
+      const mv = laneMoves(dir, ln);
       const g = new THREE.Group();
       const glyph = new THREE.Mesh(
-        arrowGeo(LANES === 1 || ln === 0, LANES === 1 || ln === LANES - 1), paint);
+        arrowGeo(mv.includes('straight'), mv.includes('left'), mv.includes('right')), paint);
       glyph.rotation.x = -Math.PI / 2;
       glyph.position.y = 0.14;
       g.add(glyph);
@@ -333,7 +359,18 @@ buildWorld();
 // ─────────────────────────── signal heads ───────────────────────────
 const BULB = { red: 0xff3b30, yellow: 0xffcc00, green: 0x34c759, off: 0x181b20 };
 const signalHeads = {};
-function makeHead(scale = 1) {                             // housing + backplate + 3 hooded lenses
+function arrowLensGeo(scale, sgn) {   // flat arrow lens; +X = the driver's left (road-paint convention)
+  const u = 0.42 * scale, s = new THREE.Shape();
+  s.moveTo(sgn * u, 0);
+  s.lineTo(sgn * 0.12 * u, 0.62 * u); s.lineTo(sgn * 0.12 * u, 0.3 * u);
+  s.lineTo(sgn * -u, 0.3 * u); s.lineTo(sgn * -u, -0.3 * u);
+  s.lineTo(sgn * 0.12 * u, -0.3 * u); s.lineTo(sgn * 0.12 * u, -0.62 * u);
+  s.closePath();
+  return new THREE.ShapeGeometry(s);
+}
+// arrow: null = ball lenses (through head); 'left'/'right' = all three aspects are arrows,
+// like a real protected-turn head — red arrow included, so a held turn bay reads as HELD
+function makeHead(scale = 1, arrow = null) {               // housing + backplate + 3 hooded lenses
   const g = new THREE.Group(), bulbs = {};
   const back = new THREE.Mesh(new THREE.BoxGeometry(1.5 * scale, 3.5 * scale, 0.1), MAT.housing);
   back.position.z = -0.26 * scale;
@@ -341,7 +378,9 @@ function makeHead(scale = 1) {                             // housing + backplat
   g.add(new THREE.Mesh(new THREE.BoxGeometry(1 * scale, 3 * scale, 0.6 * scale), MAT.housing));
   ['red', 'yellow', 'green'].forEach((c, i) => {
     const y = (1 - i) * scale;
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.4 * scale, 14, 14),
+    const m = new THREE.Mesh(
+      arrow ? arrowLensGeo(scale, arrow === 'left' ? 1 : -1)
+            : new THREE.SphereGeometry(0.4 * scale, 14, 14),
       // dark tinted lens when unlit (like real heads), saturated glow when lit. toneMapped:false —
       // the ACES pipeline was washing lit red to peach and green to mint-white at demo exposure.
       new THREE.MeshStandardMaterial({ color: BULB[c], emissive: BULB.off, emissiveIntensity: 1, toneMapped: false }));
@@ -377,14 +416,15 @@ for (const dir of DIRS) {
   pole.position.set(...world(kerbPerp, LANES > 1 ? 3.6 : 3));
   root.add(pole);
 
+  // kerb pole repeats the through aspect (single lane: the whole-arm aspect)
   const kerbHead = makeHead();
   kerbHead.g.position.set(...world(kerbPerp, 6));
   kerbHead.g.rotation.y = a.rotY;
   root.add(kerbHead.g);
-  bulbSets.push(kerbHead.bulbs);
+  bulbSets.push({ bulbs: kerbHead.bulbs, move: LANES > 1 ? 'straight' : null });
 
   if (LANES > 1) {                                          // gantry arm from the pole across the incoming half
-    const innerPerp = laneOff(dir, LANES - 1) - a.side * (LANE_W / 2);
+    const innerPerp = laneOff(dir, 0) - a.side * (LANE_W / 2);   // lane 0 = innermost; arm must reach past it or its head floats
     const armLen = Math.abs(kerbPerp - innerPerp), armMid = (kerbPerp + innerPerp) / 2;
     // a real mast arm, thick enough to read from the far side — the heads must HANG, not float
     const arm = new THREE.Mesh(
@@ -393,11 +433,15 @@ for (const dir of DIRS) {
     arm.position.set(...world(armMid, 7.1));
     root.add(arm);
     for (let k = 0; k < LANES; k++) {
-      const laneHead = makeHead(0.7);                      // per-lane head, hanging from the arm over its lane
+      // per-lane head, hanging from the arm over its lane; a lane that ONLY turns gets a
+      // protected-arrow head and shows its own movement's aspect, not the whole arm's
+      const mv = laneMoves(dir, k);
+      const arrow = mv.length === 1 && mv[0] !== 'straight' ? mv[0] : null;
+      const laneHead = makeHead(0.7, arrow);
       laneHead.g.position.set(...world(laneOff(dir, k), 5.95));
       laneHead.g.rotation.y = a.rotY;
       root.add(laneHead.g);
-      bulbSets.push(laneHead.bulbs);
+      bulbSets.push({ bulbs: laneHead.bulbs, move: arrow || 'straight' });
     }
   }
 
@@ -415,8 +459,9 @@ for (const dir of DIRS) {
   scene.add(root);
   signalHeads[dir] = root;
 }
-function setSignal(dir, state) {
-  for (const b of signalHeads[dir].userData.bulbSets) {
+function setSignal(dir) {
+  for (const set of signalHeads[dir].userData.bulbSets) {
+    const state = signalOf(dir, set.move), b = set.bulbs;
     for (const c of ['red', 'yellow', 'green']) {
       const on = c === state;
       b[c].material.color.setHex(on ? BULB[c] : BULB.off);
@@ -429,23 +474,43 @@ function setSignal(dir, state) {
 
 // ─────────────────────────── signal control ───────────────────────────
 // The dumb fixed cycle is both the non-live default and the "system OFF" baseline.
-const CYCLE = GROUPS.flatMap(g => [{ green: g, d: 7 }, { yellow: g, d: 2 }, { allred: true, d: 1 }]);
+// Stages are per MOVEMENT now, not per arm: each group runs through (straight+right) first, then
+// a protected left arrow where a left bay exists. Stem/single-lane groups keep one combined stage
+// (a shared lane can't obey a split aspect — its lefts stay permissive, gap-acceptance yields).
+const CYCLE = GROUPS.flatMap(g => {
+  const gd = DIRS.filter(d => APPROACH[d].group === g);
+  const split = LANES > 1 && gd.some(d => DIRS.includes(EXITS[d].straight) && DIRS.includes(EXITS[d].left));
+  const m = split ? 'thru' : 'all';
+  const st = [{ green: g, m, d: 7 }, { yellow: g, m, d: 2 }];
+  if (split) st.push({ green: g, m: 'left', d: 4 }, { yellow: g, m: 'left', d: 2 });
+  st.push({ allred: true, d: 1 });
+  return st;
+});
 let cycleIdx = 0, cycleT = 0;
 let systemOn = !LOCKFIX;                         // live: ON = adaptive server, OFF = fixed timer. lockfixed pins OFF — it may stream for detection boxes, but the dumb timer keeps the wheel
 let liveSignals = null, liveCounts = null, livePhase = '—', liveBoxes = [];
 let lastInferMs = 0;                             // detector latency — paces the stream + warns on tab pile-up
 
-const groupState = g => CYCLE[cycleIdx].green === g ? 'green' : CYCLE[cycleIdx].yellow === g ? 'yellow' : 'red';
-function signalOf(dir) {
-  if (LIVE && systemOn && liveSignals) return liveSignals[dir] || 'red';
-  return groupState(APPROACH[dir].group);
+// move=null → whole-arm view, the MOST permissive movement: peds walk only when every movement is
+// red, HUD chips show "anything is flowing". Live signals arrive keyed 'N.thru'/'N.left' from a
+// movement-aware server, or plain 'N' from an arm-level one — both are honored.
+function signalOf(dir, move = null) {
+  if (LIVE && systemOn && liveSignals) {
+    if (move != null) return liveSignals[dir + '.' + MK(move)] || liveSignals[dir] || 'red';
+    const st = [liveSignals[dir], liveSignals[dir + '.thru'], liveSignals[dir + '.left']].filter(Boolean);
+    return st.includes('green') ? 'green' : st.includes('yellow') ? 'yellow' : 'red';
+  }
+  const s = CYCLE[cycleIdx];
+  if ((s.green || s.yellow) !== APPROACH[dir].group) return 'red';
+  if (move != null && s.m !== 'all' && s.m !== MK(move)) return 'red';
+  return s.green ? 'green' : 'yellow';
 }
 function tickSignals(dt) {
   cycleT += dt;
   if (cycleT >= CYCLE[cycleIdx].d) { cycleT = 0; cycleIdx = (cycleIdx + 1) % CYCLE.length; }
-  for (const dir of DIRS) setSignal(dir, signalOf(dir));
+  for (const dir of DIRS) setSignal(dir);
   const s = CYCLE[cycleIdx];
-  return s.allred ? 'ALL-RED' : `${s.green || s.yellow} ${s.green ? 'GREEN' : 'YELLOW'}`;
+  return s.allred ? 'ALL-RED' : `${s.green || s.yellow}${s.m === 'left' ? ' ◀' : ''} ${s.green ? 'GREEN' : 'YELLOW'}`;
 }
 
 // ─────────────────────────── vehicles ───────────────────────────
@@ -527,24 +592,34 @@ function pickType() {
 
 const cars = [];
 window.__relay = { cars, camera, controls, get boxes() { return liveBoxes; } };   // console/debug handle (read-only)
-// route: cars pick a movement (straight / left / right) and swing onto the exit arm at a pivot
+// buses/trucks run straight routes (as city heavies do) — their swept turn arcs are the single
+// biggest source of held approaches, so they turn rarely, not never.
+const MOVE_W = heavy => heavy ? { straight: 0.9, right: 0.05, left: 0.05 }
+                              : { straight: 0.55, right: 0.2, left: 0.25 };
+// spawn lane follows movement demand, not a uniform roll — a dedicated left bay must not swallow
+// half the traffic just because it is one of two lanes. Pick the movement first, then a lane
+// that legally serves it.
+function pickLane(dir, heavy) {
+  const weights = MOVE_W(heavy);
+  const perLane = [...Array(LANES).keys()].map(l => laneMoves(dir, l));
+  const avail = [...new Set(perLane.flat())];
+  let r = Math.random() * avail.reduce((s, m) => s + weights[m], 0);
+  let move = avail[0];
+  for (const m of avail) { r -= weights[m]; if (r <= 0) { move = m; break; } }
+  const lanes = perLane.flatMap((ms, l) => ms.includes(move) ? [l] : []);
+  return lanes[(Math.random() * lanes.length) | 0];
+}
+// route: cars pick a movement among their LANE's legal moves and swing onto the exit arm at a
+// pivot. A forced lane (surge / ambulance) still obeys the painted discipline: whatever that
+// lane allows — a left bay never sends anyone straight through a red arrow.
 function planRoute(dir, lane, heavy = false) {
-  const arms = Object.entries(EXITS[dir]).filter(([, arm]) => DIRS.includes(arm));
-  // lane discipline: right turns from the kerb lane, left turns from the inner lane — a turn from
-  // any other lane sweeps across its neighbours' straight paths. On an approach with no straight
-  // exit (T stem) every lane must turn, so the non-kerb lanes all go left: a lane with no legal
-  // move would fall back to a null route and drive straight off the map.
-  const hasStraight = arms.some(([m]) => m === 'straight');
-  const options = arms.filter(([m]) => m === 'straight' || LANES === 1
-    || (m === 'right' ? lane === LANES - 1 : hasStraight ? lane === 0 : lane < LANES - 1));
+  const options = laneMoves(dir, lane).filter(m => DIRS.includes(EXITS[dir][m]));
   if (!options.length) return null;
-  // buses/trucks run straight routes (as city heavies do) — their swept turn arcs are the single
-  // biggest source of held approaches, so they turn rarely, not never.
-  const weights = heavy ? { straight: 0.9, right: 0.05, left: 0.05 }
-                        : { straight: 0.55, right: 0.2, left: 0.25 };
-  let r0 = Math.random() * options.reduce((s, [m]) => s + weights[m], 0);
-  let move = options[0][0], arm = options[0][1];
-  for (const [m, a] of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; arm = a; break; } }
+  const weights = MOVE_W(heavy);
+  let r0 = Math.random() * options.reduce((s, m) => s + weights[m], 0);
+  let move = options[0];
+  for (const m of options) { r0 -= weights[m]; if (r0 <= 0) { move = m; break; } }
+  const arm = EXITS[dir][move];
   if (move === 'straight') return null;
 
   // tangent quarter-circle between the entry lane line and the exit lane line
@@ -561,6 +636,7 @@ function planRoute(dir, lane, heavy = false) {
   const dYaw = ARM[arm].rotY - a.rotY;
   const yawSign = Math.sign(Math.atan2(Math.sin(dYaw), Math.cos(dYaw)));
   return {
+    move,                                                 // which aspect gates this car at the line
     crossing: move === 'left',                            // wide arc across the oncoming flow → must yield
     uA: o2 / a.sign - r,                                  // arc begins here (u-space)
     arcLen: r * Math.PI / 2, r, ex, rotSign, yawSign,
@@ -598,7 +674,7 @@ function addCar(dir, u, forcedType, forcedLane) {
   const type = forcedType || pickType();
   const pool = pools[type];
   if (!pool || !pool.length) return;
-  const T = TYPES[type], lane = forcedLane != null ? forcedLane : (Math.random() * LANES) | 0;
+  const T = TYPES[type], lane = forcedLane != null ? forcedLane : pickLane(dir, TYPES[type].len >= 6);
   if (cars.some(c => c.dir === dir && c.lane === lane && Math.abs(c.u - u) < (c.len + T.len) / 2 + GAP)) return;
   const mesh = new THREE.Group();
   mesh.add(pool[(Math.random() * pool.length) | 0].clone(true));
@@ -650,15 +726,22 @@ function forceSpawn(dir, type) {
   return false;
 }
 
-// hard separation: every vehicle is a capsule (spine segment + half-WIDTH); two bodies may NEVER
-// overlap. Radius must model width, not length: the old three-disc max(0.9, len/6) made a bus
-// 3.5m "wide" — parked heavies phantom-blocked the whole adjacent lane (3m apart), freezing exits.
+// hard separation: every vehicle is an exact oriented RECTANGLE (length × width); two bodies may
+// NEVER overlap. The old capsule (spine + radius) under-covered its own corners by r·(√2−1) ≈ 0.4m,
+// so capsule-"separated" turners still rendered interlocked at the box. halfW models width, not
+// length: a length-derived radius phantom-blocked adjacent lanes.
 const SEP = 0.35;                                         // minimum body daylight (m)
 const halfW = c => c.type === 'motorcycle' ? 0.5 : c.len >= 6 ? 1.25 : 0.95;
-function spineOf(x, z, ry, len, r) {
-  const hx = -Math.sin(ry), hz = -Math.cos(ry), h = Math.max(0.1, len / 2 - r);
-  return [x - hx * h, z - hz * h, x + hx * h, z + hz * h];
+function footprintOf(x, z, ry, len, hw) {                 // flat corner ring [x0,z0 … x3,z3]
+  const hx = -Math.sin(ry), hz = -Math.cos(ry);
+  const ax = hx * len / 2, az = hz * len / 2, px = hz * hw, pz = -hx * hw;
+  return [x + ax + px, z + az + pz, x + ax - px, z + az - pz,
+          x - ax - px, z - az - pz, x - ax + px, z - az + pz];
 }
+const rectEdge = (R, i) => {
+  const j = (i + 1) % 4;
+  return [R[i * 2], R[i * 2 + 1], R[j * 2], R[j * 2 + 1]];
+};
 function pointSegDist(px, pz, s) {
   const dx = s[2] - s[0], dz = s[3] - s[1], L2 = dx * dx + dz * dz;
   const t = L2 ? Math.max(0, Math.min(1, ((px - s[0]) * dx + (pz - s[1]) * dz) / L2)) : 0;
@@ -674,20 +757,52 @@ function segDist(A, B) {
   return Math.min(pointSegDist(A[0], A[1], B), pointSegDist(A[2], A[3], B),
                   pointSegDist(B[0], B[1], A), pointSegDist(B[2], B[3], A));
 }
+function rectGap(A, B) {                                  // surface-to-surface distance, 0 when overlapping
+  for (const [P, Q] of [[A, B], [B, A]]) {                // SAT over both rects' edge normals
+    for (const e of [0, 1]) {
+      const nx = P[e * 2 + 3] - P[e * 2 + 1], nz = P[e * 2] - P[e * 2 + 2];
+      let pLo = Infinity, pHi = -Infinity, qLo = Infinity, qHi = -Infinity;
+      for (let k = 0; k < 8; k += 2) {
+        const pv = P[k] * nx + P[k + 1] * nz, qv = Q[k] * nx + Q[k + 1] * nz;
+        pLo = Math.min(pLo, pv); pHi = Math.max(pHi, pv);
+        qLo = Math.min(qLo, qv); qHi = Math.max(qHi, qv);
+      }
+      if (pHi < qLo || qHi < pLo) {                       // separated → closest points lie on edges
+        let g = Infinity;
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++)
+          g = Math.min(g, segDist(rectEdge(A, i), rectEdge(B, j)));
+        return g;
+      }
+    }
+  }
+  return 0;                                               // no separating axis — bodies touch/overlap
+}
+const pointRectGap = (px, pz, R) => {
+  // containment first: edge distance alone would read a point dead-centre under a bus as ~1.25m clear
+  let pos = false, neg = false;
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    const cr = (R[j * 2] - R[i * 2]) * (pz - R[i * 2 + 1]) - (R[j * 2 + 1] - R[i * 2 + 1]) * (px - R[i * 2]);
+    if (cr > 0) pos = true; else if (cr < 0) neg = true;
+  }
+  if (!(pos && neg)) return 0;                            // inside (or on an edge)
+  return Math.min(
+    pointSegDist(px, pz, rectEdge(R, 0)), pointSegDist(px, pz, rectEdge(R, 1)),
+    pointSegDist(px, pz, rectEdge(R, 2)), pointSegDist(px, pz, rectEdge(R, 3)));
+};
 // smallest surface-to-surface gap the car would have at position u (vs all cars + people on zebras)
 function minGapAt(c, u, walkers) {
-  const p = poseOf(c, u), rc = halfW(c), mine = spineOf(p.x, p.z, p.ry, c.len, rc);
+  const p = poseOf(c, u), mine = footprintOf(p.x, p.z, p.ry, c.len, halfW(c));
   let gap = Infinity;
   for (const o of cars) {
     if (o === c) continue;
     const q = o.mesh.position, dx = q.x - p.x, dz = q.z - p.z;
     const reach = (c.len + o.len) * 0.7 + 2;
     if (dx * dx + dz * dz > reach * reach) continue;      // coarse cull
-    const ro = halfW(o);
-    gap = Math.min(gap, segDist(mine, spineOf(q.x, q.z, o.mesh.rotation.y, o.len, ro)) - rc - ro);
+    gap = Math.min(gap, rectGap(mine, footprintOf(q.x, q.z, o.mesh.rotation.y, o.len, halfW(o))));
   }
   for (const w of walkers)
-    gap = Math.min(gap, pointSegDist(w.x, w.z, mine) - rc - 0.45);
+    gap = Math.min(gap, pointRectGap(w.x, w.z, mine) - 0.45);
   return gap;
 }
 
@@ -718,24 +833,32 @@ function moveCars(dt) {
   const byLane = {};
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
-    const redHold = signalOf(dir) !== 'green';
     const crossBox = boxTotal - (boxByGroup[APPROACH[dir].group] || 0);
     for (let lane = 0; lane < LANES; lane++) {
-      const held = redHold || (pedPerp[dir] || []).some(p => Math.abs(p - laneOff(dir, lane)) < 3.0);
+      const pedHold = (pedPerp[dir] || []).some(p => Math.abs(p - laneOff(dir, lane)) < 3.0);
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
       for (let i = 0; i < list.length; i++) {
         const c = list[i], before = c.u;
+        // each car answers to ITS movement's aspect, not the arm's: a red left arrow holds the
+        // bay while the through lanes discharge, and the through red holds them during the arrow
+        const held = signalOf(dir, c.route ? c.route.move : 'straight') !== 'green' || pedHold;
+        const leader = list[i + 1];
         let target = c.u + c.speed * dt;
         let stopDist = Infinity;         // distance to the nearest thing worth braking for
         const stopAt = -STOP - c.len / 2;
+        // spillback: crossing the line only to stop inside the box behind a stalled same-lane
+        // chain traps the car there when the phase flips — the seed of every cross-traffic knot.
+        // Clear means the tail is past the exit zebra, not merely past the box edge.
+        const spill = c.u <= stopAt + 0.01 && !c.route && leader && !leader.route
+          && (leader.vel ?? 0) < 0.5
+          && leader.u - (c.len + leader.len) / 2 - GAP < ZEBRA.to + c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
         // held → red or someone on our zebra; else don't enter a packed box ("do not block the junction")
-        if (c.u <= stopAt + 0.01 && (held || crossBox >= LANES + 2
+        if (c.u <= stopAt + 0.01 && (held || spill || crossBox >= LANES + 2
             || (turnClaim && (!c.route || c.u < c.route.uA)))) {
           target = Math.min(target, stopAt);
           stopDist = stopAt - c.u;
         }
-        const leader = list[i + 1];
         // the lane wall only binds while both cars are still on the shared straight segment —
         // once either enters its turning arc their paths diverge and u-distance means nothing
         // (minGapAt still hard-guards any real proximity)
@@ -753,34 +876,48 @@ function moveCars(dt) {
             if (o.dir !== OPP[c.dir]) continue;
             const oStop = -STOP - o.len / 2;
             const committed = o.u > oStop + 0.01 && o.u < ROAD_HALF + 4;    // already in/near the box
-            const incoming = o.u <= oStop + 0.01 && oStop - o.u < 12 && (o.vel ?? 0) > 2;
-            // (deliberately NOT yielding to an oncoming car still parked at its line: both launch,
-            // meet mid-box, and the wedge/inch tiers squeeze the turner across — Kathmandu-style.
-            // Yielding to parked cars starves the turner's whole lane for the entire green.)
-            if (committed || incoming) { held = true; target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
+            // anyone at/near the oncoming line on green is launching or about to. Gating this on
+            // velocity (>2) left a ~0.3s blind window while it pulled off — turner and oncoming
+            // both committed and wedged mid-box, the single biggest junction-knot source.
+            const near = o.u <= oStop + 0.01 && oStop - o.u < 12
+              && signalOf(o.dir, o.route ? o.route.move : 'straight') === 'green';
+            // two opposing left-turners waiting on each other stand off forever — fixed approach
+            // priority lets exactly one commit; `committed` then holds the other until it clears.
+            const yieldTo = near && (!o.route?.crossing || DIRS.indexOf(c.dir) > DIRS.indexOf(o.dir));
+            if (committed || yieldTo) { held = true; target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
           }
           // turn-abort, like a real driver: a turner that can't find a gap for 6s with traffic
           // stacked behind gives up and goes straight — its lane flows again instead of sitting
           // out the whole green behind one indecisive left. (Only where a straight exit exists.)
           c.turnWait = held ? (c.turnWait || 0) + dt : 0;
-          if (held && c.turnWait > 6 && DIRS.includes(EXITS[c.dir].straight)
+          // (only from a lane whose paint allows straight — a dedicated left bay may not bail
+          // out into a movement whose aspect it doesn't answer to)
+          if (held && c.turnWait > 6 && laneMoves(c.dir, c.lane).includes('straight')
               && cars.some(o => o !== c && o.dir === c.dir && o.lane === c.lane && c.u - o.u > 0 && c.u - o.u < 14)) {
             c.route = null; c.turnWait = 0;
           }
         }
-        // arc-clearance: don't commit a turn if a STOPPED vehicle already sits inside the box on the
-        // swept path — it can't clear in time and the turner wedges mid-arc (bus vs parked box car).
-        // only STOPPED in-box cars count, so the moving oncoming flow never starves the turn.
+        // arc-clearance: don't commit a turn while anything STOPPED sits on the swept path — the
+        // whole arc PLUS the first metres of the exit arm (a stalled exit, or someone on the exit
+        // zebra, wedges the turner mid-box exactly like a parked car would). Only near-stopped
+        // bodies count, so the moving oncoming flow never starves the turn.
         if (c.route && c.u <= stopAt + 0.01 && target > stopAt) {
-          const rt = c.route;
-          for (let k = 1; k <= 6; k++) {
-            const us = rt.uA + (k / 6) * rt.arcLen, ps = poseOf(c, us), rcS = halfW(c);
-            const mineS = spineOf(ps.x, ps.z, ps.ry, c.len, rcS);
+          const rt = c.route, rcS = halfW(c);
+          // 12 samples ≈ 1.8m spacing on the longest arc — under a walker's check radius, so
+          // nothing on the path can fall between two samples
+          for (let k = 1; k <= 12; k++) {
+            const us = rt.uA + (k / 12) * (rt.arcLen + 6), ps = poseOf(c, us);
+            const mineS = footprintOf(ps.x, ps.z, ps.ry, c.len, rcS);
             let hit = false;
             for (const o of cars) {
-              if (o === c || (o.vel ?? 0) > 1 || !inBox(o)) continue;
-              if (segDist(mineS, spineOf(o.mesh.position.x, o.mesh.position.z, o.mesh.rotation.y, o.len, halfW(o))) - rcS - halfW(o) < SEP) { hit = true; break; }
+              if (o === c || (o.vel ?? 0) > 1) continue;
+              const dx = o.mesh.position.x - ps.x, dz = o.mesh.position.z - ps.z;
+              const reach = (c.len + o.len) * 0.7 + 2;
+              if (dx * dx + dz * dz > reach * reach) continue;
+              if (rectGap(mineS, footprintOf(o.mesh.position.x, o.mesh.position.z, o.mesh.rotation.y, o.len, halfW(o))) < SEP) { hit = true; break; }
             }
+            if (!hit) for (const w of walkers)
+              if (pointRectGap(w.x, w.z, mineS) - 0.45 < SEP) { hit = true; break; }
             if (hit) { target = stopAt; stopDist = Math.min(stopDist, stopAt - c.u); break; }
           }
         }
@@ -812,13 +949,14 @@ function moveCars(dt) {
           const next = minGapAt(c, c.u + adv, walkers);
           // three tiers, all zero-contact: normal keeps SEP daylight; a stuck driver inches while not
           // worsening anyone's gap; the single longest-stuck driver squeezes past to break a knot.
+          // Floors are true rectangle daylight — under the old capsule they read as touching bodies.
           // read wasStuck, not c.stuck: the reset above already zeroed it for gap-blocked cars,
           // which would keep every knot-plug permanently in the strictest tier
           const wedged = wasStuck > 4 && wasStuck >= maxStuck - 1e-6;
           const inching = wasStuck > 1.5;
           if (wedged || inching) adv = Math.min(adv, c.speed * 0.25 * dt);
-          const blockedNow = wedged ? next < 0.02
-                           : inching ? next < 0.06 && next < now
+          const blockedNow = wedged ? next < 0.08
+                           : inching ? next < 0.15 && next < now
                            : next < SEP && next < now;
           if (blockedNow) { adv = 0; c.vel = 0; c.stuck = wasStuck + dt; }   // one dt per frame, max
         }
@@ -915,6 +1053,11 @@ function cctvLabels(show) {
   DIRS.forEach((dir, i) => {
     const el = document.createElement('div');
     el.textContent = `● CAM ${i + 1} — ${NAMES_FULL[dir]} approach`;
+    // live signal + count ride inside the caption pill — corner-drawn chips hid behind side panels
+    const sig = document.createElement('span');
+    sig.dataset.dir = dir;
+    sig.style.cssText = 'margin-left:8px;font-weight:700';
+    el.appendChild(sig);
     const rows = Math.ceil(DIRS.length / 2);
     Object.assign(el.style, {
       position: 'fixed', left: (i % 2) * 50 + (i % 2 ? 1.2 : 21) + '%', top: Math.floor(i / 2) * (100 / rows) + 1.5 + '%',
@@ -925,6 +1068,19 @@ function cctvLabels(show) {
     document.body.appendChild(el);
     cctvLabelEls.push(el);
   });
+}
+// one switch for every view control: keeps the 1-click grid button, the junction-panel row and
+// the per-cam captions in agreement no matter which control flipped the mode.
+function setCamMode(v) {
+  camMode = v;
+  cctvLabels(v === 'cctv' && DIRS.length > 1);
+  const gb = document.getElementById('cam-grid');
+  if (gb) {
+    gb.textContent = v === 'cctv' ? '🗺  single view' : `🎥  CCTV grid ×${DIRS.length}`;
+    gb.classList.toggle('on', v === 'cctv');
+  }
+  document.querySelectorAll('#view-row button').forEach(b =>
+    b.classList.toggle('on', (b.textContent.startsWith('CCTV') ? 'cctv' : 'overview') === v));
 }
 
 // ─────────────────────────── HUD + scenario controls ───────────────────────────
@@ -1011,19 +1167,18 @@ function junctionPanel() {
   };
   p.appendChild(row('shape', [['4-way', '4'], ['T', 'T'], ['2-arm', '2']], TOPO, v => rebuild(v, LANES)));
   p.appendChild(row('lanes', [['1', 1], ['2', 2], ['3', 3]], LANES, v => rebuild(TOPO, v)));
-  // dragging the camera moves the "CCTV" the detector reads — one chip brings back the
-  // calibrated pose (and with it, the boxes) without a reload
+  // the detector always reads the FIXED virtual CCTV — this chip just returns the display
+  // camera to that calibrated pose without a reload
   p.appendChild(row('camera', [['⟲ reset view', 'reset']], null, () => {
     camera.position.set(26, 28, 38);
     controls.target.set(0, -1, 2);
     controls.update();
   }));
-  if (!CAP && !LIVE) p.appendChild(row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, v => {                       // capture/live: labels+zones are projected via the overview camera
-    camMode = v;
-    cctvLabels(v === 'cctv');
-    [...p.children[2].querySelectorAll('button')].forEach(b =>
-      b.classList.toggle('on', (b.textContent.startsWith('CCTV') ? 'cctv' : 'overview') === v));
-  }));
+  if (!CAP && DIRS.length > 1) {                   // capture is calibrated to the overview camera
+    const vr = row('view', [['overview', 'overview'], ['CCTV ×' + DIRS.length, 'cctv']], camMode, setCamMode);
+    vr.id = 'view-row';
+    p.appendChild(vr);
+  }
   document.body.appendChild(p);
 }
 
@@ -1086,6 +1241,7 @@ function injectStyles() {
   .relay-junction .jrow > span{ width:48px; color:var(--muted); font-size:11px; }
   .relay-help{ position:fixed; left:14px; bottom:16px; z-index:11; width:34px; height:34px; padding:0;
     border-radius:50%; font:700 15px ui-monospace,monospace; color:var(--cy); }
+  #cam-grid{ position:fixed; left:14px; bottom:62px; z-index:12; padding:9px 12px; font-size:12.5px; }
   .relay-explain{ position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
     background:rgba(6,8,11,.55); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); opacity:0; transition:opacity .25s; }
   .relay-explain.show{ opacity:1; }
@@ -1147,6 +1303,12 @@ function buildLiveUI() {
   mctx.scale(PR, PR);
   drawChart();
 
+  // one click into the operator's wall: N pole cameras, one per approach, boxes + lights live
+  if (DIRS.length > 1) {
+    const grid = button(`🎥  CCTV grid ×${DIRS.length}`, () => setCamMode(camMode === 'cctv' ? 'overview' : 'cctv'), 'cam-grid');
+    document.body.appendChild(grid);
+  }
+
   if (LOCKFIX) return;                           // pinned-fixed pages get no toggle — that's the point
   const toggle = button('', () => { systemOn = !systemOn; modeWait = 0; modeT = 0; paintToggle(); }, 'sys-toggle');
   const paintToggle = () => {
@@ -1161,64 +1323,167 @@ function sizeOverlay() {
   if (overlay) { overlay.width = innerWidth * PR; overlay.height = innerHeight * PR; }
 }
 
-const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
-// "CCTV 1" inset: the exact frame the detector reads, boxes and all — shown whenever the user's
-// camera leaves the calibrated pose, so free-look never hides what the system sees.
-let pipWrap = null, pipCanvas = null, pipCtx = null;
-function drawPip(show) {
-  if (!LIVE || EMBED) return;
-  if (!pipWrap) {
-    pipWrap = document.createElement('div');
-    pipWrap.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:12;display:none;' +
-      'border:1px solid rgba(125,211,252,.45);border-radius:9px;overflow:hidden;' +
-      'box-shadow:0 6px 22px rgba(0,0,0,.45);background:#0b0d10';
-    const cap = document.createElement('div');
-    cap.textContent = '● CCTV 1 — what the system reads';
-    cap.style.cssText = 'font:600 10px ui-monospace,monospace;color:#7dd3fc;padding:4px 8px;letter-spacing:.06em';
-    pipCanvas = document.createElement('canvas');
-    pipCanvas.width = 288; pipCanvas.height = 162;
-    pipCanvas.style.cssText = 'display:block;width:288px;height:162px';
-    pipCtx = pipCanvas.getContext('2d');
-    pipWrap.append(cap, pipCanvas);
-    document.body.appendChild(pipWrap);
+const BOX_COLORS = { car: '#34c759', motorcycle: '#ff9f0a', bicycle: '#ffd60a', bus: '#5ac8fa', truck: '#ff453a', ambulance: '#ffffff', autorickshaw: '#bf5af2' };
+// free-look reprojection: detector boxes live in CCTV screen space, so once the user orbits away
+// each box is matched to the sim vehicle under it (in CCTV space) and redrawn around that vehicle
+// in the CURRENT view — detections stay glued to the traffic from any angle, no inset needed.
+const _pv = new THREE.Vector3();
+function projTo(cam, x, y, z) {
+  _pv.set(x, y, z).applyMatrix4(cam.matrixWorldInverse);
+  if (_pv.z > -0.1) return null;                           // behind the camera
+  _pv.applyMatrix4(cam.projectionMatrix);
+  return [_pv.x * 0.5 + 0.5, -_pv.y * 0.5 + 0.5];
+}
+let _mdBoxes = null, _mdOut = [];
+function matchedDetections() {
+  // one match per detector result, not per rAF: boxes land at ~7-10Hz while drawing runs at 60,
+  // and the pairing is against capture-time positions anyway — recomputing between results only
+  // burned CPU on already-throttled demo hardware. (carScreenBox still reprojects every frame.)
+  if (liveBoxes === _mdBoxes) return _mdOut;
+  cctvCam.updateMatrixWorld(true);
+  cctvCam.matrixWorldInverse.copy(cctvCam.matrixWorld).invert();
+  // match against where each vehicle WAS when the detector's frame was captured (result age +
+  // inference time): matching current positions loses fast movers that outrun their own box.
+  const lag = Math.min(0.7, ((performance.now() - (liveBoxes.at || performance.now())) + lastInferMs) / 1000);
+  const centers = cars.map(c => {
+    const back = (c.vel ?? 0) * lag, ry = c.mesh.rotation.y;
+    return projTo(cctvCam, c.mesh.position.x + Math.sin(ry) * back, 1, c.mesh.position.z + Math.cos(ry) * back);
+  });
+  // globally nearest-first + class-aware: greedy in box order let a "car" box claim the bike
+  // standing beside its own car (queues are exactly where boxes crowd) — every label smear the
+  // founder saw was this. A class mismatch costs half a box of distance, so labels prefer their
+  // own kind but a mislabeled detection still lands on the vehicle under it, never one far away.
+  const cand = [];
+  for (let k = 0; k < liveBoxes.length; k++) {
+    const b = liveBoxes[k], bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    const gate = Math.max(b.w, b.h) * 0.8 + 0.02, pen = Math.max(b.w, b.h) * 0.5;
+    for (let i = 0; i < cars.length; i++) {
+      if (!centers[i]) continue;
+      const d = Math.hypot(centers[i][0] - bx, centers[i][1] - by);
+      // a box with no vehicle near its center (already exited, detector ghost) is dropped, not guessed
+      if (d < gate) cand.push({ k, i, s: d + ((TYPES[cars[i].type].cls || cars[i].type) !== b.cls ? pen : 0) });
+    }
   }
-  pipWrap.style.display = show ? 'block' : 'none';
-  if (!show) return;
-  const W = pipCanvas.width, H = pipCanvas.height;
-  pipCtx.drawImage(streamCanvas, 0, 0, W, H);              // last frame the detector actually got
-  pipCtx.lineWidth = 1.1;
-  pipCtx.font = '600 8px ui-monospace, monospace';
-  for (const b of liveBoxes) {
-    pipCtx.globalAlpha = Math.min(1, Math.max(0.3, (b.conf - 0.2) * 2.2));
-    pipCtx.strokeStyle = BOX_COLORS[b.cls] || '#34c759';
-    pipCtx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+  cand.sort((p, q) => p.s - q.s);
+  const usedB = new Set(), usedC = new Set(), out = [];
+  for (const p of cand) {
+    if (usedB.has(p.k) || usedC.has(p.i)) continue;
+    usedB.add(p.k); usedC.add(p.i);
+    out.push({ b: liveBoxes[p.k], c: cars[p.i] });
   }
-  pipCtx.globalAlpha = 1;
+  _mdBoxes = liveBoxes; _mdOut = out;
+  return out;
+}
+function carScreenBox(c, cam = camera) {
+  const p = c.mesh.position, ry = c.mesh.rotation.y;
+  const hl = c.len / 2 + 0.2, hw = halfW(c) + 0.15, h = c.len >= 6 ? 3.1 : c.type === 'motorcycle' ? 1.8 : 1.7;
+  const cos = Math.cos(ry), sin = Math.sin(ry);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const sx of [-hw, hw]) for (const sz of [-hl, hl]) for (const sy of [0.1, h]) {
+    const pt = projTo(cam, p.x + sx * cos + sz * sin, sy, p.z - sx * sin + sz * cos);
+    if (!pt) return null;                                  // any corner behind the camera → skip whole box
+    x0 = Math.min(x0, pt[0]); y0 = Math.min(y0, pt[1]); x1 = Math.max(x1, pt[0]); y1 = Math.max(y1, pt[1]);
+  }
+  if (x1 < 0 || y1 < 0 || x0 > 1 || y0 > 1) return null;   // fully off-screen
+  return [x0, y0, x1 - x0, y1 - y0];
+}
+// one entry point for putting pixels on screen: single user camera, or the operator's wall —
+// a 2×N scissored grid of pole cameras. streamFrame ALSO restores through this, so the grid
+// never flickers back to the overview when a detector frame is captured mid-tick.
+function renderView() {
+  const cctvNow = camMode === 'cctv' && DIRS.length > 1;
+  for (const s of armMarkers) s.visible = !cctvNow;
+  if (!cctvNow) { renderer.render(scene, camera); return; }
+  renderer.setScissorTest(true);
+  const W = renderer.domElement.width, H = renderer.domElement.height;
+  const cw = Math.ceil(W / 2), ch = Math.ceil(H / Math.ceil(DIRS.length / 2));
+  DIRS.forEach((dir, i) => {
+    const x = (i % 2) * cw, yTop = Math.floor(i / 2) * ch, y = H - yTop - ch;   // GL origin = bottom-left
+    renderer.setViewport(x, y, cw, ch);
+    renderer.setScissor(x, y, cw, ch);
+    poleCams[dir].aspect = cw / ch;
+    poleCams[dir].updateProjectionMatrix();
+    renderer.render(scene, poleCams[dir]);
+  });
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
 }
 function drawOverlay() {
   const W = overlay.width, H = overlay.height;
   octx.clearRect(0, 0, W, H);
-  if (liveBoxes.at && performance.now() - liveBoxes.at > 700) return;   // feed stalled — no ghost boxes
+  const fresh = !(liveBoxes.at && performance.now() - liveBoxes.at > 700);      // stalled feed — no ghost boxes
+  if (camMode === 'cctv' && DIRS.length > 1) return drawGridOverlay(W, H, fresh);
+  if (!fresh) return;
   octx.lineWidth = (EMBED ? 1.25 : 2) * PR;
   octx.font = `600 ${11 * PR}px ui-monospace, monospace`;
-  // main-canvas boxes only align when the display camera IS the CCTV pose; when the user orbits
-  // away, the boxes live in the "CCTV 1" inset instead (drawn below) — never misaligned, never gone.
-  const aligned = atCCTVPose();
-  drawPip(!aligned);
-  if (!aligned) return;
-  for (const b of liveBoxes) {
+  // every detection is matched to its vehicle and the box drawn around that vehicle NOW, in the
+  // current view — detector truth for what/whether, sim pose for where. Verbatim detector boxes
+  // trail moving traffic by a full inference (100-400ms ≈ a car length at 14 m/s).
+  const boxes = matchedDetections().map(m => ({ b: m.b, r: carScreenBox(m.c) }));
+  for (const { b, r } of boxes) {
+    if (!r) continue;
     const col = BOX_COLORS[b.cls] || '#34c759';
     // low-confidence detections fade instead of shouting: a 0.22 ghost box on bare asphalt reads
     // as a glitch at full opacity, as honest uncertainty at a whisper.
     octx.globalAlpha = Math.min(1, Math.max(0.25, (b.conf - 0.2) * 2.2));
     octx.strokeStyle = col;
-    octx.strokeRect(b.x * W, b.y * H, b.w * W, b.h * H);
+    octx.strokeRect(r[0] * W, r[1] * H, r[2] * W, r[3] * H);
     // in the small compare embeds the boxes alone carry the "camera is read" story — text is noise.
     if (EMBED || b.conf < 0.35) continue;
+    const label = `${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`;
+    const lx = r[0] * W, ly = Math.max(12 * PR, r[1] * H - 3 * PR);
+    octx.fillStyle = 'rgba(11,13,16,.72)';
+    octx.fillRect(lx - 2 * PR, ly - 10 * PR, octx.measureText(label).width + 5 * PR, 13 * PR);
     octx.fillStyle = col;
-    octx.fillText(`${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`, b.x * W, Math.max(12 * PR, b.y * H - 3 * PR));
+    octx.fillText(label, lx, ly);
   }
   octx.globalAlpha = 1;
+}
+// operator's wall overlay: every pole camera gets its own detections (matched once in CCTV space,
+// reprojected per quadrant) plus a live signal chip — each lane watched, each light accounted for,
+// exactly how a deployed multi-camera controller presents itself.
+function drawGridOverlay(W, H, fresh) {
+  const rows = Math.ceil(DIRS.length / 2), cw = W / 2, ch = H / rows;
+  const matched = fresh ? matchedDetections() : [];
+  DIRS.forEach((dir, i) => {
+    const qx = (i % 2) * cw, qy = Math.floor(i / 2) * ch;
+    octx.save();
+    octx.beginPath(); octx.rect(qx, qy, cw, ch); octx.clip();
+    octx.lineWidth = 1.5 * PR;
+    octx.font = `600 ${10 * PR}px ui-monospace, monospace`;
+    for (const { b, c } of matched) {
+      const r = carScreenBox(c, poleCams[dir]);
+      if (!r) continue;
+      const col = BOX_COLORS[b.cls] || '#34c759';
+      octx.globalAlpha = Math.min(1, Math.max(0.25, (b.conf - 0.2) * 2.2));
+      octx.strokeStyle = col;
+      octx.strokeRect(qx + r[0] * cw, qy + r[1] * ch, r[2] * cw, r[3] * ch);
+      if (b.conf < 0.35) continue;
+      const label = `${b.cls}${b.id != null ? ' #' + b.id : ''} ${b.conf}`;
+      const lx = qx + r[0] * cw, ly = Math.max(qy + 11 * PR, qy + r[1] * ch - 3 * PR);
+      octx.fillStyle = 'rgba(11,13,16,.72)';
+      octx.fillRect(lx - 2 * PR, ly - 9 * PR, octx.measureText(label).width + 5 * PR, 12 * PR);
+      octx.fillStyle = col;
+      octx.fillText(label, lx, ly);
+    }
+    octx.globalAlpha = 1;
+    octx.restore();
+    // signal + count into the caption pill: this approach's light as the controller holds it
+    const pill = cctvLabelEls[i], sigEl = pill && pill.lastChild;
+    if (sigEl) {
+      const sig = signalOf(dir);
+      const n = liveCounts && liveCounts[dir] != null ? liveCounts[dir] : null;
+      sigEl.textContent = `· ${sig.toUpperCase()}${n != null ? ` · ${n} in view` : ''}`;
+      sigEl.style.color = sig === 'green' ? '#86efac' : sig === 'yellow' ? '#ffcc00' : '#ff6b62';
+    }
+  });
+  // seams between the feeds — reads as a video wall, not one warped scene
+  octx.strokeStyle = 'rgba(125,211,252,.30)';
+  octx.lineWidth = 2 * PR;
+  octx.beginPath();
+  octx.moveTo(cw, 0); octx.lineTo(cw, H);
+  for (let r = 1; r < rows; r++) { octx.moveTo(0, r * ch); octx.lineTo(W, r * ch); }
+  octx.stroke();
 }
 // live queued-over-time chart: one series, each segment coloured by the mode that produced it,
 // so flipping R.E.L.A.Y. off paints the resulting pile-up straight into the timeline.
@@ -1267,11 +1532,23 @@ function computeZones() {
   const zones = {};
   for (const dir of DIRS) {
     const a = APPROACH[dir];
-    const near = a.sign * -STOP, far = a.sign * -(STOP + 42), mid = a.side * (ROAD_HALF / 2), hw = ROAD_HALF / 2;
-    zones[dir] = (a.axis === 'z'
-      ? [[mid - hw, 1.2, near], [mid + hw, 1.2, near], [mid + hw, 1.2, far], [mid - hw, 1.2, far]]
-      : [[near, 1.2, mid - hw], [near, 1.2, mid + hw], [far, 1.2, mid + hw], [far, 1.2, mid - hw]]
+    const near = a.sign * -STOP, far = a.sign * -(STOP + 42);
+    const quad = (pA, pB) => (a.axis === 'z'
+      ? [[pA, 1.2, near], [pB, 1.2, near], [pB, 1.2, far], [pA, 1.2, far]]
+      : [[near, 1.2, pA], [near, 1.2, pB], [far, 1.2, pB], [far, 1.2, pA]]
     ).map(p => project(...p));
+    // dedicated turn bays get their OWN zone (keyed dir.left / dir.thru) — the detector then
+    // counts turn demand separately and the controller can give the arrow only when needed.
+    // Arms without a bay keep the single whole-arm zone, and an arm-level server keeps working.
+    const bays = [...Array(LANES).keys()]
+      .filter(l => { const m = laneMoves(dir, l); return m.length === 1 && m[0] === 'left'; }).length;
+    if (bays) {
+      const cut = a.side * bays * LANE_W;
+      zones[dir + '.left'] = quad(0, cut);
+      zones[dir + '.thru'] = quad(cut, a.side * ROAD_HALF);
+    } else {
+      zones[dir] = quad(0, a.side * ROAD_HALF);
+    }
   }
   return zones;
 }
@@ -1301,7 +1578,7 @@ function connectWS() {
       if (!systemOn) {
         banner.textContent = '🚑 ambulance on ' + emg.join(', ') + ' — blind fixed cycle, no priority';
       } else {
-        const clearing = emg.filter(d => m.signals[d] === 'green');
+        const clearing = emg.filter(d => ['', '.thru', '.left'].some(k => m.signals[d + k] === 'green'));
         banner.textContent = clearing.length
           ? '🚑 EMERGENCY PREEMPT — clearing ' + clearing.join(', ')
           : '🚑 emergency detected on ' + emg.join(', ') + ' — switching…';
@@ -1345,10 +1622,12 @@ function streamFrame() {
   streamCanvas.width = w;
   streamCanvas.height = h;
   // render the FIXED CCTV pose, copy it for the detector, then restore the user's view — all
-  // within one rAF, so only the user's frame ever reaches the screen.
+  // within one rAF, so only the user's frame ever reaches the screen. Markers are forced visible
+  // so the detector's frame never shifts with the user's view mode (grid hides them on screen).
+  for (const s of armMarkers) s.visible = true;
   renderer.render(scene, cctvCam);
   streamCtx.drawImage(renderer.domElement, 0, 0, w, h);
-  renderer.render(scene, camera);
+  renderView();
   // announce a siren only once it is near the camera's field — announcing a spawn still 100m
   // upstream made the "emergency detected" banner precede any visible ambulance by seconds.
   const emergencies = [...new Set(cars.filter(c => c.type === 'ambulance' && c.u < ROAD_HALF && c.u > -(STOP + 50)).map(c => c.dir))];
@@ -1363,7 +1642,7 @@ function streamFrame() {
 }
 
 // ─────────────────────────── capture mode (auto-labeled training frames) ───────────────────────────
-const CLASS_ID = { car: 0, motorcycle: 1, bus: 2, truck: 3, ambulance: 4, autorickshaw: 5 };
+const CLASS_ID = { car: 0, motorcycle: 1, bus: 2, truck: 3, ambulance: 4 };   // must mirror gatichowk.yaml exactly
 const _bb = new THREE.Box3();
 let capN = 0, capAcc = 0;
 
@@ -1371,25 +1650,36 @@ function labelFor(car) {
   _bb.setFromObject(car.mesh);
   let x1 = 2, y1 = 2, x2 = -2, y2 = -2;
   for (const X of [_bb.min.x, _bb.max.x]) for (const Y of [_bb.min.y, _bb.max.y]) for (const Z of [_bb.min.z, _bb.max.z]) {
-    const [sx, sy] = project(X, Y, Z);
-    x1 = Math.min(x1, sx); y1 = Math.min(y1, sy);
-    x2 = Math.max(x2, sx); y2 = Math.max(y2, sy);
+    const pt = projTo(cctvCam, X, Y, Z);
+    if (!pt) return null;                          // any corner behind the camera → mirrored garbage, not a box
+    x1 = Math.min(x1, pt[0]); y1 = Math.min(y1, pt[1]);
+    x2 = Math.max(x2, pt[0]); y2 = Math.max(y2, pt[1]);
   }
+  if (x2 <= 0 || y2 <= 0 || x1 >= 1 || y1 >= 1) return null;   // fully off-frame — clamping it would fake a box at the edge
   x1 = Math.max(0, x1); y1 = Math.max(0, y1);
   x2 = Math.min(1, x2); y2 = Math.min(1, y2);
   const w = x2 - x1, h = y2 - y1;
   if (w <= 0.006 || h <= 0.006) return null;
   const cls = CLASS_ID[TYPES[car.type].cls || car.type];
+  if (cls == null) return null;                    // a type outside the trained classes must never write a label line
   return `${cls} ${((x1 + x2) / 2).toFixed(6)} ${((y1 + y2) / 2).toFixed(6)} ${w.toFixed(6)} ${h.toFixed(6)}`;
 }
 function captureTick(dt) {
   capAcc += dt;
   if (capAcc < 0.2 || capN >= CAP) return;
   capAcc = 0;
+  // labels project through cctvCam, so the captured pixels MUST be the cctvCam render — copying
+  // the on-screen view coupled the dataset to wherever the user camera happened to sit, and one
+  // poisoned capture run trained a detector that scored its own garbage well and saw nothing live.
+  // Same double-render pattern as streamFrame: markers visible, render cctvCam, copy, restore.
+  for (const s of armMarkers) s.visible = true;
+  renderer.render(scene, cctvCam);
+  cctvCam.matrixWorldInverse.copy(cctvCam.matrixWorld).invert();   // projTo reads this
   const label = cars.map(labelFor).filter(Boolean).join('\n');
   streamCanvas.width = renderer.domElement.width;
   streamCanvas.height = renderer.domElement.height;
   streamCtx.drawImage(renderer.domElement, 0, 0);
+  renderView();
   const image = streamCanvas.toDataURL('image/jpeg', 0.9);
   const name = 'frame_' + String(capN).padStart(5, '0');
   fetch('/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, image, label }) }).catch(() => {});
@@ -1417,25 +1707,7 @@ function tick() {
   hud.total.textContent = cars.length;
 
   if (controls) controls.update();
-  const cctvNow = camMode === 'cctv' && DIRS.length > 1;
-  for (const s of armMarkers) s.visible = !cctvNow;
-  if (cctvNow) {
-    renderer.setScissorTest(true);
-    const W = renderer.domElement.width, H = renderer.domElement.height;
-    const cw = Math.ceil(W / 2), ch = Math.ceil(H / Math.ceil(DIRS.length / 2));
-    DIRS.forEach((dir, i) => {
-      const x = (i % 2) * cw, yTop = Math.floor(i / 2) * ch, y = H - yTop - ch;   // GL origin = bottom-left
-      renderer.setViewport(x, y, cw, ch);
-      renderer.setScissor(x, y, cw, ch);
-      poleCams[dir].aspect = cw / ch;
-      poleCams[dir].updateProjectionMatrix();
-      renderer.render(scene, poleCams[dir]);
-    });
-    renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, W, H);
-  } else {
-    renderer.render(scene, camera);
-  }
+  renderView();
   if (LIVE) {
     drawOverlay();
     if (mctx) {                                    // sample the live queue for the mode-coloured chart
@@ -1519,8 +1791,9 @@ function startEmbedBridge() {
 
 let peds = { tick: () => {}, crossers: () => [], waiting: () => ({}) };
 loadModels().then(async () => {
-  const loadGLB = url => new Promise((res, rej) => loader.load(url, g => res(g.scene), undefined, rej));
-  peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLB, cloneSkinned });
+  // full gltf, not just the scene — peds need the animation clips riding alongside
+  const loadGLTF = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
+  peds = await initPeds({ THREE, scene, DIRS, APPROACH, ROAD_HALF, ZEBRA, signalOf, loadGLTF, cloneSkinned });
 }).then(() => {
   injectStyles();
   for (let i = 0; i < 28; i++) addCar(DIRS[(Math.random() * DIRS.length) | 0], -START + Math.random() * (START - 6));
