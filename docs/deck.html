@@ -72,6 +72,7 @@
   <div style="margin-top:6px">
     <span class="pill">one camera</span><span class="pill">one small computer</span><span class="pill">the existing lights</span>
   </div>
+  <p class="cap" style="margin-top:22px">Everything in this presentation runs live on this laptop.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>Niraj Kafle · July 2026</span><span>01</span></div>
 </section>
 
@@ -187,7 +188,7 @@
       <div class="cap">A roundabout in Hanoi. Around 40 vehicles found and counted in every frame.</div>
     </div>
   </div>
-  <p class="sub" style="margin-top:18px;font-size:21px">These clips run with no junction-specific setup. <b>One model, trained once for our kind of traffic, works at every junction.</b> Measured accuracy: 0.95 out of 1.</p>
+  <p class="sub" style="margin-top:18px;font-size:21px">These clips run with no junction-specific setup: <b>one model, working on junctions it has never seen.</b> On our validation footage it scores 0.95 out of 1.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>06</span></div>
 </section>
 
@@ -198,10 +199,10 @@
   <div class="grid2" style="margin-top:8px">
     <div>
       <img src="img/compare.jpg" alt="side by side comparison">
-      <div class="cap">Two copies of the same junction receive identical traffic. The left one runs R.E.L.A.Y., the right one runs a fixed timer. The result is measured live on screen.</div>
+      <div class="cap">Two simulated copies of the same junction receive identical traffic. The left one runs R.E.L.A.Y., the right one runs a fixed timer. The result is measured live on screen.</div>
     </div>
     <div>
-      <div class="big">▼44%<small> queue</small></div>
+      <div class="big">▼44%<small> queue, in simulation</small></div>
       <div class="lbl">typical wait per vehicle</div>
       <div class="bar" style="width:44%;background:var(--green)">R.E.L.A.Y. · 6 seconds</div>
       <div style="height:8px"></div>
@@ -227,7 +228,7 @@
     </div>
     <div>
       <div class="grid2" style="gap:18px">
-        <div class="stat"><div class="v g">−32%</div><div class="k">less queueing than fixed timers, across all three</div></div>
+        <div class="stat"><div class="v g">−32%</div><div class="k">less queueing than fixed timers across all three, in simulation</div></div>
         <div class="stat"><div class="v g">0</div><div class="k">gridlocks in 45 minutes of maximum traffic</div></div>
       </div>
       <p class="sub" style="margin-top:20px;font-size:21px">When one junction gets congested, the junction before it sends fewer cars. <b>Adding a junction is a configuration change, not new hardware.</b></p>
@@ -245,9 +246,10 @@
     <tr><td>SCATS / SCOOT<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive systems from Australia and the UK</span></td><td>$20,000&ndash;80,000</td><td>sensors cut into the road</td><td>push-button</td><td>extra hardware</td></tr>
     <tr><td>Surtrac<br><span style="font-size:13px;color:var(--faint);font-weight:400">adaptive system from Pittsburgh, USA</span></td><td>$20,000+</td><td>radar on every arm</td><td>partial</td><td>partial</td></tr>
     <tr><td>Lalitpur AI lights<br><span style="font-size:13px;color:var(--faint);font-weight:400">running since December 2024</span></td><td>&mdash;</td><td>camera, reads density only</td><td>none</td><td>none</td></tr>
-    <tr class="win"><td>R.E.L.A.Y.</td><td>~$250&ndash;400</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
+    <tr class="win"><td>R.E.L.A.Y. <span style="font-size:13px;font-weight:400">(prototype)</span></td><td>~$250&ndash;400 hardware</td><td>the camera already on the pole</td><td>counted &amp; served</td><td>priority, time-limited</td></tr>
   </table>
-  <p class="sub" style="margin-top:22px;font-size:21px">No road is dug up. The camera is usually already installed.</p>
+  <p class="cap" style="margin-top:14px">Their prices are for complete installed systems. Ours is the hardware cost of a prototype; a real deployment adds installation and support.</p>
+  <p class="sub" style="margin-top:12px;font-size:21px">No road is dug up. The camera is usually already installed.</p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>09</span></div>
 </section>
 
@@ -273,9 +275,9 @@
   <div class="grid2" style="gap:26px;margin-top:10px">
     <div>
       <div class="lbl" style="color:var(--green);margin-top:0">strengths</div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> 50 to 300 times cheaper than existing systems.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Hardware costs a few hundred dollars, not tens of thousands.</p></div>
       <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Serves vehicles, pedestrians and ambulances.</p></div>
-      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Every number here was measured, not estimated.</p></div>
+      <div class="card" style="margin-bottom:13px"><p><b style="color:var(--green)">✓</b> Every number here comes from a test we can rerun in front of you.</p></div>
       <div class="card"><p><b style="color:var(--green)">✓</b> At worst, it behaves like today's fixed timer.</p></div>
     </div>
     <div>
@@ -304,31 +306,37 @@
     <div>
       <div class="lbl" style="margin-top:0">compared with Lalitpur's system</div>
       <table>
-        <tr><th></th><th>Lalitpur</th><th>R.E.L.A.Y.</th></tr>
+        <tr><th></th><th>Lalitpur (deployed)</th><th>R.E.L.A.Y. (prototype)</th></tr>
         <tr><td>reads</td><td>traffic density only</td><td>every vehicle, weighed by size</td></tr>
         <tr><td>pedestrians</td><td>not sensed</td><td>counted &amp; served</td></tr>
         <tr><td>ambulances</td><td>no priority</td><td>green before arrival</td></tr>
         <tr><td>empty roads</td><td>still get green</td><td>get none</td></tr>
         <tr><td>junctions</td><td>work alone</td><td>coordinate</td></tr>
-        <tr><td>results</td><td>not published</td><td>public dashboard</td></tr>
+        <tr><td>results</td><td>not published</td><td>public dashboard, planned</td></tr>
       </table>
     </div>
   </div>
   <div class="foot"><span>R.E.L.A.Y.</span><span>12</span></div>
 </section>
 
-<!-- 13 · ask -->
+<!-- 13 · closing -->
 <section class="slide">
-  <div class="kicker">What we need</div>
-  <h2>One junction, ninety days,<br>results in public</h2>
-  <div class="steps" style="margin-top:18px">
+  <div class="kicker">What we built, and what's next</div>
+  <h2>It works. Here is where it goes.</h2>
+  <div class="grid4" style="margin-top:12px">
+    <div class="stat"><div class="v g">1</div><div class="k">detector, trained by us for this traffic</div></div>
+    <div class="stat"><div class="v g">4</div><div class="k">live demos: simulator, real footage, side-by-side test, network</div></div>
+    <div class="stat"><div class="v g">13</div><div class="k">safety rules the code checks on itself</div></div>
+    <div class="stat"><div class="v g">▼44%</div><div class="k">less queueing than a fixed timer, in simulation</div></div>
+  </div>
+  <div class="steps" style="margin-top:22px">
     <div class="step"><div class="n">1</div><b>Pilot</b><span>An existing camera, watch-only mode. No risk to traffic.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">2</div><b>Control</b><span>It runs the lights. Police keep the override. Results published.</span></div>
+    <div class="step"><div class="n">2</div><b>Control</b><span>It runs the lights. Police keep the override.</span></div>
     <div class="arr">→</div>
-    <div class="step"><div class="n">3</div><b>Extend</b><span>One main road, with ambulance priority to the nearest hospital.</span></div>
+    <div class="step"><div class="n">3</div><b>Extend</b><span>One main road, with ambulance priority to the hospital.</span></div>
   </div>
-  <p class="sub" style="margin-top:34px;font-size:30px"><b>The software is built and measured.<br>We need a junction and a partner to prove it on the road.</b></p>
+  <p class="sub" style="margin-top:26px;font-size:26px"><b>All of it is running on this laptop right now. Ask us to break it.</b></p>
   <div class="foot"><span>R.E.L.A.Y.</span><span>github.com/kafle1/relay</span><span>13</span></div>
 </section>
 

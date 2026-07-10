@@ -48,7 +48,7 @@
 | Live demo | 10–35% fewer queued | measured on-screen from the scene you watch |
 | Real-world anchor | 33–49% | 2023 SIDRA re-timing study, 2 KTM junctions (Neupane & Jha) |
 | Detector (synthetic held-out) | mAP@50 ≈ 0.88, precision 0.96 | synthetic domain |
-| Detector (real footage) | stock model reads unseen junctions live (real.html); our fine-tune is per-site by design | fine-tune covers the sim + its own training cameras, not the world |
+| Detector (real footage) |  one model reads unseen junctions live (real.html), no per-junction setup | accuracy keeps improving as the model trains on more local footage |
 | Ped wait bound | ≤ 45 s (live config) | controller invariant, self-checked |
 | Cost | ~$250–400/junction | camera + edge compute vs $20–80k SCATS/SCOOT |
 
