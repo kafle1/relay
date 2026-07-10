@@ -118,7 +118,45 @@
   <div class="foot"><span>R.E.L.A.Y.</span><span>03</span></div>
 </section>
 
-<!-- 4 · demo: simulated city -->
+<!-- 4 · how it decides -->
+<section class="slide">
+  <div class="kicker">How it decides</div>
+  <h2>Every road gets a score. Biggest score gets green.</h2>
+  <p class="sub">Here's one real moment at a junction, exactly as the system sees it. Score = <b>how much is waiting × how long it's waited</b>. A bus counts as 3, a car as 1, a motorbike as 0.3 — because that's how much road they hold.</p>
+  <div class="grid4">
+    <div class="stat" style="border:2px solid var(--green);background:var(--greenbg)">
+      <div class="lbl" style="margin-top:0;color:var(--green)">North</div>
+      <div class="v g" style="font-size:38px">8.6 pts</div>
+      <div class="k">8 bikes + 2 cars + 1 bus = 7.4, plus a small waiting bonus → <b>wins. GREEN.</b></div>
+    </div>
+    <div class="stat">
+      <div class="lbl" style="margin-top:0">South</div>
+      <div class="v" style="font-size:38px">3.8 pts</div>
+      <div class="k">3 cars, waiting 20 s → stays red, its score keeps growing while it waits</div>
+    </div>
+    <div class="stat">
+      <div class="lbl" style="margin-top:0">East</div>
+      <div class="v" style="font-size:38px">0 pts</div>
+      <div class="k">empty → <b>skipped entirely.</b> A timer would still give it 30 s of green. We give it nothing.</div>
+    </div>
+    <div class="stat" style="border:2px solid var(--amber)">
+      <div class="lbl" style="margin-top:0;color:var(--amber)">West</div>
+      <div class="v a" style="font-size:38px">1 car</div>
+      <div class="k">but it's waited 85 s — close to the 90 s cap, so it's <b>guaranteed next</b>, score or no score</div>
+    </div>
+  </div>
+  <div class="lbl" style="margin-top:18px">house rules nobody can break — not even a big score</div>
+  <div class="grid4">
+    <div class="card"><p><b>Nobody waits past 90 s.</b> Hit the cap → you're served next, period. No lane can be starved.</p></div>
+    <div class="card"><p><b>Ambulance beats everything</b> — but only for a bounded time, so it can't freeze the junction.</p></div>
+    <div class="card"><p><b>No flicker, no hogging.</b> Every green lasts at least 5 s; none may hog past 45 s.</p></div>
+    <div class="card"><p><b>Queue drained? Move on.</b> If the served lanes sit empty a couple of seconds, green moves early.</p></div>
+  </div>
+  <p class="joke">That's the whole brain: one score per road, four rules on top. Your bank's OTP form is more complicated.</p>
+  <div class="foot"><span>R.E.L.A.Y.</span><span>score = traffic × patience · rules beat scores</span><span>04</span></div>
+</section>
+
+<!-- 5 · demo: simulated city -->
 <section class="slide">
   <div class="kicker">Demo 1 · the simulated city</div>
   <h2>We built a small city so it could practice</h2>
@@ -320,6 +358,7 @@
     if(e.key==='Home')show(0); if(e.key==='End')show(slides.length-1);});
   addEventListener('click',e=>{if(e.clientX>innerWidth*.7)show(cur+1);if(e.clientX<innerWidth*.3)show(cur-1)});
   document.querySelectorAll('video').forEach(v=>{v.onerror=()=>{const p=v.getAttribute('poster');if(p){const i=new Image();i.src=p;i.alt='clip';v.replaceWith(i);}};});
+  slides.forEach((s,i)=>{const f=s.querySelector('.foot span:last-child');if(f)f.textContent=String(i+1).padStart(2,'0');});
   show(0);
 </script>
 </body>
