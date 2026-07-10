@@ -133,6 +133,9 @@ if (!CAP) {                                      // drag anywhere except capture
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
+  // embeds are watched, not driven: a stray drag would leave the calibrated CCTV pose and the
+  // detection boxes would vanish for good (the PiP inset and the reset chip only exist full-page)
+  controls.enabled = !EMBED;
   // zones are projected from the FIXED virtual CCTV, so dragging the display camera never
   // reshapes what the controller reads — no resend needed here.
 }
@@ -690,11 +693,16 @@ function minGapAt(c, u, walkers) {
 
 function moveCars(dt) {
   const inBox = c => Math.abs(c.mesh.position.x) < ROAD_HALF + 1 && Math.abs(c.mesh.position.z) < ROAD_HALF + 1;
-  const boxCount = cars.filter(inBox).length;
-  // TEMP DEBUG INSTRUMENTATION — remove before commit
-  window.__boxCountHist = window.__boxCountHist || [];
-  window.__boxCountHist.push({ t: simTime, boxCount, signalNS: signalOf('N') });
-  if (window.__boxCountHist.length > 6000) window.__boxCountHist.shift();
+  // "don't block the junction" must count only CROSS traffic: same-group occupants are flowing
+  // with you (parallel/opposing lanes), and counting them made a busy green throttle its own
+  // discharge — four of your own cars mid-box held the fifth at the line on a full green.
+  let boxTotal = 0;
+  const boxByGroup = {};
+  for (const o of cars) {
+    if (!inBox(o)) continue;
+    boxTotal++;
+    boxByGroup[APPROACH[o.dir].group] = (boxByGroup[APPROACH[o.dir].group] || 0) + 1;
+  }
   const maxStuck = Math.max(0, ...cars.map(c => c.stuck || 0));
   // a long vehicle (bus/truck) committed to a left-turn arc sweeps almost the whole box; hold the
   // other approaches out of the box so nothing parks in its swept path and deadlocks it mid-turn.
@@ -711,6 +719,7 @@ function moveCars(dt) {
   for (const c of cars) (byLane[c.dir + c.lane] ||= []).push(c);      // follow the leader in YOUR lane
   for (const dir of DIRS) {
     const redHold = signalOf(dir) !== 'green';
+    const crossBox = boxTotal - (boxByGroup[APPROACH[dir].group] || 0);
     for (let lane = 0; lane < LANES; lane++) {
       const held = redHold || (pedPerp[dir] || []).some(p => Math.abs(p - laneOff(dir, lane)) < 3.0);
       const list = (byLane[dir + lane] || []).sort((p, q) => p.u - q.u);
@@ -721,23 +730,10 @@ function moveCars(dt) {
         const stopAt = -STOP - c.len / 2;
         // <= + epsilon: a car parked exactly AT the line stays held (strict < would release it)
         // held → red or someone on our zebra; else don't enter a packed box ("do not block the junction")
-        if (c.u <= stopAt + 0.01 && (held || boxCount >= LANES + 2
+        if (c.u <= stopAt + 0.01 && (held || crossBox >= LANES + 2
             || (turnClaim && (!c.route || c.u < c.route.uA)))) {
           target = Math.min(target, stopAt);
           stopDist = stopAt - c.u;
-          // TEMP DEBUG INSTRUMENTATION — remove before commit
-          // only count cases where this car is essentially AT the line (within 2m) and its
-          // in-lane leader (if any) is already far enough away that the wall constraint isn't
-          // the real reason it's stopped — isolates the box-gate as the BINDING constraint.
-          if (!held && boxCount >= LANES + 2 && !turnClaim && c.u > stopAt - 2) {
-            const ldr = list[i + 1];
-            const leaderGapM = ldr ? (ldr.u - c.u) : Infinity;
-            if (leaderGapM > 8) {
-              window.__boxGateHits = (window.__boxGateHits || 0) + 1;
-              window.__boxGateLog = window.__boxGateLog || [];
-              window.__boxGateLog.push({ t: +simTime.toFixed(2), dir, lane, u: +c.u.toFixed(2), stopAt: +stopAt.toFixed(2), boxCount, leaderGapM: ldr ? +leaderGapM.toFixed(1) : null, listLen: list.length });
-            }
-          }
         }
         const leader = list[i + 1];
         // the lane wall only binds while both cars are still on the shared straight segment —
@@ -1300,10 +1296,16 @@ function connectWS() {
     const emg = m.emergencies || [];
     banner.style.display = emg.length ? 'block' : 'none';
     if (emg.length) {
-      const clearing = emg.filter(d => m.signals[d] === 'green');
-      banner.textContent = clearing.length
-        ? '🚑 EMERGENCY PREEMPT — clearing ' + clearing.join(', ')
-        : '🚑 emergency detected on ' + emg.join(', ') + ' — switching…';
+      // the fixed-timer panel must never claim it is reacting — its lights follow the blind
+      // cycle regardless of what the server's controller would do. Say so; that IS the story.
+      if (!systemOn) {
+        banner.textContent = '🚑 ambulance on ' + emg.join(', ') + ' — blind fixed cycle, no priority';
+      } else {
+        const clearing = emg.filter(d => m.signals[d] === 'green');
+        banner.textContent = clearing.length
+          ? '🚑 EMERGENCY PREEMPT — clearing ' + clearing.join(', ')
+          : '🚑 emergency detected on ' + emg.join(', ') + ' — switching…';
+      }
     }
     if (m.metrics && statLine) {
       const load = modeT > 3 ? (modeWait / modeT).toFixed(1) : '—';

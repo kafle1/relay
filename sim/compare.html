@@ -146,6 +146,7 @@
       if (!p) return;
       if (typeof d.queued === 'number') {
         p.q = d.queued;
+        p.at = performance.now();               // liveness stamp — gates the header controls
         // light EMA at ingest: the plotted line stays calm while the raw value feeds the strips
         const s = p.hist.length ? p.hist[p.hist.length - 1].s * 0.72 + d.queued * 0.28 : d.queued;
         p.hist.push({ t: performance.now(), q: d.queued, s });
@@ -290,10 +291,19 @@
     $('b-dn').onclick = () => setDial(density - 0.25);
     $('b-up').onclick = () => setDial(density + 0.25);
 
+    // header controls stay dark until BOTH embeds are alive: a click during load or right after
+    // Reset lands before the iframe's bridge listener exists and silently does nothing — the
+    // worst possible demo moment is a judge pressing 🚑 and seeing no ambulance.
+    const CTRLS = ['b-amb', 'b-surge', 'b-reset', 'b-dn', 'b-up'].map($);
+    function gateControls() {
+      const ok = [S.L, S.R].every(p => p.at && performance.now() - p.at < 2500);
+      for (const b of CTRLS) { b.disabled = !ok; b.style.opacity = ok ? '' : 0.45; }
+    }
+
     addEventListener('resize', sizeCanvas);
     sizeCanvas();
     pollMetrics(); setInterval(pollMetrics, 2000);
-    setInterval(() => { updateStrips(); updateVerdict(); draw(); }, 250);
+    setInterval(() => { updateStrips(); updateVerdict(); draw(); gateControls(); }, 250);
   })();
   </script>
 </body>
