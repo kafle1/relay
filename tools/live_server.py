@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 from controller import Controller, four_way, Timings, PCU, junction_from_dirs  # noqa: E402
 from microsim import FixedTimer, poisson                                       # noqa: E402
-from perception import CONF, point_in_poly                                     # noqa: E402  shared with the offline pipeline
+from perception import CONF, cross_class_dedupe, iou, point_in_poly            # noqa: E402  shared with the offline pipeline
 
 SIM = os.path.abspath(os.path.join(HERE, "..", "sim"))
 DS = os.path.abspath(os.path.join(HERE, "..", "dataset"))
@@ -32,7 +32,12 @@ IMG, LBL = os.path.join(DS, "images"), os.path.join(DS, "labels")
 # prefer the mixed-domain fine-tune (real CCTV + synthetic render), then sim-only, then stock
 _CANDIDATES = [os.path.abspath(os.path.join(HERE, "..", "dataset", "runs", n, "weights", "best.pt"))
                for n in ("ft_mixed", "ft")]
-MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), "yolo11s.pt")
+# resolve the stock checkpoint against the repo, not the CWD — launched from tools/ a bare
+# "yolo11s.pt" misses the shipped file and silently re-downloads it (or dies offline)
+_STOCK = os.path.abspath(os.path.join(HERE, "..", "yolo11s.pt"))
+if not os.path.exists(_STOCK):
+    _STOCK = "yolo11s.pt"
+MODEL_PATH = next((p for p in _CANDIDATES if os.path.exists(p)), _STOCK)
 
 if MODEL_PATH == "yolo11s.pt":
     print("WARNING: no fine-tuned weights found — falling back to stock COCO, which detects almost")
@@ -42,7 +47,7 @@ print(f"loading detector: {MODEL_PATH}")
 # two detectors, one loop: the fine-tune reads the synthetic sim (stock sees nothing there),
 # stock COCO reads fresh real-world footage (the fine-tune only knows the sim + its one real
 # training camera). A client picks per connection; the sim pages take the default.
-MODELS = {"ft": MODEL_PATH, "stock": "yolo11s.pt"}
+MODELS = {"ft": MODEL_PATH, "stock": _STOCK}
 _loaded = {}
 def get_model(key):
     """(model, names) for 'ft' or 'stock', loaded once per process."""
@@ -57,15 +62,6 @@ DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 # ~100-300ms per frame — with several tabs open the server starved to death), single worker because
 # concurrent predict() on one model isn't thread-safe. Extra clients queue here, loop stays live.
 INFER = ThreadPoolExecutor(max_workers=1)
-
-
-def iou(a, b):
-    """Intersection-over-union of two {x,y,w,h} boxes (normalized coords)."""
-    ix = max(0.0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
-    iy = max(0.0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
-    inter = ix * iy
-    union = a["w"] * a["h"] + b["w"] * b["h"] - inter
-    return inter / union if union > 0 else 0.0
 
 
 class LiveCompare:
@@ -175,7 +171,9 @@ async def ws(sock: WebSocket):
             # A corrupt frame skips quietly; nothing crashes the socket.
             # low floor + per-class gates (CONF), like perception.py: a flat 0.35 drops the small
             # far-away two-wheelers that ARE the Kathmandu story (edge case A2).
-            # agnostic NMS: a distant queue otherwise grows stacked car+truck+moto boxes per vehicle.
+            # cross-class dedupe happens AFTER those gates (cross_class_dedupe below) — agnostic
+            # NMS inside predict() let a person box or a below-gate detection suppress the real
+            # vehicle box, relabeling bikes/trucks as whatever survived.
             # 960px sharpens the small far-queue objects; on a thermally-throttled machine that can
             # cost 300-400ms/frame and the boxes visibly trail moving traffic — drop to 704px.
             # Hysteresis (up at >250ms, back only under 120ms): each size change re-warms the model,
@@ -191,7 +189,7 @@ async def ws(sock: WebSocket):
                 img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
                 if img is None:
                     return None, None
-                return img, m.predict(img, conf=0.2, iou=0.5, imgsz=size, agnostic_nms=True,
+                return img, m.predict(img, conf=0.2, iou=0.5, imgsz=size,
                                       device=DEVICE, verbose=False)[0]
             try:
                 img, res = await asyncio.get_running_loop().run_in_executor(INFER, _detect)
@@ -203,7 +201,7 @@ async def ws(sock: WebSocket):
             infer_avg = infer_avg * 0.8 + infer_ms * 0.2
             h, w = img.shape[:2]
 
-            boxes = []
+            dets = []
             counts = {d: {} for d in (zones or {"N": 1, "S": 1, "E": 1, "W": 1})}
             emergencies = set(msg.get("emergencies") or [])   # transponder-style announce is immediate
             yolo_sirens = set()                               # visual detections need 2 consecutive frames
@@ -216,18 +214,21 @@ async def ws(sock: WebSocket):
                 if float(b.conf) < CONF.get(cls, CONF["default"]):
                     continue
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
-                cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h
+                dets.append({"x": x1 / w, "y": y1 / h, "w": (x2 - x1) / w, "h": (y2 - y1) / h,
+                             "cls": cls, "conf": round(float(b.conf), 2)})
+            boxes = cross_class_dedupe(dets)
+            for b in boxes:
+                cx, cy = b["x"] + b["w"] / 2, b["y"] + b["h"] / 2
                 appr = None
                 if zones:
                     for d, poly in zones.items():
                         if poly and point_in_poly(cx, cy, poly):
                             appr = d; break
-                boxes.append({"x": x1 / w, "y": y1 / h, "w": (x2 - x1) / w, "h": (y2 - y1) / h,
-                              "cls": cls, "conf": round(float(b.conf), 2), "appr": appr})
+                b["appr"] = appr
                 if appr:
-                    counts[appr][cls] = counts[appr].get(cls, 0) + 1
-                    if cls == "ambulance":
-                        yolo_sirens.add(appr)
+                    counts[appr][b["cls"]] = counts[appr].get(b["cls"], 0) + 1
+                    if b["cls"] == "ambulance":
+                        yolo_sirens.add(appr.split(".")[0])   # sirens are arm-level; zones may be per-movement
 
             # stable per-vehicle identity: greedy IoU association with the previous frame.
             # Matched boxes are smoothed (no flicker) and keep their id across frames — the
@@ -269,8 +270,11 @@ async def ws(sock: WebSocket):
                     moved = abs(t["box"]["x"] - b["x"]) + abs(t["box"]["y"] - b["y"])
                     if moved > 0.012:
                         t["still_since"] = t_now
+                    # heavy blend only while still (anti-flicker); a moving vehicle follows the
+                    # fresh detection — the 0.55 blend trailed fast two-wheelers by half a box.
+                    a = 0.55 if moved <= 0.012 else 0.15
                     for k in ("x", "y", "w", "h"):
-                        t["box"][k] = t["box"][k] * 0.55 + b[k] * 0.45
+                        t["box"][k] = t["box"][k] * a + b[k] * (1 - a)
                         b[k] = round(t["box"][k], 4)
                     t["miss"] = 0
                     b["id"] = best
@@ -300,7 +304,11 @@ async def ws(sock: WebSocket):
             dt = min(now - last, 0.5); last = now
             # pedestrian demand rides along with the frame (push-button style); controller sanitizes
             state = ctrl.tick(counts, emergencies, dt, peds=msg.get("peds"))
-            n_counts = {d: sum(counts[d].values()) for d in counts}
+            # HUD counts stay arm-level even when zones are per-movement ("N.thru" + "N.left" → "N")
+            n_counts = {}
+            for d in counts:
+                arm = d.split(".")[0]
+                n_counts[arm] = n_counts.get(arm, 0) + sum(counts[d].values())
             await sock.send_json({
                 "signals": state["signals"], "phase": state["phase"], "stage": state["stage"],
                 "counts": n_counts, "boxes": boxes, "emergencies": list(emergencies),

@@ -14,6 +14,27 @@ CONF = {"motorcycle": 0.24, "bicycle": 0.24, "default": 0.38}
 EMERGENCY = {"ambulance"}
 
 
+def iou(a, b):
+    """Intersection-over-union of two {x,y,w,h} boxes (normalized coords)."""
+    ix = max(0.0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+    iy = max(0.0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+    inter = ix * iy
+    union = a["w"] * a["h"] + b["w"] * b["h"] - inter
+    return inter / union if union > 0 else 0.0
+
+
+def cross_class_dedupe(dets, thr=0.5):
+    """One vehicle, one box: per-class NMS still leaves a stacked car+truck+motorcycle trio on a
+    single far-queue vehicle — keep the most confident. Runs AFTER the PCU/confidence filters,
+    unlike agnostic NMS inside predict(), where a person box (discarded later anyway) or a
+    below-gate detection could suppress the real vehicle box and erase or relabel it."""
+    kept = []
+    for d in sorted(dets, key=lambda d: -d["conf"]):
+        if all(iou(d, k) < thr for k in kept):
+            kept.append(d)
+    return kept
+
+
 def point_in_poly(x, y, poly):
     inside, j = False, len(poly) - 1
     for i in range(len(poly)):
@@ -47,7 +68,7 @@ class Perception:
         if not h or not w:
             return self.counts(), set(), []            # degenerate frame — keep last counts
         raw = {a: {} for a in self.zones}
-        boxes, emergencies = [], set()
+        dets, emergencies = [], set()
         for b in (res.boxes or []):
             # only classes with a PCU weight count — anything else (person, dog, ...) is ignored,
             # never relabeled. Stock COCO and our fine-tune both emit PCU names directly.
@@ -58,13 +79,16 @@ class Perception:
             if conf < CONF.get(name, CONF["default"]):
                 continue
             x1, y1, x2, y2 = (float(v) for v in b.xyxy[0])
-            cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h   # centroid-in-zone (edge case B17)
+            dets.append({"x": x1 / w, "y": y1 / h, "w": (x2 - x1) / w, "h": (y2 - y1) / h,
+                         "cls": name, "conf": round(conf, 2)})
+        boxes = cross_class_dedupe(dets)
+        for b in boxes:
+            cx, cy = b["x"] + b["w"] / 2, b["y"] + b["h"] / 2   # centroid-in-zone (edge case B17)
             appr = next((a for a, poly in self.zones.items() if poly and point_in_poly(cx, cy, poly)), None)
-            boxes.append({"x": x1 / w, "y": y1 / h, "w": (x2 - x1) / w, "h": (y2 - y1) / h,
-                          "cls": name, "conf": round(conf, 2), "appr": appr})
+            b["appr"] = appr
             if appr:
-                raw[appr][name] = raw[appr].get(name, 0) + 1
-                if name in EMERGENCY:
+                raw[appr][b["cls"]] = raw[appr].get(b["cls"], 0) + 1
+                if b["cls"] in EMERGENCY:
                     emergencies.add(appr)
         # temporal smoothing (edge case B16): EMA per approach+class
         for a in self.zones:
