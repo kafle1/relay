@@ -89,9 +89,13 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | **Detector, real footage** | cars: strong; dense two-wheeler swarms: undercounts (improves at `--imgsz 960`) | known limitation — regional fine-tune is the fix, documented below |
 | **Controller invariants** | all pass: clearance, empty-skip, min-green, no-starvation, preemption | asserted by `src/controller.py` |
 
-*(Real-world anchor: a 2023 SIDRA re-timing study of two Kathmandu junctions measured 33–49% delay
-reduction from smarter signal timing alone — Neupane & Jha, "Traffic flow optimization at urban
-intersections of Kathmandu", IOE/SIDRA analysis, 2023.)*
+*(Local anchor: measured studies of signalised intersections in the Kathmandu valley report
+saturation flows and delays well away from standard capacity guidance, and put the difference down
+to the local vehicle mixture and lane discipline. That is the condition under which a fixed plan
+copied from a design manual performs worst. Shrestha & Marsani, "Development of saturation flow and
+delay model at signalised intersection of Kathmandu", IOE Graduate Conference, 2014; Nepali et al.,
+"Assessment of traffic characteristics at major urban road intersection of Kathmandu valley",
+Journal of Civil and Construction Engineering 10(1), 2024.)*
 
 ## Repository layout
 
