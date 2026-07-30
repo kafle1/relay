@@ -38,6 +38,9 @@ ambulance button preempts each junction in sequence: a green wave down the corri
 
 - **Perception:** one YOLO model reads a fixed junction camera → per-approach, per-class vehicle
   counts (PCU-weighted, so a bus ≠ a motorcycle).
+- **The junction calibrates itself:** approach zones come from clustered vehicle trajectories, lanes
+  from the road paint, and both land in a config file a person reviews before it goes live
+  ([auto-calibration](#auto-calibration-lanes-and-approaches)).
 - **Control:** queue-weighted **max-pressure** — `score(phase) = PCU-demand × (1 + wait/max_wait)
   + ped-pressure + emergency-boost` — with empty-phase skip, gap-out, min/max-green, yellow + all-red clearance,
   hard anti-starvation, and emergency preemption. Every safety invariant is asserted by a runnable
@@ -69,6 +72,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # checks
 .venv/bin/python src/controller.py    # safety + fairness invariants
+.venv/bin/python src/lanes.py         # lane detection: finds lanes on paint, none without it
+.venv/bin/python src/calibrate.py     # junction auto-calibration on synthetic traffic
 .venv/bin/python src/microsim.py      # adaptive-vs-fixed benchmark on identical arrivals
 
 # the fine-tuned detector ships with the repo (dataset/runs/ft_mixed/weights/best.pt, 5MB) —
@@ -109,10 +114,13 @@ sim/                the synthetic live junction (Three.js)
   assets/models/    CC0 / CC-BY 3D vehicles
 src/
   controller.py     weighted max-pressure controller (+ invariant self-check)
-  perception.py     YOLO frame → per-approach, per-class PCU counts
+  perception.py     YOLO frame → per-approach and per-lane, per-class PCU counts
+  lanes.py          road paint → lane polygons per approach, with a confidence (+ self-check)
+  calibrate.py      vehicle trajectories → a proposed junction topology (+ self-check)
   pipeline.py       camera/clip → perception → controller, end to end
   microsim.py       adaptive-vs-fixed benchmark on identical arrivals
 tools/
+  autocalibrate.py  watch a junction for a warmup window → topology config + review preview
   live_server.py    FastAPI + WebSocket: YOLO on streamed frames → signals back
                     (also serves POST /save, so capture mode writes training frames here too)
   pseudo_label.py   label real CCTV frames with stock YOLO (free real-domain labels)
@@ -122,6 +130,92 @@ tools/
 docs/               research synthesis · design spec · 96-case edge-case register
 ```
 
+## Auto-calibration: lanes and approaches
+
+Topology is still config, not code. This writes the first draft of that config by watching the
+camera: no clicking, no training, no per-site labels.
+
+```bash
+.venv/bin/python tools/autocalibrate.py <camera-or-clip> myjunction.json --warmup 240
+#   -> myjunction.json  zones + lanes + everything it measured
+#   -> myjunction.jpg   the same thing drawn on the road, for review
+.venv/bin/python src/pipeline.py <camera-or-clip> --zones myjunction.json
+```
+
+![auto-calibrated approaches, Hanoi](docs/img/autocal_hanoi.jpg)
+
+*Three minutes of the Hanoi clip: 879 trajectories, 677 usable, three approaches (coloured per arm,
+grey is what the clustering threw away), junction centre as the red cross, stop lines in amber.
+Ten outbound streams were rejected as exits and two more zones were dropped for landing on asphalt a
+busier zone already had. There is no paint on this apron, so all three count at approach level.*
+
+**Approaches from trajectories** (`src/calibrate.py`). Every detection goes through a small
+predictive centroid tracker, and trajectories that travel the same road the same way cluster into
+one approach: heading within 30 degrees, and within about a lane width of the cluster's axis line.
+Where a vehicle happened to be first detected is deliberately not part of that test, so a queue tail
+far back joins its own approach. The junction centre is the least-squares intersection of the
+approach axes; it sets the stop-line setback, and each zone is that arm's own traffic from the 4th
+to the 96th lateral percentile, upstream of the setback. Streams that only ever move away from the
+centre are exits and get dropped, because a green for an exit is worse than a green for an empty
+lane. Where two proposed zones land on the same asphalt the busier one wins: over-splitting one
+approach is harmless, but merging two conflicting streams into one zone would hand them a shared
+green, so the clustering stays conservative on purpose. Each approach also reports its observed turn
+split, which is what decides whether an arm deserves a protected left of its own.
+
+**Lanes from paint** (`src/lanes.py`). Classical CV, picked for explainability: a median road plate
+over the warmup window (moving vehicles average away, paint stays), a top-hat ridge filter and a
+white/yellow colour gate for the markings, Hough segments filtered to the flow direction, a RANSAC
+vanishing point, then lateral offsets clustered into lane boundaries. Out comes a polygon per lane
+plus a confidence built from four things you can go and measure: paint support, spacing regularity,
+vanishing-point agreement, and how crisp the paint is. A zebra crossing's stripes also run with the
+traffic, so the minimum-lane-width rule folds a whole crossing into one boundary rather than
+eight lanes. An edge line is the first marking a road loses, so where the carriageway continues past
+the outermost painted line the kerb lane is extrapolated (that extrapolation keeps the vanishing
+point exactly, and the lane is flagged as inferred rather than seen).
+
+The synthetic feed renders its own lane paint, which makes it the one junction here with ground
+truth: two lanes per direction, marked with a centreline and one divider, no edge lines. Point the
+calibrator at frames captured from it (`?capture=N`) and it proposes all four approaches, then reads
+exactly 2 lanes on the approach whose zone came out wide enough to hold them. The other three zones
+came back too thin to fit paint into and count at approach level.
+
+![auto-calibration on the synthetic junction](docs/img/autocal_sim.jpg)
+
+*The synthetic feed, same tool, same 22 seconds of traffic: 376 trajectories, four approaches, and
+the two lanes of the near carriageway picked out of the paint (white, bottom left).*
+
+**Per-lane queues, unchanged safety logic.** Each lane carries its own PCU queue. On that synthetic
+approach the two lanes read 0 and 7.0 PCU at the same instant, with 68% of the approach's detections
+landing inside a lane: six vehicles in one lane and six across three discharge very differently, and
+an approach total cannot tell them apart. What the controller consumes does not change, so every
+safety invariant still holds and `src/controller.py` still passes untouched. Lanes sharpen what the
+camera reports; they do not rewrite what the signal logic is allowed to do.
+
+**Honest limits.**
+
+- Lane detection needs visible markings. On the Hanoi roundabout apron there is no paint, confidence
+  reads 0.00, and the run counts at approach level instead. That fallback is the designed answer,
+  not a failure, and `lane_coverage()` reports how much of an approach's traffic actually landed
+  inside a lane so you can tell the difference.
+- The road plate needs the asphalt visible in most of the samples it averages. On the Dhaka and HCMC
+  clips the traffic never clears, so the median is a smear of vehicles rather than a road, and that
+  smear is long and collinear enough to fit a lane line: it scored 0.86 until paint crispness (the
+  median top-hat ridge, 85 to 124 on real markings against 15 to 16 on smear) joined the confidence.
+  Those clips now say "markings too soft to be paint" and count at approach level.
+- Auto-calibration needs a warmup window with traffic on every arm. An arm nobody uses does not
+  exist as far as the proposal is concerned, and ten minutes of the boulevard clip fitted it much
+  better than four did. Compass keys are phase names, assigned by best overall alignment rather than
+  first come first served, and on a camera whose streets all run diagonally the residual is still
+  large: 13 to 27 degrees on the boulevard, 41 to 45 on the Hanoi roundabout. Every approach carries
+  its own error in the config, and anything past 35 degrees prints as a warning to check by hand.
+- It proposes, you deploy. Read the preview, edit the JSON, and keep `tools/draw_zones.py` for the
+  cameras where clicking four polygons is simply faster.
+
+Both modules carry the same kind of runnable self-check as the controller: `python src/lanes.py`
+asserts that a marked road yields lanes and that bare asphalt yields none, and
+`python src/calibrate.py` asserts that synthetic 4-way traffic comes back as N/S/E/W with the exits
+rejected, no two zones sharing asphalt, and the emitted config building a real controller topology.
+
 ## Deploying on a new junction — no training required
 
 One shared detector serves every real camera (vehicles look the same everywhere; the general
@@ -129,7 +223,8 @@ model needs zero per-site training — verified on Thailand and Hanoi junctions 
 during development). Per junction, setup is one minute:
 
 ```bash
-.venv/bin/python tools/draw_zones.py <camera-or-clip> myjunction.json   # click the approach zones
+.venv/bin/python tools/autocalibrate.py <camera-or-clip> myjunction.json   # watch the traffic
+.venv/bin/python tools/draw_zones.py <camera-or-clip> myjunction.json      # or click the zones
 .venv/bin/python src/pipeline.py <camera-or-clip> --zones myjunction.json
 ```
 
