@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 PORT := 8000
 
-.PHONY: dev setup check pipeline compare capture train stop webcam
+.PHONY: dev setup check pipeline calibrate compare capture train stop webcam
 
 ## make dev — start everything, open the demo, stay in the foreground with live logs (Ctrl-C = stop)
 dev: setup stop
@@ -37,12 +37,19 @@ stop:
 ## make check — run every self-check (controller invariants + benchmark)
 check: setup
 	$(PY) src/controller.py
+	$(PY) src/lanes.py
+	$(PY) src/calibrate.py
 	$(PY) src/microsim.py
 
 ## make pipeline CLIP=path/to/clip.mp4 — run the core system on any footage
 pipeline: setup
 	@test -n "$(CLIP)" || { echo "usage: make pipeline CLIP=path/to/clip.mp4  (no footage in repo — live sim is the test surface: make dev)"; exit 1; }
 	$(PY) src/pipeline.py "$(CLIP)"
+
+## make calibrate CLIP=path/to/clip.mp4 [OUT=topology.json]: watch the traffic, propose zones + lanes
+calibrate: setup
+	@test -n "$(CLIP)" || { echo "usage: make calibrate CLIP=path/to/clip.mp4 [OUT=topology.json]"; exit 1; }
+	$(PY) tools/autocalibrate.py "$(CLIP)" $(or $(OUT),topology.json)
 
 ## make compare — open the split-screen fixed-vs-adaptive demo
 compare:

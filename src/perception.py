@@ -55,9 +55,10 @@ def point_in_poly(x, y, poly):
 
 
 class Perception:
-    """model: an ultralytics YOLO. zones: {approach: [(x,y)...] normalized 0..1 polygons}."""
+    """model: an ultralytics YOLO. zones: {approach: [(x,y)...] normalized 0..1 polygons}.
+    lanes (optional): {approach: [polygon, ...]} from src/lanes.py or a calibration config."""
 
-    def __init__(self, model, zones, smooth_alpha=0.35):
+    def __init__(self, model, zones, smooth_alpha=0.35, lanes=None):
         self.model = model
         # ultralytics returns names as a dict, but hub/exported checkpoints can give a list
         names = getattr(model, "names", {}) or {}
@@ -66,6 +67,18 @@ class Perception:
         self.alpha = smooth_alpha                      # EMA ≈ 1s at ~3 detections/s
         self.smoothed = {a: {} for a in zones}
         self.last_update = 0.0
+        self.set_lanes(lanes)
+
+    def set_lanes(self, lanes):
+        """Attach (or replace) per-lane polygons. Approach-level counts are untouched by this: lanes
+        are a FINER read on the same detections, never a different one, so an approach whose lanes
+        were never found, or came back below the confidence gate, keeps counting exactly as before.
+        Callable mid-run: lane detection needs a warmup window to build its road plate."""
+        self.lanes = {a: [p for p in polys if p and len(p) >= 3]
+                      for a, polys in (lanes or {}).items() if a in self.zones and polys}
+        self.lanes = {a: p for a, p in self.lanes.items() if p}
+        self.lane_smoothed = {a: [{} for _ in polys] for a, polys in self.lanes.items()}
+        self._cover = {a: 1.0 for a in self.lanes}     # no evidence yet; the first frame corrects it
 
     def read(self, frame, device=None, imgsz=640):
         """One frame -> (counts, emergencies, boxes). Never raises on a bad frame (edge case A9)."""
@@ -77,6 +90,8 @@ class Perception:
         if not h or not w:
             return self.counts(), set(), []            # degenerate frame — keep last counts
         raw = {a: {} for a in self.zones}
+        raw_lane = {a: [{} for _ in polys] for a, polys in self.lanes.items()}
+        seen = {a: [0, 0] for a in self.lanes}          # [landed in a lane, landed in the approach]
         dets, emergencies = [], set()
         for b in (res.boxes or []):
             # only classes with a PCU weight count — anything else (person, dog, ...) is ignored,
@@ -99,6 +114,14 @@ class Perception:
                 raw[appr][b["cls"]] = raw[appr].get(b["cls"], 0) + 1
                 if b["cls"] in EMERGENCY:
                     emergencies.add(appr)
+                polys = self.lanes.get(appr)
+                if polys:
+                    li = next((i for i, p in enumerate(polys) if point_in_poly(cx, cy, p)), None)
+                    b["lane"] = li                      # None = in the approach but between/outside lanes
+                    seen[appr][1] += 1
+                    if li is not None:
+                        seen[appr][0] += 1
+                        raw_lane[appr][li][b["cls"]] = raw_lane[appr][li].get(b["cls"], 0) + 1
         # temporal smoothing (edge case B16): EMA per approach+class
         for a in self.zones:
             keys = set(raw[a]) | set(self.smoothed[a])
@@ -106,11 +129,37 @@ class Perception:
                 self.smoothed[a][k] = (1 - self.alpha) * self.smoothed[a].get(k, 0.0) + self.alpha * raw[a].get(k, 0)
                 if self.smoothed[a][k] < 0.05:
                     del self.smoothed[a][k]
+        for a, per_lane in raw_lane.items():            # same EMA, one level down
+            for i, rl in enumerate(per_lane):
+                sm = self.lane_smoothed[a][i]
+                for k in set(rl) | set(sm):
+                    sm[k] = (1 - self.alpha) * sm.get(k, 0.0) + self.alpha * rl.get(k, 0)
+                    if sm[k] < 0.05:
+                        del sm[k]
+            if seen[a][1]:
+                self._cover[a] = (1 - self.alpha) * self._cover[a] + self.alpha * (seen[a][0] / seen[a][1])
         self.last_update = time.monotonic()
         return self.counts(), emergencies, boxes
 
     def counts(self):
         return {a: dict(c) for a, c in self.smoothed.items()}
+
+    def lane_counts(self):
+        """{approach: [{class: n} per lane]}. Only for approaches that have lanes attached."""
+        return {a: [dict(c) for c in per_lane] for a, per_lane in self.lane_smoothed.items()}
+
+    def lane_queues(self):
+        """{approach: [PCU per lane]}. Per-lane demand is what a saturation-flow estimate or a
+        per-movement phase needs: six vehicles in one lane and six across three discharge very
+        differently, and the approach total cannot tell them apart."""
+        return {a: [round(sum(PCU.get(k, 1.0) * n for k, n in c.items()), 2) for c in per_lane]
+                for a, per_lane in self.lane_smoothed.items()}
+
+    def lane_coverage(self):
+        """Share of an approach's detections that landed inside one of its lanes. Low means the lane
+        geometry misses part of the carriageway (a worn edge line, a shoulder, a filtering
+        motorcycle stream). Trust the approach-level count there, not the per-lane split."""
+        return {a: round(v, 3) for a, v in self._cover.items()}
 
     def stale(self, max_age=3.0):
         """True if perception hasn't produced counts recently (controller should fall back — C30)."""
