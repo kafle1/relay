@@ -38,7 +38,7 @@ Ours can, and proves it with a runnable self-check."*
   Bengaluru/Hyderabad. Trust-ladder lesson: *advisory first, control after trust* — our pilot path
   answer ("shadow mode first") in one phrase.
 - **Bengaluru BATCS** (165 junctions, 2024–25): -20% travel time, **-33% at Hudson Circle** — the
-  best mixed-traffic result to cite next to SIDRA-KTM 33–49%.
+  best mixed-traffic result to cite alongside the Kathmandu junction studies (Shrestha and Marsani 2014; Nepali et al. 2024).
 - **CoSiCoSt (C-DAC, India)**: markets "engineered for poor lane discipline and vehicle
   heterogeneity" — the *"designed for chaos, not despite it"* framing is directly ours to use.
 

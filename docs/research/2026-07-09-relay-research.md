@@ -56,7 +56,7 @@ Build R.E.L.A.Y. as a single Python pipeline: **Ultralytics YOLO (fine-tuned) �
 ### Axis 4 — Kathmandu Mixed Traffic (see §5 for pitch)
 - **Nepal has no indigenous PCU standard** — NRS 2070 imports India's IRC numbers wholesale.
 - Field motorcycle PCU (~0.23–0.27) is **far below** the imported 0.5. Shrestha (2010) redefined the reference unit as "motorcycle" not "car". Shrestha (2013): PCU isn't constant across 3 Kathmandu intersections.
-- A 2023 SIDRA re-timing of two Kathmandu junctions found **33–49% delay/travel-time reductions with zero AI** — proven headroom.
+- Published Kathmandu junction studies (Shrestha and Marsani 2014; Nepali et al. 2024) measure **saturation flows and delays well off standard capacity guidance**: real headroom for junction-specific timing.
 - ~1M motorcycles in the Valley, ~70–80% of national fleet, >50% of Valley accidents. Regional study: real saturation flow hits **2574 pcu/h/lane, *above* HCM benchmarks** via seepage/filtering.
 
 ---
@@ -100,7 +100,7 @@ Build R.E.L.A.Y. as a single Python pipeline: **Ultralytics YOLO (fine-tuned) �
 
 **The 3 strongest "why this fits Kathmandu" facts:**
 1. **Structurally different traffic physics that fixed PCU tables provably cannot represent** — Nepal's own engineers broke the car-centric convention; PCU isn't even constant across three intersections in one city. Only a live per-lane per-class YOLO count tracks a coefficient that changes intersection-to-intersection and hour-to-hour. A static lookup table is *provably wrong* here.
-2. **Headroom empirically proven today, zero AI** — 2023 SIDRA study: **33–49% delay reductions** from smarter logic alone on manually-controlled Kathmandu junctions. Nepal's Dept of Roads already runs a "Kathmandu Valley Intelligent Traffic System Project." You answer a govt-recognized problem more cheaply (CCTV + one YOLO) than SIDRA/drone consulting.
+2. **Headroom is real and locally documented**: Kathmandu junction studies (Shrestha and Marsani 2014; Nepali et al. 2024) show delays and saturation flows sitting far from standard guidance on manually-controlled junctions. Nepal's Dept of Roads already runs a "Kathmandu Valley Intelligent Traffic System Project." You answer a govt-recognized problem more cheaply (CCTV + one YOLO) than SIDRA/drone consulting.
 3. **Motorcycles ARE the traffic** — ~1M in the Valley, ~70–80% of national fleet, >50% of accidents, saturation flow **2574 pcu/h/lane above HCM benchmarks** via lateral filtering. R.E.L.A.Y. is built around the exact dense, non-lane, motorcycle-dominant pattern a Western-trained model or fixed timer was never designed to see.
 
 **Commercial validation:** NoTraffic (camera+radar, no induction loops, decentralized real-time control) raised $90M + Florida statewide approval — proves pure-vision adaptive control is fundable and deployable today. (Don't overclaim its proprietary algorithm over your published, theorem-backed max-pressure.)
