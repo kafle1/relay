@@ -143,3 +143,8 @@ third-party and not redistributed here.
 
 3D models: Kenney Car Kit (CC0), Poly Pizza bus/motorcycle/scooter (CC-BY 3.0), Quaternius
 pedestrian (CC0) — see [ATTRIBUTION.md](ATTRIBUTION.md).
+
+## License
+
+GNU AGPL-3.0 — see [LICENSE](LICENSE). The detector is built on Ultralytics YOLO, which is itself
+AGPL-3.0, so this repo inherits the same terms. 3D assets keep their own licenses (see above).
