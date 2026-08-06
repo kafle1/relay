@@ -1,0 +1,372 @@
+\begin{thebibliography}{45}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Webster(1958)]{Webster1958TrafficSignalSettings}
+F.~V. Webster.
+\newblock Traffic signal settings.
+\newblock Road Research Technical Paper~39, Road Research Laboratory,
+  Department of Scientific and Industrial Research, London, UK, 1958.
+
+\bibitem[Shrestha and Marsani(2014)]{shrestha2014development}
+Sambriddhi Shrestha and Anil Marsani.
+\newblock Development of saturation flow and delay model at signalised
+  intersection of {Kathmandu}.
+\newblock In \emph{Proceedings of the IOE Graduate Conference}, pages 387--392,
+  Kathmandu, Nepal, 2014.
+
+\bibitem[Nepali et~al.(2024)Nepali, Bohara, Lama, and
+  Thapa]{nepali2024assessment}
+Siddhartha Nepali, Shashwot~Singh Bohara, Nishan Lama, and Rabin Thapa.
+\newblock Assessment of traffic characteristics at major urban road
+  intersection of {Kathmandu} valley.
+\newblock \emph{Journal of Civil and Construction Engineering}, 10\penalty0
+  (1), 2024.
+\newblock \doi{10.46610/JOCCE.2024.v010i01.003}.
+
+\bibitem[Hunt et~al.(1981)Hunt, Robertson, Bretherton, and
+  Winton]{Hunt1981SCOOT}
+P.~B. Hunt, D.~I. Robertson, R.~D. Bretherton, and R.~I. Winton.
+\newblock {SCOOT}: A traffic responsive method of coordinating signals.
+\newblock TRRL Laboratory Report LR 1014, Transport and Road Research
+  Laboratory, Crowthorne, Berkshire, UK, 1981.
+
+\bibitem[Robertson and Bretherton(1991)]{Robertson1991SCOOTMethod}
+D.~I. Robertson and R.~D. Bretherton.
+\newblock Optimizing networks of traffic signals in real time: the {SCOOT}
+  method.
+\newblock \emph{IEEE Transactions on Vehicular Technology}, 40\penalty0
+  (1):\penalty0 11--15, 1991.
+\newblock \doi{10.1109/25.69966}.
+
+\bibitem[Sims and Dobinson(1980)]{Sims1980SCATS}
+A.~G. Sims and K.~W. Dobinson.
+\newblock The {S}ydney coordinated adaptive traffic ({SCAT}) system philosophy
+  and benefits.
+\newblock \emph{IEEE Transactions on Vehicular Technology}, 29\penalty0
+  (2):\penalty0 130--137, 1980.
+\newblock \doi{10.1109/T-VT.1980.23833}.
+
+\bibitem[Gartner(1983)]{Gartner1983OPAC}
+Nathan~H. Gartner.
+\newblock {OPAC}: A demand-responsive strategy for traffic signal control.
+\newblock \emph{Transportation Research Record}, 906:\penalty0 75--81, 1983.
+
+\bibitem[Mirchandani and Head(2001)]{Mirchandani2001RHODES}
+Pitu Mirchandani and Larry Head.
+\newblock A real-time traffic signal control system: architecture, algorithms,
+  and analysis.
+\newblock \emph{Transportation Research Part C: Emerging Technologies},
+  9\penalty0 (6):\penalty0 415--432, 2001.
+\newblock \doi{10.1016/S0968-090X(00)00047-4}.
+
+\bibitem[Redmon et~al.(2016)Redmon, Divvala, Girshick, and
+  Farhadi]{redmon2016yolo}
+Joseph Redmon, Santosh Divvala, Ross Girshick, and Ali Farhadi.
+\newblock You only look once: Unified, real-time object detection.
+\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and
+  Pattern Recognition}, pages 779--788, 2016.
+\newblock \doi{10.1109/CVPR.2016.91}.
+
+\bibitem[Bochkovskiy et~al.(2020)Bochkovskiy, Wang, and
+  Liao]{bochkovskiy2020yolov4}
+Alexey Bochkovskiy, Chien-Yao Wang, and Hong-Yuan~Mark Liao.
+\newblock {YOLOv4}: Optimal speed and accuracy of object detection.
+\newblock \emph{arXiv preprint arXiv:2004.10934}, 2020.
+
+\bibitem[Umair et~al.(2021)Umair, Farooq, Raza, Chen, and
+  Abdulhai]{umair2021efficient}
+Muhammad Umair, Muhammad~Umar Farooq, Rana~Hammad Raza, Qian Chen, and Baher
+  Abdulhai.
+\newblock Efficient video-based vehicle queue length estimation using computer
+  vision and deep learning for an urban traffic scenario.
+\newblock \emph{Processes}, 9\penalty0 (10):\penalty0 1786, 2021.
+\newblock \doi{10.3390/pr9101786}.
+
+\bibitem[Harilakshmi and Jansi~Rani(2023)]{harilakshmi2023deep}
+V.~S. Harilakshmi and P.~Arockia Jansi~Rani.
+\newblock Deep learning based artificial intelligent systems in road traffic
+  density estimation and congestion classification.
+\newblock \emph{Indian Journal of Science and Technology}, 16\penalty0
+  (24):\penalty0 1768--1776, 2023.
+\newblock \doi{10.17485/IJST/v16i24.1660}.
+
+\bibitem[Abewickrema et~al.(2025)Abewickrema, Yildirimoglu, and
+  Kim]{abewickrema2025ensemble}
+Wanuji Abewickrema, Mehmet Yildirimoglu, and Jiwon Kim.
+\newblock An ensemble deep learning framework for real-time queue length
+  estimation at signalized intersections.
+\newblock \emph{Data Science for Transportation}, 7\penalty0 (2):\penalty0 15,
+  2025.
+\newblock \doi{10.1007/s42421-025-00129-1}.
+
+\bibitem[Papanashi et~al.(2024)Papanashi, Chadaga, R, Huddar, Sreelakshmi, and
+  Kumar~P]{papanashi2024adaptive}
+Suhas Papanashi, Manya Chadaga, Kshithi R, Santosh~S. Huddar, K.~Sreelakshmi,
+  and Ramakanth Kumar~P.
+\newblock Adaptive traffic signal timing: Leveraging {YOLOv10} and computer
+  vision for real-time optimization.
+\newblock In \emph{2024 8th International Conference on Computational System
+  and Information Technology for Sustainable Solutions (CSITSS)}, pages 1--6,
+  2024.
+\newblock \doi{10.1109/CSITSS64042.2024.10817018}.
+
+\bibitem[Alruyshid et~al.(2025)Alruyshid, Lutfy, and
+  Hammood]{alruyshid2025aibased}
+Mohanad~Hilal Alruyshid, Omar~Farouq Lutfy, and Dalal~Abdulmohsin Hammood.
+\newblock An {AI}-based traffic light control system using {YOLOv10} with
+  emergency and public bus prioritization: A case study in {Baghdad}.
+\newblock \emph{International Journal of Transportation Development and
+  Integration}, 9\penalty0 (3):\penalty0 609--618, 2025.
+\newblock \doi{10.18280/ijtdi.090314}.
+
+\bibitem[Talaat et~al.(2025)Talaat, El-Balka, Sweidan, Gamel, and
+  Al-Zoghby]{talaat2025smart}
+Fatma~M. Talaat, Rana~Mohamed El-Balka, Sara Sweidan, Samah~Adel Gamel, and
+  Aya~M. Al-Zoghby.
+\newblock Smart traffic management system using {YOLOv11} for real-time vehicle
+  detection and dynamic flow optimization in smart cities.
+\newblock \emph{Neural Computing and Applications}, 37\penalty0 (24):\penalty0
+  19957--19974, 2025.
+\newblock \doi{10.1007/s00521-025-11434-9}.
+
+\bibitem[Medvei et~al.(2025)Medvei, Bordei, Ni{\c{t}}{\u{a}}, and
+  {\c{T}}{\u{a}}pu{\c{s}}]{medvei2025deepsignal}
+Mirabela~Melinda Medvei, Alin-Viorel Bordei, {\c{S}}tefania~Loredana
+  Ni{\c{t}}{\u{a}}, and Nicolae {\c{T}}{\u{a}}pu{\c{s}}.
+\newblock {DeepSIGNAL-ITS}: Deep learning signal intelligence for adaptive
+  traffic signal control in intelligent transportation systems.
+\newblock \emph{Applied Sciences}, 15\penalty0 (17):\penalty0 9396, 2025.
+\newblock \doi{10.3390/app15179396}.
+
+\bibitem[Varaiya(2013{\natexlab{a}})]{Varaiya2013MaxPressure}
+Pravin Varaiya.
+\newblock Max pressure control of a network of signalized intersections.
+\newblock \emph{Transportation Research Part C: Emerging Technologies},
+  36:\penalty0 177--195, 2013{\natexlab{a}}.
+\newblock \doi{10.1016/j.trc.2013.08.014}.
+
+\bibitem[Varaiya(2013{\natexlab{b}})]{Varaiya2013MaxPressureChapter}
+Pravin Varaiya.
+\newblock The max-pressure controller for arbitrary networks of signalized
+  intersections.
+\newblock In Satish~V. Ukkusuri and Kaan Ozbay, editors, \emph{Advances in
+  Dynamic Network Modeling in Complex Transportation Systems}, volume~2 of
+  \emph{Complex Networks and Dynamic Systems}, pages 27--66. Springer, New
+  York, NY, USA, 2013{\natexlab{b}}.
+\newblock \doi{10.1007/978-1-4614-6243-9_2}.
+
+\bibitem[Tassiulas and Ephremides(1992)]{Tassiulas1992Stability}
+Leandros Tassiulas and Anthony Ephremides.
+\newblock Stability properties of constrained queueing systems and scheduling
+  policies for maximum throughput in multihop radio networks.
+\newblock \emph{IEEE Transactions on Automatic Control}, 37\penalty0
+  (12):\penalty0 1936--1948, 1992.
+\newblock \doi{10.1109/9.182479}.
+
+\bibitem[Wongpiromsarn et~al.(2012)Wongpiromsarn, Uthaicharoenpong, Wang,
+  Frazzoli, and Wang]{Wongpiromsarn2012Distributed}
+Tichakorn Wongpiromsarn, Tawit Uthaicharoenpong, Yu~Wang, Emilio Frazzoli, and
+  Danwei Wang.
+\newblock Distributed traffic signal control for maximum network throughput.
+\newblock In \emph{2012 15th International IEEE Conference on Intelligent
+  Transportation Systems (ITSC)}, pages 588--595, 2012.
+\newblock \doi{10.1109/ITSC.2012.6338817}.
+
+\bibitem[Le et~al.(2015)Le, Kov{\'a}cs, Walton, Vu, Andrew, and
+  Hoogendoorn]{Le2015Decentralized}
+Tung Le, P{\'e}ter Kov{\'a}cs, Neil Walton, Hai~L. Vu, Lachlan L.~H. Andrew,
+  and Serge S.~P. Hoogendoorn.
+\newblock Decentralized signal control for urban road networks.
+\newblock \emph{Transportation Research Part C: Emerging Technologies},
+  58:\penalty0 431--450, 2015.
+\newblock \doi{10.1016/j.trc.2014.11.009}.
+
+\bibitem[Levin et~al.(2020)Levin, Hu, and Odell]{Levin2020CyclicalMaxPressure}
+Michael~W. Levin, Jeffrey Hu, and Michael Odell.
+\newblock Max-pressure signal control with cyclical phase structure.
+\newblock \emph{Transportation Research Part C: Emerging Technologies},
+  120:\penalty0 102828, 2020.
+\newblock \doi{10.1016/j.trc.2020.102828}.
+
+\bibitem[Wei et~al.(2021)Wei, Zheng, Gayah, and Li]{wei2021recent}
+Hua Wei, Guanjie Zheng, Vikash~V. Gayah, and Zhenhui Li.
+\newblock Recent advances in reinforcement learning for traffic signal control:
+  A survey of models and evaluation.
+\newblock \emph{ACM SIGKDD Explorations Newsletter}, 22\penalty0 (2):\penalty0
+  12--18, 2021.
+\newblock \doi{10.1145/3447556.3447565}.
+
+\bibitem[Haydari and Yilmaz(2022)]{haydari2022deep}
+Ammar Haydari and Yasin Yilmaz.
+\newblock Deep reinforcement learning for intelligent transportation systems: A
+  survey.
+\newblock \emph{IEEE Transactions on Intelligent Transportation Systems},
+  23\penalty0 (1):\penalty0 11--32, 2022.
+\newblock \doi{10.1109/TITS.2020.3008612}.
+
+\bibitem[Noaeen et~al.(2022)Noaeen, Naik, Goodman, Crebo, Abrar, Abad, Bazzan,
+  and Far]{noaeen2022reinforcement}
+Mohammad Noaeen, Atharva Naik, Liana Goodman, Jared Crebo, Taimoor Abrar, Zahra
+  Shakeri~Hossein Abad, Ana L.~C. Bazzan, and Behrouz Far.
+\newblock Reinforcement learning in urban network traffic signal control: A
+  systematic literature review.
+\newblock \emph{Expert Systems with Applications}, 199:\penalty0 116830, 2022.
+\newblock \doi{10.1016/j.eswa.2022.116830}.
+
+\bibitem[Wei et~al.(2018)Wei, Zheng, Yao, and Li]{wei2018intellilight}
+Hua Wei, Guanjie Zheng, Huaxiu Yao, and Zhenhui Li.
+\newblock {IntelliLight}: A reinforcement learning approach for intelligent
+  traffic light control.
+\newblock In \emph{Proceedings of the 24th ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, pages 2496--2505, 2018.
+\newblock \doi{10.1145/3219819.3220096}.
+
+\bibitem[Chen et~al.(2020)Chen, Wei, Xu, Zheng, Yang, Xiong, Xu, and
+  Li]{chen2020thousand}
+Chacha Chen, Hua Wei, Nan Xu, Guanjie Zheng, Ming Yang, Yuanhao Xiong, Kai Xu,
+  and Zhenhui Li.
+\newblock Toward a thousand lights: Decentralized deep reinforcement learning
+  for large-scale traffic signal control.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, volume~34, pages 3414--3421, 2020.
+\newblock \doi{10.1609/aaai.v34i04.5744}.
+
+\bibitem[Wei et~al.(2019)Wei, Chen, Zheng, Wu, Gayah, Xu, and
+  Li]{wei2019presslight}
+Hua Wei, Chacha Chen, Guanjie Zheng, Kan Wu, Vikash~V. Gayah, Kai Xu, and
+  Zhenhui Li.
+\newblock {PressLight}: Learning max pressure control to coordinate traffic
+  signals in arterial network.
+\newblock In \emph{Proceedings of the 25th ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, pages 1290--1298, 2019.
+\newblock \doi{10.1145/3292500.3330949}.
+
+\bibitem[Genders and Razavi(2016)]{genders2016using}
+Wade Genders and Saiedeh Razavi.
+\newblock Using a deep reinforcement learning agent for traffic signal control,
+  2016.
+\newblock Preprint, arXiv:1611.01142.
+
+\bibitem[Terven et~al.(2023)Terven, Cordova-Esparza, and
+  Romero-Gonzalez]{terven2023comprehensive}
+Juan Terven, Diana-Margarita Cordova-Esparza, and Julio-Alejandro
+  Romero-Gonzalez.
+\newblock A comprehensive review of {YOLO} architectures in computer vision:
+  From {YOLOv1} to {YOLOv8} and {YOLO-NAS}.
+\newblock \emph{Machine Learning and Knowledge Extraction}, 5\penalty0
+  (4):\penalty0 1680--1716, 2023.
+\newblock \doi{10.3390/make5040083}.
+
+\bibitem[Lin et~al.(2014)Lin, Maire, Belongie, Hays, Perona, Ramanan,
+  Doll{\'a}r, and Zitnick]{lin2014microsoft}
+Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva
+  Ramanan, Piotr Doll{\'a}r, and C.~Lawrence Zitnick.
+\newblock {Microsoft COCO}: Common objects in context.
+\newblock In \emph{Computer Vision -- ECCV 2014}, volume 8693 of \emph{Lecture
+  Notes in Computer Science}, pages 740--755. Springer, 2014.
+\newblock \doi{10.1007/978-3-319-10602-1_48}.
+
+\bibitem[Bewley et~al.(2016)Bewley, Ge, Ott, Ramos, and
+  Upcroft]{bewley2016simple}
+Alex Bewley, Zongyuan Ge, Lionel Ott, Fabio Ramos, and Ben Upcroft.
+\newblock Simple online and realtime tracking.
+\newblock In \emph{2016 IEEE International Conference on Image Processing
+  (ICIP)}, pages 3464--3468, 2016.
+\newblock \doi{10.1109/ICIP.2016.7533003}.
+
+\bibitem[Wojke et~al.(2017)Wojke, Bewley, and Paulus]{wojke2017simple}
+Nicolai Wojke, Alex Bewley, and Dietrich Paulus.
+\newblock Simple online and realtime tracking with a deep association metric.
+\newblock In \emph{2017 IEEE International Conference on Image Processing
+  (ICIP)}, pages 3645--3649, 2017.
+\newblock \doi{10.1109/ICIP.2017.8296962}.
+
+\bibitem[Jocher et~al.(2023)Jocher, Chaurasia, and Qiu]{jocher2023yolov8}
+Glenn Jocher, Ayush Chaurasia, and Jing Qiu.
+\newblock Ultralytics {YOLO}, version 8.0.0, 2023.
+\newblock Software, AGPL-3.0. \url{https://github.com/ultralytics/ultralytics}.
+
+\bibitem[Khanam and Hussain(2024)]{khanam2024yolov11}
+Rahima Khanam and Muhammad Hussain.
+\newblock {YOLOv11}: An overview of the key architectural enhancements.
+\newblock \emph{arXiv preprint arXiv:2410.17725}, 2024.
+
+\bibitem[Louisell et~al.(2004)Louisell, Collura, Teodorovic, and
+  Tignor]{louisell2004simple}
+Chuck Louisell, John Collura, Dusan Teodorovic, and Sam Tignor.
+\newblock Simple worksheet method to evaluate emergency vehicle preemption and
+  its impacts on safety.
+\newblock \emph{Transportation Research Record}, 1867\penalty0 (1):\penalty0
+  151--162, 2004.
+\newblock \doi{10.3141/1867-18}.
+
+\bibitem[Humagain et~al.(2020)Humagain, Sinha, Lai, and
+  Ranjitkar]{humagain2020systematic}
+Subash Humagain, Roopak Sinha, Edmund Lai, and Prakash Ranjitkar.
+\newblock A systematic review of route optimisation and pre-emption methods for
+  emergency vehicles.
+\newblock \emph{Transport Reviews}, 40\penalty0 (1):\penalty0 35--53, 2020.
+\newblock \doi{10.1080/01441647.2019.1649319}.
+
+\bibitem[Das et~al.(2022)Das, Altekar, Head, and Saleem]{das2022traffic}
+Debashis Das, Niraj~Vasant Altekar, K.~Larry Head, and Faisal Saleem.
+\newblock Traffic signal priority control strategy for connected emergency
+  vehicles with dilemma zone protection for freight vehicles.
+\newblock \emph{Transportation Research Record}, 2676\penalty0 (1):\penalty0
+  499--517, 2022.
+\newblock \doi{10.1177/03611981211039157}.
+
+\bibitem[Chandra and Kumar(2003)]{chandra2003effect}
+Satish Chandra and Upendra Kumar.
+\newblock Effect of lane width on capacity under mixed traffic conditions in
+  {India}.
+\newblock \emph{Journal of Transportation Engineering}, 129\penalty0
+  (2):\penalty0 155--160, 2003.
+\newblock \doi{10.1061/(ASCE)0733-947X(2003)129:2(155)}.
+
+\bibitem[Arasan and Arkatkar(2010)]{arasan2010microsimulation}
+V.~Thamizh Arasan and Shriniwas~S. Arkatkar.
+\newblock Microsimulation study of effect of volume and road width on {PCU} of
+  vehicles under heterogeneous traffic.
+\newblock \emph{Journal of Transportation Engineering}, 136\penalty0
+  (12):\penalty0 1110--1119, 2010.
+\newblock \doi{10.1061/(ASCE)TE.1943-5436.0000176}.
+
+\bibitem[Kumar et~al.(2018)Kumar, Arkatkar, and Joshi]{kumar2018new}
+Pallav Kumar, Shriniwas Arkatkar, and Gaurang Joshi.
+\newblock New approach for estimating passenger car units on multilane urban
+  roads with heterogeneous traffic conditions.
+\newblock \emph{Journal of Transportation Engineering, Part A: Systems},
+  144\penalty0 (3):\penalty0 04018002, 2018.
+\newblock \doi{10.1061/JTEPBS.0000117}.
+
+\bibitem[Daganzo(1997)]{daganzo1997fundamentals}
+Carlos~F. Daganzo.
+\newblock \emph{Fundamentals of Transportation and Traffic Operations}.
+\newblock Pergamon, Oxford, UK, 1997.
+\newblock ISBN 978-0-08-042785-0.
+
+\bibitem[{Transportation Research Board}(2022)]{trb2022hcm}
+{Transportation Research Board}.
+\newblock \emph{Highway Capacity Manual, 7th Edition: A Guide for Multimodal
+  Mobility Analysis}.
+\newblock The National Academies Press, Washington, DC, USA, 2022.
+\newblock ISBN 978-0-309-08766-7.
+\newblock \doi{10.17226/26432}.
+
+\bibitem[Lopez et~al.(2018)Lopez, Behrisch, Bieker-Walz, Erdmann,
+  Fl{\"o}tter{\"o}d, Hilbrich, L{\"u}cken, Rummel, Wagner, and
+  Wie{\ss}ner]{lopez2018microscopic}
+Pablo~Alvarez Lopez, Michael Behrisch, Laura Bieker-Walz, Jakob Erdmann,
+  Yun-Pang Fl{\"o}tter{\"o}d, Robert Hilbrich, Leonhard L{\"u}cken, Johannes
+  Rummel, Peter Wagner, and Evamarie Wie{\ss}ner.
+\newblock Microscopic traffic simulation using {SUMO}.
+\newblock In \emph{2018 21st International Conference on Intelligent
+  Transportation Systems (ITSC)}, pages 2575--2582, 2018.
+\newblock \doi{10.1109/ITSC.2018.8569938}.
+
+\end{thebibliography}

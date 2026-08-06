@@ -1,0 +1,24 @@
+{
+  "n_trials_per_level": 300,
+  "settle_range_s": [
+    40.0,
+    160.0
+  ],
+  "levels": {
+    "light": 0.6,
+    "medium": 1.0,
+    "heavy": 1.4
+  },
+  "profile": "asymmetric",
+  "timings": {
+    "min_green": 5,
+    "max_green": 30,
+    "yellow": 3,
+    "all_red": 1.5,
+    "max_wait": 60,
+    "w_wait": 0.4
+  },
+  "fixed_green": 13.0,
+  "dt": 0.5,
+  "sat_flow_veh_per_s": 0.55
+}

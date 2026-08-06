@@ -1,0 +1,112 @@
+{
+  "device": "mps",
+  "model": "yolo11s.pt",
+  "imgsz": 960,
+  "duration_s": 60.0,
+  "presets": {
+    "levanhien": {
+      "src": "footage/levanhien_suvanhanh_intersection_cctv.mp4",
+      "signalised": true,
+      "caption": "Signalised boulevard: closed-loop control",
+      "zones": {
+        "N": [
+          [
+            0.52,
+            0.28
+          ],
+          [
+            0.98,
+            0.28
+          ],
+          [
+            0.98,
+            0.99
+          ],
+          [
+            0.52,
+            0.99
+          ]
+        ],
+        "E": [
+          [
+            0.02,
+            0.14
+          ],
+          [
+            0.98,
+            0.14
+          ],
+          [
+            0.98,
+            0.29
+          ],
+          [
+            0.02,
+            0.29
+          ]
+        ]
+      },
+      "label": {
+        "N": "boulevard",
+        "E": "cross street"
+      },
+      "start": 0.0,
+      "fig_at": [
+        22.0,
+        38.0
+      ]
+    },
+    "hcmc": {
+      "src": "footage/hcmc_intersection_cctv.mp4",
+      "signalised": false,
+      "caption": "Dense mixed traffic: detection and PCU demand only",
+      "zones": {
+        "W": [
+          [
+            0.02,
+            0.3
+          ],
+          [
+            0.49,
+            0.3
+          ],
+          [
+            0.49,
+            0.97
+          ],
+          [
+            0.02,
+            0.97
+          ]
+        ],
+        "E": [
+          [
+            0.51,
+            0.3
+          ],
+          [
+            0.98,
+            0.3
+          ],
+          [
+            0.98,
+            0.97
+          ],
+          [
+            0.51,
+            0.97
+          ]
+        ]
+      },
+      "label": {
+        "W": "west half",
+        "E": "east half"
+      },
+      "start": 0.0,
+      "fig_at": [
+        18.0
+      ]
+    }
+  },
+  "torch": "2.13.0"
+}

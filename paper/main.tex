@@ -1,0 +1,1010 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\captionsetup{font=small,labelfont=bf}
+\graphicspath{{figures/}}
+\setlength{\parskip}{0.15em}
+\newcommand{\relay}{R.E.L.A.Y.}
+\newcommand{\pcu}{PCU}
+
+\title{\bfseries A Low-Cost Single-Camera Adaptive Signal Controller for\\
+Heterogeneous Urban Traffic: Queue-Weighted Pressure Control with\\
+Bounded Fairness and Emergency Preemption}
+
+\author{Niraj Kafle\thanks{Kathmandu, Nepal. Correspondence: \texttt{contact.me.kafle@gmail.com}.
+Source code, experiment scripts and raw result files: \url{https://github.com/kafle1/relay}.}}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Fixed-time signal plans remain the default in many South Asian cities, where traffic is
+motorcycle-dominated, demand is strongly asymmetric between approaches, and the budget for inductive
+loops or radar is unavailable. We present \relay, an adaptive signal controller whose only input is one
+existing fixed junction camera. A single convolutional detector produces per-approach, per-class vehicle
+counts, which are converted to passenger-car-unit (\pcu) demand and consumed by a queue-weighted
+pressure controller in the max-pressure family. The controller adds the operational rules a deployable
+signal needs and a plain argmax policy lacks: empty-phase skipping, gap-out, minimum and maximum green,
+a hard anti-starvation bound, pedestrian demand treated as pressure rather than as a fixed interval, and
+emergency preemption with a bounded hold. We evaluate it in a seeded point-queue microsimulation against
+an equal-split fixed-time plan and against a deliberately favourable reference whose cycle and splits come
+from Webster's formulae applied to the true mean demand. Across 30 seeds per cell and five demand levels,
+mean delay falls by 14.2\% to 38.8\% against the Webster plan under asymmetric demand and by 22.1\% to
+37.6\% when a single approach dominates, with the 95th-percentile wait cut from 25.8~s to 15.8~s at
+1278~veh/h. We also report two negative results. Under balanced saturated demand the controller is 30.5\%
+worse than the Webster plan, because unconstrained switching raises the phase change rate from 204 to 359
+per hour and cuts displayed green time from 0.743 to 0.550 of wall time. In a three-junction corridor,
+disabling the downstream coupling term changes mean delay by less than 2.5\%, so the corridor gain comes
+from local adaptivity rather than coordination. Emergency preemption reaches green in 4.19~s on average
+over 900 trials, with a measured worst case of 13.85~s against an analytical bound of 14.0~s. The
+perception stack runs at a median of 38.3~ms per frame at 960~px inference on a consumer laptop, but on
+motorcycle-dense footage it undercounts severely, with sampled counts rising 83\% between 640~px and
+1600~px without converging. This is a simulation and real-footage feasibility study, not a field
+deployment.
+\end{abstract}
+
+\noindent\textbf{Keywords:} adaptive traffic signal control; max-pressure control; computer
+vision; heterogeneous traffic; emergency vehicle preemption; low-cost intelligent transport systems
+
+\section{Introduction}
+
+Urban signal control in low- and middle-income cities is usually performed by fixed-time plans or by
+police officers operating signals manually. Both allocate green without measuring what is queued.
+The consequence is visible at almost any asymmetric junction: a busy arterial approach holds a long
+queue while the crossing minor street receives the green it would receive at three in the morning.
+Webster's method \citep{Webster1958TrafficSignalSettings} showed that cycle length and splits should
+follow demand, but a fixed plan can only follow the demand measured when the plan was designed, and
+re-timing surveys are infrequent. Studies of signalised intersections in the Kathmandu valley report
+saturation flows and delays that differ substantially from standard capacity guidance, attributing
+the difference to the local vehicle mixture and to lane discipline
+\citep{shrestha2014development,nepali2024assessment}, which is exactly the condition under which a
+plan imported from a design manual performs badly.
+
+The established remedy is a demand-responsive system such as SCOOT
+\citep{Hunt1981SCOOT,Robertson1991SCOOTMethod} or SCATS \citep{Sims1980SCATS}, or an
+optimisation-based controller in the OPAC \citep{Gartner1983OPAC} and RHODES
+\citep{Mirchandani2001RHODES} lineage. These work and have decades of field evidence behind them, but
+they are expensive: they assume a detector plant, communications and a central control room, so
+per-junction cost is dominated by sensing and civil works rather than by the algorithm. In a city where
+the signal head itself is sometimes unpowered, that capital profile is prohibitive.
+
+Two conditions have changed. Fixed cameras are already installed at many urban junctions for
+enforcement and monitoring, so a camera-based controller reuses a paid-for asset. And single-stage
+object detectors are now accurate and cheap enough to run at video rate on commodity hardware
+\citep{redmon2016yolo,bochkovskiy2020yolov4}, which makes per-approach vehicle counting a software
+problem rather than a sensor-procurement problem. Vision-based queue and density estimation from fixed
+cameras is an established technique in its own right
+\citep{umair2021efficient,harilakshmi2023deep,abewickrema2025ensemble}, and several recent studies
+connect a detector to a signal timer on this basis
+\citep{papanashi2024adaptive,alruyshid2025aibased,talaat2025smart,medvei2025deepsignal}.
+
+What is often missing in that applied literature is the control side. Many camera-based studies
+compute a vehicle count and set green time in proportion to it, which is a proportional rule rather
+than a control policy, and they rarely state what prevents a minor approach from being starved, what
+happens when the detector fails, or how the policy behaves at saturation. Conversely, the theoretical
+literature on max-pressure control
+\citep{Varaiya2013MaxPressure,Varaiya2013MaxPressureChapter} provides throughput-optimality results
+in a form that assumes ideal queue observation and imposes no minimum green, no clearance interval and
+no fairness bound, all of which a deployable signal requires.
+
+This paper describes and evaluates \relay, a controller placed deliberately between those positions. Its
+contributions are: a single-camera perception-to-control pipeline for heterogeneous traffic in which
+presence and \pcu-weighted demand are kept as separate quantities, because a \pcu-weighted score alone
+classifies a lone motorcycle as an empty lane; a queue-weighted pressure controller whose fairness is
+enforced by separate maximum-wait bounds for vehicles and pedestrians and by a cap on the preemption hold
+rather than left to the score; an evaluation against a Webster plan computed from the true mean demand,
+much harder to beat than the equal-split baseline camera-based studies usually use, with an explicit
+report of where our controller loses and why; and a measured preemption latency distribution compared
+against a closed-form worst-case bound.
+
+We are explicit about what this is not. There is no field installation, no controller cabinet in the
+loop and no before-and-after study on a real signal: control results come from a seeded
+microsimulation and perception results from recorded footage. The contribution is a feasibility and
+design study at the level a city could use to decide whether a pilot is worth funding, and
+Section~\ref{sec:limitations} states which claims a field trial would still have to establish.
+
+\section{Related work}
+
+\subsection{Fixed-time and demand-responsive control}
+
+Webster's analysis of cycle length and green splits \citep{Webster1958TrafficSignalSettings} remains
+the reference method for fixed-time plans and is the basis of the stronger baseline used here. Among
+demand-responsive systems, SCOOT adjusts splits, offsets and cycle time from cyclic flow profiles
+measured upstream of the stop line, SCATS selects among plans using measured degree of saturation, and
+OPAC and RHODES solve a rolling-horizon optimisation over predicted arrivals. All four depend on a
+detector plant installed and maintained in the carriageway, and all four were designed for streams in
+which lane discipline holds and vehicle classes are similar in size.
+
+\subsection{Max-pressure and backpressure control}
+
+Max-pressure signal control derives from backpressure scheduling in queueing networks
+\citep{Tassiulas1992Stability}. Varaiya
+\citep{Varaiya2013MaxPressure,Varaiya2013MaxPressureChapter} showed that repeatedly activating the
+phase maximising a weighted difference between upstream and downstream queues stabilises any demand
+within the capacity region using only local queue information, with no demand forecast and no
+coordination plan, which is attractive for a decentralised low-communication deployment. Related
+work established distributed formulations \citep{Wongpiromsarn2012Distributed} and decentralised
+variants with weaker information requirements \citep{Le2015Decentralized}.
+
+Two properties of the theoretical policy conflict with practice. First, the argmax is evaluated freely at
+every decision epoch, so the policy may switch as often as the decision interval allows, and since each
+switch costs a clearance interval during which no approach discharges, unconstrained switching wastes
+capacity; Levin et al. \citep{Levin2020CyclicalMaxPressure} address this with a cyclical phase structure,
+and our balanced-demand result in Section~\ref{sec:results} is an independent, quantified instance of the
+same effect. Second, throughput optimality is proved for the unconstrained policy, and adding minimum
+green, maximum green, hysteresis and forced service breaks the argmax property and voids the proof. We
+therefore describe our controller as a queue-weighted pressure heuristic in the max-pressure family and
+make no stability claim.
+
+\subsection{Learning-based control}
+
+Reinforcement learning is the dominant research direction for signal control. Surveys by Wei et al.
+\citep{wei2021recent}, Haydari and Yilmaz \citep{haydari2022deep} and Noaeen et al.
+\citep{noaeen2022reinforcement} cover the field; representative works include IntelliLight
+\citep{wei2018intellilight}, large-scale decentralised training \citep{chen2020thousand} and
+PressLight \citep{wei2019presslight}, whose reward is derived from max-pressure and which is
+therefore a direct point of comparison. Early work by Genders and Razavi
+\citep{genders2016using} established the basic formulation.
+
+We did not adopt a learned policy, for reasons specific to the deployment context rather than to the
+merits of the methods: training requires a simulator calibrated to the target junction and none exists
+for the junctions we are concerned with; a neural policy does not naturally expose the maximum-wait or
+clearance guarantees an authority approving a signal plan needs; and it transfers poorly across
+geometries, whereas a pressure rule parameterised only by a phase set moves to a new junction by
+drawing polygons on a camera image. The comparison we do not make, and which should be made, is a
+head-to-head against a trained policy on the same arrival streams.
+
+\subsection{Camera-based counting and vision-driven signal control}
+
+Vehicle detection from fixed cameras is a mature application of single-stage detectors
+\citep{redmon2016yolo,bochkovskiy2020yolov4}, reviewed by Terven et al.
+\citep{terven2023comprehensive}, typically trained on general corpora \citep{lin2014microsoft} and
+extended with tracking when trajectories are required \citep{bewley2016simple,wojke2017simple}. Our
+system uses the Ultralytics implementation of the YOLO family \citep{jocher2023yolov8}; the architecture
+generation we fine-tune is described in \citep{khanam2024yolov11}, which remains a preprint. Because the
+controller consumes instantaneous per-approach occupancy rather than cumulative crossings, we count
+detections inside approach polygons instead of tracking individual vehicles, which removes
+identity-switch errors in dense queues from the control path.
+
+Recent applied studies pair such a detector with a signal timer. Papanashi et al.
+\citep{papanashi2024adaptive} report YOLO-based adaptive timing evaluated in Bengaluru, a
+heterogeneous-traffic context comparable to ours; Alruyshid et al. \citep{alruyshid2025aibased} add
+emergency and public-bus prioritisation in a Baghdad case study; Talaat et al. \citep{talaat2025smart}
+and Medvei et al. \citep{medvei2025deepsignal} report detector-driven controllers, the latter combining
+detection with a learned policy. These works establish that the perception component is practical. Our
+contribution relative to them is on the control side: an explicit pressure formulation, stated fairness
+bounds, a preemption latency bound, and an evaluation including a demand-optimal fixed-time baseline
+that reports where the adaptive policy loses. We are not aware of a published camera-based adaptive
+controller that reports a regime in which its own policy is worse than the fixed-time baseline; given
+the mechanism identified in Section~\ref{sec:discussion} that regime almost certainly exists for those
+systems too, and its absence from the record is more likely a reporting bias than a property of the
+systems.
+
+Emergency preemption has its own long operational history and a careful literature on its side effects,
+since a preemption interrupts the cycle and can create hazards at the transition
+\citep{louisell2004simple}; Humagain et al. \citep{humagain2020systematic} review route optimisation and
+preemption methods, and recent work exploits connected-vehicle messaging to grant priority with explicit
+dilemma-zone protection \citep{das2022traffic}. Our approach differs in its detection channel, since the
+emergency vehicle is recognised visually by the same detector that counts ordinary traffic and no
+transponder or vehicle-side equipment is required. That is an advantage in cost and a disadvantage in
+reliability, which is why the ambulance class carries the highest confidence threshold and why the hold
+is capped, and what we add is a stated worst-case latency bound with a measurement against it.
+
+\section{System architecture}
+
+\relay{} consists of a perception stage and a control stage connected by a single data structure: a
+mapping from approach identifier to per-class vehicle count. Everything downstream of that mapping
+is independent of how the counts were obtained, which is what allows the same controller to be
+driven by recorded footage, a live camera, or a synthetic feed.
+
+\subsection{Perception}
+
+A single fixed camera views the junction. Each approach is defined by a polygon in normalised image
+coordinates, drawn once per site; no per-site model training is performed. For each frame a YOLO
+detector produces class-labelled boxes, which are filtered in four steps.
+
+First, per-class confidence gating, because a single global threshold is unsuitable for mixed traffic:
+two-wheelers are small in the image and are lost at a threshold that suppresses false positives on cars,
+so the system uses 0.24 for motorcycles and bicycles, 0.38 by default, 0.50 for trucks and 0.68 for
+ambulances. The high ambulance gate is a safety choice, not an accuracy choice, since an ambulance
+detection moves the signal by itself and a marginal read on a white van would hand the junction to a
+non-existent emergency, while a vehicle below the gate still contributes ordinary demand through its
+next-best label. Second, cross-class deduplication, since per-class non-maximum suppression can leave one
+distant vehicle carrying stacked car, truck and motorcycle boxes: a greedy pass in descending confidence
+retains a box only if its intersection over union with every retained box is below 0.5, running after the
+confidence filters so a discarded low-confidence box cannot suppress a valid one. Third, approach
+assignment by centroid containment, giving one consistent rule for vehicles straddling a boundary,
+followed by an exponential moving average per approach and class with coefficient 0.35, roughly a
+one-second time constant at the observed detection rate. Fourth, failure handling: a bad frame returns the
+last smoothed counts rather than raising, and a staleness flag set after three seconds without a
+successful update makes the pipeline feed the controller empty counts, so the wait clocks and the
+maximum-wait rule cycle the phases safely instead of holding green on stale demand.
+
+\subsection{Control, topology and deployment}
+
+The controller consumes the count mapping and a set of conflict-free phases, and is topology-agnostic:
+four-arm, three-arm and two-arm junctions differ only in the phase set passed at construction, and
+approaches may be specified per arm or per movement, in which case the phase set is generated to
+include paired through phases, paired protected-left phases and one split phase per arm serving both of
+that arm's movements. Adding a junction therefore requires drawing polygons and declaring phases, not
+changing code.
+
+Pedestrian demand enters as a separate transponder-style input giving, per arm, the number waiting, the
+longest wait and the number currently crossing. It is sanitised before use: non-numeric values, unknown
+arms, negative counts and non-finite waits are discarded, counts are clamped to 200 and waits to
+180~s, so a client fault cannot inject an unbounded aging term.
+
+The intended installation is one small computer per junction, taking a feed from an existing camera and
+driving the existing signal controller, with no central server in the control path and no
+junction-to-junction communication beyond the single downstream queue scalar the corridor configuration
+reads. We measure the perception cost in Section~\ref{sec:results} but claim no cost figure, since no
+hardware was procured.
+
+\section{Control formulation}
+\label{sec:control}
+
+\subsection{Notation and derived quantities}
+
+Let $A$ be the set of approaches and $P$ a set of phases, each $p \in P$ a subset of $A$ that may be
+served simultaneously without conflict. Let $\Delta t$ be the control step. At each step perception
+reports counts $n_{a,c}$ for approach $a$ and class $c$, and a set of approaches on which an
+emergency vehicle was detected in the current frame.
+
+Two distinct quantities are derived, the \pcu-weighted demand and the occupancy indicator:
+\begin{equation}
+d_a = \sum_{c} w_c \, n_{a,c},
+\label{eq:demand}
+\end{equation}
+with weights $w_c$ from Table~\ref{tab:pcu}, and
+\begin{equation}
+o_a = \mathbb{1}\!\left[\textstyle\sum_c n_{a,c} > 0\right].
+\label{eq:presence}
+\end{equation}
+Keeping these separate matters: a single motorcycle contributes $d_a = 0.3$, which a demand threshold
+would treat as an empty approach, so the empty-phase skip and gap-out rules key on $o_a$ rather than
+$d_a$ and a lone two-wheeler still receives a full minimum green.
+
+\begin{table}[t]
+\centering
+\caption{Passenger-car-unit weights $w_c$ used in Equation~\eqref{eq:demand}. These are
+configuration values selected for a motorcycle-dominated mix. Their ordering is consistent with
+published equivalency estimates for heterogeneous South Asian traffic
+\citep{chandra2003effect,arasan2010microsimulation,kumar2018new}, but they were not estimated from
+local field measurements in this work; see Section~\ref{sec:limitations}.}
+\label{tab:pcu}
+\small
+\begin{tabular}{lccccccc}
+\toprule
+Class & car & motorcycle & bus & truck & ambulance & bicycle & auto-rickshaw \\
+\midrule
+$w_c$ & 1.0 & 0.3 & 2.5 & 2.5 & 2.0 & 0.2 & 0.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each approach carries a clock $r_a$ answering how long the oldest waiting vehicle on that approach
+has waited, rather than how long since the approach last had green. With $G$ the set of approaches
+currently green and $z_a$ counting consecutive seconds the approach has read empty,
+\begin{equation}
+r_a \leftarrow
+\begin{cases}
+0 & a \in G,\\[2pt]
+r_a + \Delta t & a \notin G \ \text{and}\ o_a = 1,\\[2pt]
+0 & a \notin G,\ o_a = 0,\ z_a \geq \tau_e,\\[2pt]
+r_a & \text{otherwise},
+\end{cases}
+\label{eq:wait}
+\end{equation}
+with $\tau_e = 3$~s. The third case is necessary rather than cosmetic: without it a long-vacant
+approach accumulates a large clock value, which the first arriving vehicle inherits, triggering forced
+service against a loaded corridor. The debounce keeps a detection dropout from erasing a real queue's
+guarantee.
+
+\subsection{Phase score}
+
+Define a bounded urgency multiplier $u_a = 1 + \min(r_a, R)/R \in [1,2]$, where $R$ is the
+maximum-wait parameter. The vehicle pressure of a phase is
+\begin{equation}
+D(p) = \sum_{a \in p} d_a \, u_a .
+\label{eq:vehpressure}
+\end{equation}
+Aging multiplies each approach's own demand and is capped at a factor of two, so waiting cannot
+manufacture demand that does not exist. This is a deliberate departure from an additive term
+$d_a + \lambda r_a$, which inverts the intended ordering: with $\lambda = 0.4$ a two-vehicle approach
+that has waited 45~s scores like an eighteen-\pcu{} queue and the controller rotates phases at
+minimum-green cadence. For the same reason the multiplier is applied per approach rather than at phase
+level, since a phase-level $\max_a r_a$ lets a starving single-vehicle turn bay double the score of a
+phase whose large through queue has just been served.
+
+Pedestrians are treated as demand. A phase $p$ frees the crossing of arm $x$ when neither $x$ nor the
+opposing arm, whose straight-ahead movement would traverse the same crossing, is served:
+$F(p) = \{x : x \notin \mathrm{arms}(p) \ \text{and}\ \mathrm{opp}(x) \notin \mathrm{arms}(p)\}$.
+With $m_x$ people waiting to cross arm $x$, $k_x$ currently on that crossing and $v_x$ the longest
+pedestrian wait there,
+\begin{equation}
+\Phi(p) = w_{\mathrm{ped}} \left( \sum_{x \in F(p)} (m_x + k_x) \right)
+\left( 1 + \frac{\min\big(\max_{x \in F(p),\, m_x > 0} v_x,\ V\big)}{V} \right),
+\label{eq:pedpressure}
+\end{equation}
+with $w_{\mathrm{ped}} = 0.3$, so one waiting person contributes about as much pressure as one
+motorcycle, and $V$ the pedestrian maximum-wait parameter. Turning traffic across an open crossing
+yields to pedestrians in normal permissive operation, which is why $F(p)$ excludes only
+straight-ahead conflicts; counting pedestrians whose crossing is not actually freed causes the
+controller to hold greens that do not serve them. The complete score adds a large emergency constant
+$B(p) = B_0 \, \mathbb{1}[\exists a \in p : a \in \hat{E}]$ with $B_0 = 10^6$:
+\begin{equation}
+S(p) = D(p) + \Phi(p) + B(p).
+\label{eq:score}
+\end{equation}
+
+A detection is a per-frame event and detectors drop frames, so each approach carries a hold timer reset to
+$\theta = 2.5$~s whenever an emergency is announced on that arm and otherwise decaying by $\Delta t$; the
+latched set is $\hat{E}$. Announcements arrive at arm level and every movement key of that arm is latched,
+because the camera cannot resolve which lane the emergency vehicle occupies, so a single missed detection
+cannot abandon an active preemption.
+
+\subsection{Target selection and the stage machine}
+
+The signal cycles through green, yellow of duration $y$ and all-red of duration $\rho$; a green is
+never followed directly by a conflicting green. The next phase is chosen by strict precedence rather
+than by the score alone. \emph{(i) Emergency:} if $\hat{E} \neq \emptyset$, take the phase serving the
+most emergency approaches, breaking ties by the largest $r_a$ among them, so that on a movement-level
+junction the split-arm phase is chosen and whichever lane the emergency vehicle occupies turns green.
+\emph{(ii) Vehicle starvation:} otherwise, if any approach has $r_a \geq R$ and $d_a > 0$, force a
+phase serving the worst such approach, preferring one that also serves approaches within 25~s of the
+threshold so that two clearance intervals are not paid where one would do; an empty approach cannot
+starve, so this never awards green to an empty lane. \emph{(iii) Pedestrian starvation:} otherwise, if
+any arm has $m_x > 0$ and $v_x \geq V$, force a phase in $F(x)$ with the greatest pedestrian demand.
+\emph{(iv) Score:} otherwise take $\arg\max_p S(p)$ over phases with $D(p) > 0$ or non-zero pedestrian
+demand, resting in all-red if no phase has demand.
+
+A running green is terminated by the first applicable rule below, where $e$ is elapsed green,
+$g_{\min}$ and $g_{\max}$ the minimum and maximum green, $\gamma_t$ the gap-out time, $\Theta$ the
+preemption cap, $W$ the walk-hold allowance and $h$ the hysteresis margin.
+
+\begin{enumerate}
+\item An emergency exists on another phase and not the current one, and either $e \geq g_{\min}$ or
+the current phase is empty.
+\item An emergency exists on the current phase: hold, subject to two bounds. An approach reaching
+$r_a \geq 2R$ forces service even over an active hold, and the cumulative hold is capped at $\Theta$,
+after which the emergency term is dropped so the ordinary rules can move the signal. This prevents a
+stationary emergency vehicle from freezing the junction.
+\item The current phase is empty, meaning no approach in $p$ has $o_a = 1$ and no freed crossing has
+pedestrian demand, while another phase has demand: switch immediately without waiting for $g_{\min}$,
+since an empty phase has no vehicle to strand.
+\item $e < g_{\min}$: hold. Minimum green is not overridden for a phase actually serving traffic.
+\item Vehicle starvation elsewhere, then pedestrian starvation elsewhere: switch.
+\item A pedestrian is still on a crossing freed by the current phase and
+$e < \min(g_{\max}, g_{\min} + W)$: hold. The bound matters, because an unbounded hold lets a renewing
+pedestrian stream pin green on a lightly used approach while a loaded corridor waits.
+\item Gap-out: the served approaches have read empty for at least $\gamma_t$ and another phase has
+demand.
+\item Maximum green: $e \geq g_{\max}$, so green is yielded to the best other phase with demand.
+\item Hysteresis: $S(p^\star) > S(p) + h$ for the best alternative $p^\star$, the margin suppressing
+oscillation between phases of nearly equal score.
+\end{enumerate}
+
+Parameter values are listed in Table~\ref{tab:params}.
+
+\begin{table}[t]
+\centering
+\caption{Controller parameters. The single-junction column is the configuration used in Experiments
+1 and 3; the corridor column is the configuration of the system's network demonstration, used in
+Experiment 2.}
+\label{tab:params}
+\small
+\begin{tabular}{llcc}
+\toprule
+Symbol & Meaning & Single junction & Corridor \\
+\midrule
+$g_{\min}$ & minimum green (s) & 5.0 & 5.0 \\
+$g_{\max}$ & maximum green (s) & 30.0 & 34.0 \\
+$y$ & yellow (s) & 3.0 & 2.0 \\
+$\rho$ & all-red clearance (s) & 1.5 & 2.5 \\
+$\gamma_t$ & gap-out time (s) & 2.5 & 2.5 \\
+$R$ & vehicle maximum wait (s) & 60.0 & 26.0 \\
+$V$ & pedestrian maximum wait (s) & 60.0 & 60.0 \\
+$W$ & walk-hold allowance (s) & 12.0 & 12.0 \\
+$\Theta$ & preemption cap (s) & 60.0 & 25.0 \\
+$\theta$ & emergency latch (s) & 2.5 & 2.5 \\
+$h$ & hysteresis margin (\pcu) & 1.0 & 1.0 \\
+$w_{\mathrm{ped}}$ & pedestrian weight & 0.3 & 0.3 \\
+$\gamma$ & downstream coupling & n/a & 0.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Corridor coupling and the preemption bound}
+
+On a corridor each junction $j$ knows, for some arms, the downstream approach $(j', a')$ that the
+arm's discharge feeds. The demand presented to the score is then discounted by the downstream queue
+$q_{j',a'}$,
+\begin{equation}
+\tilde{d}_a =
+\begin{cases}
+\max\big(d_a - \gamma\, q_{j',a'},\ \varepsilon\big) & o_a = 1,\\
+0 & o_a = 0,
+\end{cases}
+\qquad \gamma = 0.4,\ \varepsilon = 0.05 .
+\label{eq:coupling}
+\end{equation}
+The floor at $\varepsilon$ keeps the coupling a discount on pressure magnitude rather than an erasure of
+presence, since a physically occupied approach must remain occupied for Equations~\eqref{eq:presence}
+and~\eqref{eq:wait}. Equation~\eqref{eq:coupling} is a one-sided approximation of the pressure difference
+used in max-pressure theory, where the difference is taken over turning movements with movement
+proportions; we use the aggregate downstream queue because it is the only downstream quantity one camera
+per junction can supply.
+
+The worst-case delay from the first emergency detection to green on the emergency approach is bounded
+by the case in which the announcement arrives immediately after the controller has committed to a
+transition away from the very phase that serves the emergency. The committed transition completes, the
+newly served phase must be given its minimum green, and only then can the preemption take effect
+through a second clearance interval:
+\begin{equation}
+L_{\max} = y + \rho + g_{\min} + y + \rho .
+\label{eq:bound}
+\end{equation}
+With the single-junction parameters of Table~\ref{tab:params}, $L_{\max} = 14.0$~s.
+
+The system also ships an executable self-check asserting twelve properties across four groups: clearance,
+green allocation (no green to an empty approach while another has demand, a full window for a lone
+motorcycle, and the $g_{\min}$ and $g_{\max}$ bounds), fairness (the $R$ and $V$ bounds and the walk hold),
+and emergency handling (prompt service, survival of a dropped detection frame mid-preemption, sequencing
+of emergencies on conflicting phases, and the $\Theta$ bound), plus input validation. All twelve pass on
+the version evaluated here and the captured output accompanies the experiment artefacts. These are
+executable assertions about behaviour under specified stimuli, not proofs, and they say nothing about the
+correctness of the perception input.
+
+\section{Experimental setup}
+\label{sec:setup}
+
+\subsection{Traffic model and baselines}
+
+Control results are obtained in a point-queue microsimulation, a standard abstraction in which delay
+accumulates at a single point rather than along a link \citep{daganzo1997fundamentals}. While an approach
+displays green it discharges at $s = 0.55$~veh/s, a saturation headway of about 1.8~s, within the range
+capacity guidance gives for a through lane \citep{trb2022hcm}, accumulated as a fractional carry so a green
+shorter than one headway releases no vehicle, and with no banking of unused capacity while the queue is
+empty. Arrivals are Poisson per approach. We did not use an established microsimulator such as SUMO
+\citep{lopez2018microscopic} because the controller under test is the system's own code and the purpose is
+to drive that code on identical arrival streams; the cost is traffic-model fidelity, which we state as a
+limitation rather than defend.
+
+The arrival process and the discharge model are the code shipped with the system under test, imported
+unchanged; the experiment scripts add warm-up handling, additional metrics and the baselines. Arrivals
+are drawn once per time step from a single seeded generator and pushed into every policy's queue system,
+so the comparison is paired at the level of individual vehicles. Runs are 1800~s with the first 300~s
+discarded, because all queues start empty, and vehicles still queued at the end are counted with the
+wait accumulated so far, since discarding them would flatter whichever policy left the longer queue.
+
+Two fixed-time baselines are used. The \emph{equal-split} plan is a round-robin giving each phase 13.0~s
+of green, which with 3.0~s yellow and 1.5~s all-red produces a 35~s cycle; this is the baseline shipped
+with the system and represents the demand-blind plans the work aims to replace. The \emph{Webster} plan
+takes cycle length and splits from Webster's formulae \citep{Webster1958TrafficSignalSettings} computed
+from the \emph{true} mean demand of the run: with lost time $L = |P|(y + \rho)$ and critical flow ratios
+$y_i = \max_{a \in p_i} \lambda_a / s$ summing to $Y$, the cycle is $C = (1.5L + 5)/(1 - Y)$ clamped to
+$[30, 120]$~s and the effective green of phase $i$ is $(C - L) y_i / Y$ floored at $g_{\min}$; when
+$Y \geq 0.95$ no finite Webster cycle exists and the cycle is set to the upper clamp with splits
+proportional to $y_i$. This baseline is deliberately generous to fixed-time control, being granted
+perfect knowledge of the average demand and re-derived for every demand cell, and it is included
+because the equal-split baseline alone makes an adaptive controller look better than it is.
+
+\subsection{Experiments}
+
+\textbf{Experiment 1: single junction.} A four-arm junction with two phases, NS and EW, under three
+demand profiles. \emph{Asymmetric} sets per-approach rates of $(0.150, 0.130, 0.040, 0.035)$~veh/s for
+N, S, E and W, the shape the shipped benchmark samples at random, fixed here so a demand level is a
+stated number; \emph{balanced} sets all four approaches to 0.089~veh/s; \emph{single} loads one approach
+at 0.250~veh/s with 0.035~veh/s on the others. Each profile is scaled by multipliers
+$m \in \{0.6, 0.8, 1.0, 1.2, 1.4\}$, giving total demands of roughly 770 to 1790~veh/h, and each cell is
+run with 30 seeds. We report mean, median, 95th-percentile and maximum wait per vehicle, mean and
+maximum queue length and throughput; per-seed reductions are compared with a paired $t$-test and a
+Wilcoxon signed-rank test. A companion diagnostic (Experiment 1b) measures, over 10 seeds per cell, the
+phase change rate and the fraction of wall time during which some approach displays green; it explains
+Experiment 1 rather than adding a claim.
+
+\textbf{Experiment 2: three-junction corridor.} A straight arterial carrying a three-arm junction, a
+four-arm junction and a second three-arm junction at 90~m spacing, with the topology, phase sets, routes
+and timing constants of the system's network demonstration, and six routes: two arterial through
+movements and four entering from side arms. Link travel time is $90/12.5 = 7.2$~s at a free-flow speed of
+12.5~m/s, so free-flow traversal of the three links is 21.6~s. Four policies are compared: the controller
+with coupling (Equation~\eqref{eq:coupling}) active, the same controller with $\gamma = 0$, an independent
+Webster plan per junction, and a coordinated Webster plan using a common cycle equal to the longest
+Webster cycle on the corridor with an eastbound progression offset of one link travel time per junction.
+Runs are 2400~s with 400~s warm-up, 20 seeds, at three demand levels, and one emergency vehicle is
+released from the west at $t = 1200$~s in every run, with other traffic yielding to it so that its
+traversal time isolates the signal contribution. The traffic layer is a re-implementation, because the
+system's corridor demonstration is a browser application that cannot be driven headlessly; the control
+logic is the system's own code.
+
+\textbf{Experiment 3: preemption latency.} The junction is driven to a loaded state for a random
+interval between 40 and 160~s, after which an emergency vehicle is announced on a randomly chosen
+approach and re-announced every step thereafter. We record the delay until that approach displays green,
+with the stage and elapsed green at the instant of announcement, and replay the identical trial against
+the equal-split baseline, which has no preemption path. 300 trials are run at each of three demand
+levels.
+
+\textbf{Experiment 4: perception.} The shipped detector is evaluated on the system's held-out split of 97
+images containing 4990 labelled instances across five classes. The full perception stack is then run over
+60~s of two real fixed-camera junction clips at 960~px inference on an Apple M3 Pro using the Metal
+backend, recording per-frame latency and per-approach counts, with the controller running on those counts
+for the clip that shows two competing signalised streams so that the signal state in the exported figures
+is its real output. Finally, to test whether the counts have converged, the stack is run over frames
+sampled every 2~s from each clip at 640, 960, 1280 and 1600~px with temporal smoothing disabled.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Single junction}
+
+\begin{table}[t]
+\centering
+\caption{Experiment 1. Mean delay per vehicle in seconds (standard deviation across 30 seeds in
+parentheses) and the paired per-seed reduction achieved by \relay{} against each baseline. Positive
+reductions favour \relay. All differences are significant at $p < 0.05$ by the Wilcoxon signed-rank
+test on paired per-seed means.}
+\label{tab:exp1}
+\small
+\begin{tabular}{llccccc}
+\toprule
+& Demand & \multicolumn{3}{c}{Mean delay per vehicle (s)} & \multicolumn{2}{c}{Reduction (\%)} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-7}
+Profile & (veh/h) & Equal split & Webster & \relay{} & vs equal & vs Webster \\
+\midrule
+Asymmetric & 767  & 11.0 (0.6)  & 8.4 (0.6)  & 5.1 (0.3)  & $+53.6$ (4.0) & $+38.8$ (5.2) \\
+           & 1022 & 11.8 (0.7)  & 8.9 (0.6)  & 5.9 (0.4)  & $+50.3$ (4.9) & $+34.1$ (5.5) \\
+           & 1278 & 13.9 (0.8)  & 9.6 (0.4)  & 7.0 (0.4)  & $+49.7$ (4.9) & $+27.0$ (4.6) \\
+           & 1534 & 19.2 (3.1)  & 10.7 (0.8) & 8.3 (0.6)  & $+55.7$ (7.2) & $+22.0$ (5.5) \\
+           & 1789 & 45.1 (17.2) & 11.8 (1.0) & 10.1 (0.8) & $+74.7$ (8.4) & $+14.2$ (5.2) \\
+\midrule
+Balanced   & 769  & 10.5 (0.6)  & 9.9 (0.4)  & 6.5 (0.4)  & $+38.1$ (3.9) & $+34.4$ (3.5) \\
+           & 1025 & 10.9 (0.4)  & 10.5 (0.4) & 7.8 (0.5)  & $+28.7$ (5.5) & $+26.4$ (4.9) \\
+           & 1282 & 11.4 (0.3)  & 11.2 (0.4) & 9.6 (0.7)  & $+16.1$ (6.5) & $+14.3$ (5.9) \\
+           & 1538 & 12.1 (0.6)  & 11.9 (0.6) & 12.4 (1.3) & $-2.7$ (9.9)  & $-5.0$ (10.4) \\
+           & 1794 & 13.2 (0.6)  & 13.5 (0.6) & 17.6 (2.0) & $-33.0$ (13.7)& $-30.5$ (13.3) \\
+\midrule
+Single     & 767  & 14.4 (2.2)  & 8.8 (0.5)  & 5.5 (0.5)  & $+61.5$ (4.2) & $+37.6$ (5.5) \\
+           & 1022 & 38.3 (16.6) & 9.8 (0.5)  & 6.9 (0.6)  & $+78.5$ (8.8) & $+29.4$ (6.6) \\
+           & 1278 & 151.8 (30.9)& 11.8 (0.9) & 9.1 (0.9)  & $+93.8$ (1.1) & $+22.9$ (5.6) \\
+           & 1534 & 239.8 (28.3)& 17.1 (3.0) & 13.1 (2.2) & $+94.5$ (0.9) & $+22.1$ (11.5) \\
+           & 1789 & 307.2 (23.7)& 21.3 (4.1) & 28.3 (10.3)& $+90.8$ (2.9) & $-33.0$ (36.4) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:exp1} and Figure~\ref{fig:exp1} give the single-junction results, in which three patterns
+should be separated.
+
+Under asymmetric demand, the regime the system is designed for, \relay{} reduces mean delay by 49.7\%
+against the equal-split plan and by 27.0\% against the Webster plan at 1278~veh/h. The gain against the
+equal-split plan grows with demand, reaching 74.7\% at 1789~veh/h, but that growth is a capacity artefact
+rather than a control improvement: at that demand the equal-split plan is oversaturated on the major
+approaches and its mean delay diverges, whereas the Webster plan and \relay{} both remain stable at
+essentially the same throughput, 1804 and 1800~veh/h. The gain against the Webster plan moves the other
+way, falling monotonically from 38.8\% to 14.2\%, because a well-timed fixed plan converges toward the
+best achievable allocation as saturation approaches. We regard the Webster column as the honest headline.
+
+Under a single dominant approach the equal-split plan collapses: at 1278~veh/h its mean delay is
+151.8~s, its mean queue is 55.4 vehicles and its throughput falls to 1123~veh/h against a demand of
+1278~veh/h, so it is not serving the traffic offered. Against the Webster plan the gain is a much more
+modest 22.9\%, and at the highest demand the sign reverses to $-33.0\%$ with a standard deviation of
+36.4 percentage points. The mechanism is identifiable: the Webster plan for that cell allocates a
+51.2~s green to the loaded phase within a 67.4~s cycle, whereas $g_{\max} = 30$~s caps \relay's green,
+so the adaptive controller pays clearance more often on an approach whose demand is close to its
+capacity. That is a parameter choice showing through, not a property of the pressure rule, and it
+argues for making $g_{\max}$ demand-dependent.
+
+Under balanced demand the advantage decays and becomes a penalty: $+34.4\%$ at 769~veh/h, $+14.3\%$
+at 1282~veh/h and $-30.5\%$ at 1794~veh/h against the Webster plan. This is a real regression, whose
+cause Section~\ref{sec:discussion} identifies.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp1_delay.pdf}
+\caption{Experiment 1. Top row: mean delay per vehicle against total demand for the three demand
+profiles, on a logarithmic axis. Bottom row: paired per-seed delay reduction achieved by \relay{}
+against each fixed-time baseline. Error bars are one standard deviation across 30 seeds. The
+balanced profile crosses zero near 1500~veh/h.}
+\label{fig:exp1}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp1_tail.pdf}
+\caption{Experiment 1. Median, 95th-percentile and worst observed wait per vehicle at demand
+multiplier 1.0, on a logarithmic axis. The tail, not the mean, is where the anti-starvation bound
+shows: under a single dominant approach the equal-split plan's worst wait averages 361.5~s against
+40.5~s for \relay.}
+\label{fig:exp1tail}
+\end{figure}
+
+Figure~\ref{fig:exp1tail} shows the wait distribution rather than the mean, which is where the fairness
+bound becomes visible. At 1278~veh/h under asymmetric demand the 95th-percentile wait is 29.9~s under
+the equal-split plan, 25.8~s under the Webster plan and 15.8~s under \relay, with worst observed waits
+averaging 50.0~s, 50.1~s and 29.6~s. Under a single dominant approach the contrast is larger: 361.5~s
+and 72.9~s against 40.5~s under \relay, consistent with the forced-service rule at $R = 60$~s.
+Figure~\ref{fig:exp1paired} shows the same comparison unaggregated, one point per seed, which makes both
+the consistency of the gain and the crossover in the balanced profile directly visible.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp1_paired.pdf}
+\caption{Experiment 1, unaggregated. Each point is one seed at one demand level, plotting \relay's
+mean delay against the Webster plan's mean delay on the identical arrival stream. Points below the
+diagonal favour \relay. Colour encodes the demand multiplier from 0.6 (dark) to 1.4 (light).}
+\label{fig:exp1paired}
+\end{figure}
+
+\subsection{Why the balanced case regresses}
+\label{sec:discussion}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp1b_switching.pdf}
+\caption{Experiment 1b. Left: phase changes per hour. Right: the fraction of wall time during which
+a green is displayed, the complement of which is time spent in yellow and all-red clearance. The
+dashed line is the equal-split fixed plan, whose behaviour is independent of demand by construction.}
+\label{fig:exp1b}
+\end{figure}
+
+Figure~\ref{fig:exp1b} explains the regression, and the explanation is a measurement rather than an
+argument. Under balanced demand the controller has no basis for preferring one phase over the other,
+so successive scores are close, the hysteresis margin of 1.0~\pcu{} is crossed frequently, and green
+terminates near the minimum. Mean green duration under balanced demand is only 7.3~s at the lowest level
+and falls to 5.3~s at $m = 1.2$, barely above $g_{\min} = 5$~s, against 12.0~s under asymmetric demand at
+the same lowest level, and the phase change rate rises from 306 to 364 per hour against 204 per hour for
+the equal-split plan. Because every change costs $y + \rho = 4.5$~s of
+clearance, the fraction of time during which some approach displays green falls from 0.743 under the
+fixed plan to 0.543 under \relay, a loss of 20 percentage points of usable capacity. At low demand
+that loss is affordable because there is spare capacity; at high balanced demand it is not, and it
+exceeds the benefit of reallocating green.
+
+The asymmetric and single profiles do not show this to the same degree, because there the score gap
+between phases is large and stable, so the incumbent keeps winning and greens stay long: mean green
+under the single-approach profile at $m = 1.4$ is 14.0~s, longer than the fixed plan's 13.0~s, and the
+switch rate of 193 per hour is below the fixed plan's 204.
+
+This is the practical form of a known theoretical issue. Max-pressure control as formulated in the
+literature evaluates its argmax freely and imposes no cycle structure, and Levin et al.
+\citep{Levin2020CyclicalMaxPressure} propose a cyclical phase structure precisely to recover the lost
+capacity. Our data quantify what the unconstrained version costs in an easily reached regime, and
+indicate that any deployment should include a saturation-aware guard that lengthens minimum green or
+falls back to a cyclical structure when the measured degree of saturation is high and phase scores are
+close. That guard is not implemented in the version evaluated here, and implementing and evaluating it
+is the most valuable single piece of future work these data indicate.
+
+\subsection{Corridor}
+
+\begin{table}[t]
+\centering
+\caption{Experiment 2. Three-junction corridor, mean over 20 seeds with standard deviation in
+parentheses. Delay is total queueing delay per vehicle across all junctions traversed. Through travel
+time is measured for the two arterial through routes only; free-flow traversal of the three links is
+21.6~s. Emergency traversal is the single emergency vehicle released in each run, whose standard
+deviation is zero for the fixed plans because those plans are deterministic.}
+\label{tab:exp2}
+\small
+\begin{tabular}{llcccc}
+\toprule
+Demand & & Mean delay & Through travel & Stops per & Emergency \\
+(veh/h) & Policy & per vehicle (s) & time (s) & vehicle & traversal (s) \\
+\midrule
+769 & Webster, independent   & 26.7 (0.9) & 39.7 (0.7) & 1.95 & 36.0 (0.0) \\
+    & Webster, coordinated   & 25.7 (0.7) & 37.0 (0.6) & 1.78 & 24.5 (0.0) \\
+    & \relay, no coupling    & 11.4 (0.5) & 25.0 (0.5) & 1.10 & 22.2 (3.4) \\
+    & \relay, coupled        & 11.4 (0.5) & 25.1 (0.5) & 1.10 & 22.2 (3.4) \\
+\midrule
+1282& Webster, independent   & 30.1 (0.8) & 41.5 (0.6) & 2.09 & 53.6 (7.5) \\
+    & Webster, coordinated   & 29.2 (1.1) & 38.0 (0.7) & 1.80 & 31.5 (0.0) \\
+    & \relay, no coupling    & 16.5 (0.9) & 29.8 (0.9) & 1.58 & 23.4 (4.6) \\
+    & \relay, coupled        & 16.6 (0.8) & 30.1 (0.8) & 1.59 & 23.8 (4.4) \\
+\midrule
+1794& Webster, independent   & 36.7 (3.3) & 43.1 (1.0) & 2.10 & 30.1 (6.5) \\
+    & Webster, coordinated   & 35.3 (3.6) & 39.3 (1.1) & 2.03 & 24.0 (0.0) \\
+    & \relay, no coupling    & 31.9 (4.2) & 45.4 (4.4) & 2.08 & 26.2 (8.3) \\
+    & \relay, coupled        & 32.6 (4.0) & 46.9 (4.4) & 2.10 & 26.1 (7.9) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp2_corridor.pdf}
+\caption{Experiment 2. Left: mean queueing delay per vehicle across the corridor. Centre: travel
+time for the two arterial through routes; at the highest demand the coordinated fixed plan gives
+through traffic a better ride than either adaptive variant. Right: traversal time of the single
+emergency vehicle released in each run, against the 21.6~s free-flow reference.}
+\label{fig:exp2}
+\end{figure}
+
+Table~\ref{tab:exp2} and Figure~\ref{fig:exp2} contain three findings, one of them negative.
+
+First, the delay reduction is large at low and moderate demand and small at high demand: 57.3\% and
+44.9\% against the independent Webster plans at 769 and 1282~veh/h, falling to 11.2\% at 1794~veh/h, with
+55.6\%, 43.1\% and 7.3\% against the coordinated plan. The coordinated plan is only 2 to 4\% better than
+the independent plans on mean delay, as expected, since progression offsets improve the through movement
+and not the average over all movements.
+
+Second, the coupling term does essentially nothing. Disabling it, which turns the corridor into three
+independently adaptive junctions, changes mean delay by $-0.2\%$, $-0.4\%$ and $-2.5\%$ at the three
+demand levels, and at the highest demand the uncoupled variant is marginally better. The corridor
+benefit is therefore attributable to local adaptivity, not to coordination. We report this plainly
+because the coupling term is part of the system's design rationale and the data do not support it.
+Two explanations are consistent with our setup and we cannot separate them here: the point-queue
+model has no spatial extent, so a downstream queue never physically blocks an upstream discharge,
+which removes the main mechanism the coupling addresses; and a single aggregate downstream queue is a
+weak proxy for the movement-specific pressure difference max-pressure theory uses.
+
+Third, and less favourably, at the highest demand \relay{} attains lower mean delay than either fixed plan,
+32.6~s against 36.7~s and 35.3~s, but \emph{worse} arterial through travel time, 46.9~s against 43.1~s and
+39.3~s. The controller minimises total delay across all movements and at saturation does so partly by
+serving side arms a coordinated plan would make wait, so a city whose objective is arterial progression
+rather than total delay would prefer the coordinated fixed plan in that regime. This is a genuine
+objective mismatch, not a bug, and it should be stated when such a system is proposed to an operator.
+
+The emergency result is unambiguous. The emergency vehicle traverses the corridor in 22.2 to 26.1~s under
+\relay{} against a free-flow reference of 21.6~s, so it is delayed by roughly 1 to 5~s across three
+signalised junctions, against 30.1 to 53.6~s under the independent Webster plans. The coordinated plan
+does well here, 24.0 to 31.5~s, because the emergency vehicle travels in the progression direction; a
+westbound emergency would not benefit.
+
+\subsection{Emergency preemption latency}
+
+\begin{table}[t]
+\centering
+\caption{Experiment 3. Delay from the first emergency detection to green on the emergency approach,
+over 900 trials. The equal-split baseline has no preemption path, so its latency is determined by
+cycle position and is independent of demand, which is why its statistics are pooled.}
+\label{tab:exp3}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+Demand & Policy & Mean (s) & SD (s) & Median (s) & 95th pct (s) & Worst (s) \\
+\midrule
+Light ($m{=}0.6$)  & \relay{} & 3.99 & 3.55 & 4.58 & 10.77 & 13.61 \\
+Medium ($m{=}1.0$) & \relay{} & 4.11 & 3.78 & 4.51 & 11.26 & 13.80 \\
+Heavy ($m{=}1.4$)  & \relay{} & 4.47 & 3.94 & 4.61 & 12.10 & 13.85 \\
+All                & \relay{} & 4.19 & 3.76 & 4.56 & 11.28 & 13.85 \\
+All                & Equal split & 7.00 & 7.04 & 5.02 & 20.59 & 22.29 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{exp3_preemption.pdf}
+\caption{Experiment 3. Left: histogram of the time from the first emergency detection to green on the
+emergency approach, over 900 trials. Right: the same data as empirical cumulative distributions
+against the analytical bound of Equation~\eqref{eq:bound}.}
+\label{fig:exp3}
+\end{figure}
+
+Mean latency is 4.19~s against 7.00~s for the fixed cycle, and is almost insensitive to demand, rising
+only from 3.99~s to 4.47~s between the lightest and heaviest loads (Table~\ref{tab:exp3}). The important
+quantity is the tail: the 95th percentile is 11.28~s against 20.59~s and the worst case over 900 trials
+is 13.85~s against 22.29~s. The measured worst case sits 0.15~s below the analytical bound of 14.0~s
+from Equation~\eqref{eq:bound}, and inspecting the worst trials confirms the predicted mechanism, since
+every trial above 13.4~s is one in which the announcement arrived within the first second of a yellow
+already transitioning away from the emergency's own phase. Because the bound is composed only of
+clearance and minimum-green settings, it can be tightened by configuration and stated in advance to an
+emergency service, which a demand-blind fixed plan cannot do.
+
+Two qualifications belong with this result. In 294 of 900 trials, or 32.7\%, the emergency approach
+already had green when the vehicle was detected, so latency was effectively zero and the mean is pulled
+down accordingly; and in 309 trials, or 34.3\%, the fixed cycle happened to reach that approach sooner
+than the preemption did, which is why the distributions overlap substantially in
+Figure~\ref{fig:exp3} even though tail behaviour differs sharply. The claim these data support is a
+bounded worst case, not a uniformly faster response.
+
+\subsection{Perception}
+
+\begin{table}[t]
+\centering
+\caption{Experiment 4. Detector performance on the system's held-out split: 97 images, 4990 labelled
+instances. The checkpoint evaluated is the one shipped with the system, a 2.59-million parameter
+model. P and R are precision and recall at the operating point the validator reports.}
+\label{tab:detector}
+\footnotesize
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{lccccccccc}
+\toprule
+& \multicolumn{4}{c}{Overall} & \multicolumn{5}{c}{AP@50 by class} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-10}
+Model & mAP@50 & mAP@50-95 & P & R & car & motorcycle & bus & truck & ambulance \\
+\midrule
+Shipped fine-tune & 0.954 & 0.809 & 0.950 & 0.886 & 0.985 & 0.851 & 0.981 & 0.964 & 0.987 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{detector.pdf}
+\caption{Experiment 4. Left: per-class average precision at IoU 0.5 on the held-out split, with the
+overall mean average precision marked. Right: sampled vehicle count as a function of inference
+resolution, normalised to the count at 640~px. Neither curve has flattened by 1600~px, which is
+direct evidence that vehicles are still being missed.}
+\label{fig:detector}
+\end{figure}
+
+Table~\ref{tab:detector} reports mean average precision of 0.954 at IoU 0.5 and 0.809 averaged over
+IoU 0.5 to 0.95, with precision 0.950 and recall 0.886. Per-class average precision exceeds 0.96 for
+cars, buses, trucks and ambulances and is lowest for motorcycles at 0.851, the expected ordering given
+that two-wheelers are the smallest and most frequently occluded class. An important caveat concerns what
+the split is: it mixes automatically labelled frames from a synthetic feed with frames from real footage
+pseudo-labelled by a general detector rather than by human annotation, so a high score establishes that
+the fine-tuned model reproduces the labelling function it was trained against, not accuracy against human
+ground truth, and the ambulance figure of 0.987 reflects a class that is easy to separate in the synthetic
+domain. We deliberately omit a comparison against general COCO-trained checkpoints on this split, because
+their class indices do not correspond to this label space and any such comparison would be an artefact of
+index mismatch.
+
+Running the full perception stack on real footage at 960~px inference on an Apple M3 Pro, median
+per-frame latency is 38.3~ms on the boulevard clip (26.1 frames per second, 95th percentile 85.7~ms) and
+85.8~ms on the dense mixed-traffic clip (11.7 frames per second, 95th percentile 130.7~ms); the first
+frame of a run costs 1735~ms because of one-off backend initialisation and is excluded. Both rates exceed
+what the control loop needs, since decision epochs are governed by the 5~s minimum green rather than by
+the frame rate, and perception is decoupled from control so a latency spike delays a count update rather
+than blocking a decision.
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{\textwidth}
+\includegraphics[width=\textwidth]{frame_levanhien_22s.png}
+\caption{Signalised boulevard. The controller is running on these counts: the near boulevard approach
+holds 8 vehicles and 6.7~\pcu{} and has green, the crossing street holds 3 vehicles and 1.6~\pcu{}
+and is red, and the header reports the real inference latency for the frame.}
+\end{subfigure}
+\vspace{0.5em}
+\begin{subfigure}{\textwidth}
+\includegraphics[width=\textwidth]{frame_hcmc_18s.png}
+\caption{Dense motorcycle-dominated traffic. The failure mode is visible: 26 vehicles are detected in
+a scene containing several hundred, so the reported \pcu{} demand of 7.7 and 9.6 for the two halves
+is a severe underestimate. No controller decision is shown, because the junction depicted is not
+signal-controlled in the way the two zones imply.}
+\end{subfigure}
+\caption{Experiment 4. The perception stack on real fixed-camera footage. Both frames are direct
+output of the system, with detections, approach polygons and per-approach \pcu{} demand as computed
+at run time.}
+\label{fig:frames}
+\end{figure}
+
+Figure~\ref{fig:frames} shows annotated frames from both clips, and the second shows the main
+perception weakness plainly. To quantify rather than assert it, we measured how the count changes with
+inference resolution (Figure~\ref{fig:detector}, right). On the dense clip the mean sampled vehicle
+count rises from 21.4 at 640~px to 26.5 at 960~px, 33.2 at 1280~px and 39.1 at 1600~px, an increase of
+83\% with no sign of convergence, and motorcycles alone rise by 120\%; on the sparser boulevard clip
+the count rises from 4.85 to 10.0. A count that keeps growing with resolution has not converged, so the
+absolute demand values the controller receives on dense two-wheeler scenes are underestimates of
+unknown magnitude. Median inference cost over the same range rises from 47.2~ms to 108.0~ms, so raising
+resolution is not free.
+
+This weakness does not immediately invalidate the control results, because the controller compares
+approaches rather than reading absolute volumes, so a systematic undercount affecting both approaches
+similarly leaves the ordering of phase scores intact. What it does affect is any rule keyed to an
+absolute quantity, in particular the occupancy indicator $o_a$ near an empty approach and the gap-out
+timer. A regionally fine-tuned detector on human-annotated South Asian footage is the direct remedy and
+is not attempted here.
+
+Taken together, these results support a narrower claim than the one usually made for camera-based adaptive
+control. The controller helps most where demand is imbalanced and the junction is not saturated, and its
+operational value is clearest in the bounds rather than the means: the worst observed wait tracks the
+configured $R$ across every profile and the preemption worst case is bounded in closed form, so an
+authority can be told in advance what the guarantees are. The coordination term is not supported by our
+data, and the pedestrian logic, though verified by executable invariants, was never benchmarked against a
+pedestrian-aware baseline, so we claim no pedestrian delay benefit.
+
+\section{Limitations}
+\label{sec:limitations}
+
+We list the limitations we believe would most affect a reader's assessment, in descending order of
+importance.
+
+\textbf{This is not a field study.} No signal was controlled. There is no controller cabinet in the loop,
+no communication with a real signal and no before-and-after measurement, so we have no evidence about the
+failure modes that appear only in the field: power interruption, lens contamination, camera
+repositioning, seasonal light changes, or the behaviour of drivers who learn that the signal responds to
+them. Every quantitative claim should be read with that scope.
+
+\textbf{The traffic model is a point queue.} Queues have no spatial extent, so there is no spillback, no
+blocking of an upstream junction by a downstream queue, no lane changing and no capacity loss from
+vehicles obstructing the junction box. The abstraction is favourable to any adaptive policy, whose
+mistakes are cheaper when queues cannot physically block anything, and specifically unfavourable to our
+coordination term, whose purpose is to prevent a jam being fed, so the corridor coupling result should be
+read as inconclusive rather than negative and a spatially explicit model in SUMO
+\citep{lopez2018microscopic} would settle it.
+
+\textbf{Perception was neither validated against human ground truth nor propagated into the control
+experiments.} The held-out split mixes synthetic frames with pseudo-labelled real frames, so the
+reported mean average precision of 0.954 measures agreement with the labelling process rather than
+accuracy against human annotation; we can state that counts on dense footage are underestimates that have
+not converged by 1600~px inference, but not the error magnitude, and a human-annotated evaluation set from
+the target city is required before any absolute demand claim. Separately, the control experiments feed the
+controller exact queue counts from the simulation, whereas the real system feeds it smoothed detector
+counts with those biases, so we have not measured how much of the delay reduction survives realistic count
+error. This is arguably the most important open question for the design. The controller contains
+mitigations (temporal smoothing, presence separated from demand, and a staleness fallback that cycles the
+phases when perception stops producing counts), but mitigations in the code are not measured robustness,
+and a sensitivity study injecting calibrated count noise and dropout into Experiment 1 should be done.
+
+\textbf{The \pcu{} weights are configuration, not calibration.} The values in Table~\ref{tab:pcu} were
+chosen to reflect a motorcycle-dominated mix rather than estimated from local field measurements.
+Because they directly scale the pressure in Equation~\eqref{eq:vehpressure}, a mis-specified motorcycle
+weight biases every phase comparison at a junction whose approaches differ in class mixture, and we ran
+no sensitivity analysis over them.
+
+\textbf{Four narrower gaps.} The single-junction experiments use a two-phase junction, so although the
+controller supports movement-level phasing and generates protected-left phases, the results do not
+exercise it; a junction with five or six phases has proportionally more lost time per cycle, which the
+balanced-demand result suggests would amplify rather than reduce the switching-cost problem. We compare
+only against fixed-time plans, whereas the natural research baseline for a pressure-based controller is a
+learned policy, PressLight \citep{wei2019presslight} in particular since its reward derives from
+max-pressure; our reasons for not deploying one are practical and stated in Section~2, but they do not
+excuse the absence of a comparison that would locate this controller between fixed-time and learned
+control. The pedestrian logic is asserted by executable invariants but never compared against an
+alternative treatment such as a conventional fixed pedestrian stage, so we report its behaviour and not
+its benefit. Finally, the values in Table~\ref{tab:params} came from iterative development against the
+system's own demonstrations rather than from optimisation over the evaluation scenarios, which cuts both
+ways: the results are not the product of tuning on the test scenarios, and the controller is probably not
+at its best, as the interaction between $g_{\max}$ and the single-approach result at high demand shows.
+
+\section{Conclusion}
+
+We have described a single-camera adaptive signal controller for heterogeneous urban traffic and
+evaluated it in a seeded microsimulation and on real fixed-camera footage. The controller converts
+per-approach, per-class detections into \pcu-weighted demand and selects phases by a queue-weighted
+pressure score in the max-pressure family, with the operational rules a deployable signal requires:
+clearance intervals, minimum and maximum green, empty-phase skipping, gap-out, a hard maximum-wait bound
+for vehicles and a separate one for pedestrians, and emergency preemption with a bounded hold.
+
+Measured against a fixed-time plan given the true mean demand, the controller reduces mean delay by 14 to
+39\% wherever demand is imbalanced, cuts the 95th-percentile and worst-case waits substantially further
+than it cuts the mean, and brings an emergency vehicle to green within a worst case of 13.85~s against an
+analytical bound of 14.0~s.
+
+Three results qualify those figures and are reported rather than suppressed. Under balanced saturated
+demand the controller is 30.5\% worse than the Webster plan, because unconstrained switching raises the
+phase change rate by 76\% and reduces displayed green time by 20 percentage points, so a cyclical phase
+structure or a saturation-aware guard is required before deployment. The corridor coordination term
+produces no measurable benefit in our model. And at high corridor demand the controller achieves lower
+total delay but worse arterial through travel time than a coordinated fixed plan, an objective mismatch an
+operator should be told about. The next steps follow from the limitations: a spatially explicit corridor
+model to settle whether the coordination term is useful, a count-noise sensitivity study, a
+human-annotated evaluation set from the target city, and a saturation-aware switching guard evaluated in
+the balanced regime.
+
+\section*{Data and code availability}
+
+The controller, perception stack and simulation harness are available at
+\url{https://github.com/kafle1/relay} under the AGPL-3.0 licence. The experiment scripts that
+produced every table and figure, the raw per-run result files, the captured invariant-check output
+and the figure generation script are distributed with this manuscript in the \texttt{experiments/}
+directory. Re-running the experiment scripts and then the figure script reproduces every number and
+every panel reported here.
+
+\section*{Declarations}
+
+The author declares no competing interests and received no funding for this work. No human subjects
+or personal data were involved: the footage used is publicly available recorded video of public
+roads, used only for aggregate vehicle counting, and no identification of individuals or vehicles was
+performed or attempted.
+
+\bibliographystyle{unsrtnat}
+\bibliography{refs}
+
+\end{document}

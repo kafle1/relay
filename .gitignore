@@ -20,3 +20,10 @@ sim/frames/
 .DS_Store
 .agent-browser/
 
+
+# latex build artefacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.blg
+paper/*.synctex.gz

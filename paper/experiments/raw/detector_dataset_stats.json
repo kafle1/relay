@@ -1,0 +1,22 @@
+{
+  "train": {
+    "images": 555,
+    "instances": {
+      "car": 10160,
+      "motorcycle": 9157,
+      "bus": 1344,
+      "truck": 3077,
+      "ambulance": 3607
+    }
+  },
+  "val": {
+    "images": 97,
+    "instances": {
+      "car": 1811,
+      "motorcycle": 1697,
+      "bus": 242,
+      "truck": 535,
+      "ambulance": 705
+    }
+  }
+}

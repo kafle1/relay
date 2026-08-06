@@ -1,0 +1,14 @@
+  ✓ crossing sirens sequenced, not raced (3 rotations in 180s, both corridors served)
+controller self-check PASSED:
+  ✓ no green->green without yellow+all-red clearance
+  ✓ empty-phase skip (no green wasted on an empty lane while another waits)
+  ✓ no starvation (max N wait 39.0s <= 60s + slack)
+  ✓ min-green honored (all green runs >= 5s: [6.0, 5.0, 5.0, 5.0, 5.0, 5.0]...)
+  ✓ emergency preemption serves the ambulance
+  ✓ emergency debounce survives a single dropped detection frame (flickering ambulance)
+  ✓ lone motorcycle gets a full green window (presence, not PCU, decides 'empty')
+  ✓ max_preempt bounds a continuous emergency hold
+  ✓ max_green caps a phase even while it is still the busiest
+  ✓ pedestrian wait bounded (walk window at 34.5s <= 60.0s + slack)
+  ✓ walk window held while someone is on the zebra
+  ✓ garbage pedestrian input ignored (junk shapes, NaN, negatives, out-of-range)

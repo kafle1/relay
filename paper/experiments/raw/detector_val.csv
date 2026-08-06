@@ -1,0 +1,4 @@
+model,params_M,mAP50,mAP50_95,precision,recall,mAP50_car,mAP50_motorcycle,mAP50_bus,mAP50_truck,mAP50_ambulance
+relay_ft_mixed,2.59,0.9536,0.8093,0.9499,0.8861,0.985,0.8509,0.981,0.9642,0.9871
+yolo11n_coco,2.62,0.0013,0.0005,0.015,0.0366,0.0008,0.005,0.0004,0.0,0.0001
+yolo11s_coco,9.46,0.0013,0.001,0.0141,0.0312,0.0002,0.005,0.0009,0.0,0.0002

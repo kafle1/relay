@@ -1,0 +1,592 @@
+% =====================================================================
+% refs.bib for "A Low-Cost Single-Camera Adaptive Signal Controller for
+% Heterogeneous Urban Traffic".
+%
+% Every entry was verified against a primary bibliographic source
+% (Crossref DOI registry, DBLP, TRID, arXiv API, or the publisher's own
+% page) on 2026-07-30. DOIs are present wherever one exists; the entries
+% without a DOI are pre-DOI-era technical reports and print monographs,
+% and each carries a comment saying so.
+%
+% Two claims that appeared in the project's own informal documentation
+% were checked and are deliberately NOT cited here:
+%   * "Neupane & Jha, Traffic flow optimization at urban intersections of
+%     Kathmandu (2023)" could not be found in any index, archive or
+%     repository and is treated as unverifiable. Kathmandu context is
+%     instead cited from shrestha2014development and nepali2024assessment.
+%   * There is no peer-reviewed publication for YOLO11. It is cited as
+%     software (jocher2023yolov8) plus the preprint (khanam2024yolov11),
+%     which is labelled as a preprint in the text.
+% =====================================================================
+
+
+% ---------------------------------------------------------------------
+% Fixed-time and demand-responsive signal control
+% ---------------------------------------------------------------------
+
+% No DOI: 1958 HMSO technical report, predates the DOI system.
+@techreport{Webster1958TrafficSignalSettings,
+  author      = {Webster, F. V.},
+  title       = {Traffic Signal Settings},
+  institution = {Road Research Laboratory, Department of Scientific and Industrial Research},
+  address     = {London, UK},
+  number      = {39},
+  type        = {Road Research Technical Paper},
+  year        = {1958}
+}
+
+% No DOI: pre-DOI-era grey-literature technical report (TRID view 179439).
+@techreport{Hunt1981SCOOT,
+  author      = {Hunt, P. B. and Robertson, D. I. and Bretherton, R. D. and Winton, R. I.},
+  title       = {{SCOOT}: A Traffic Responsive Method of Coordinating Signals},
+  institution = {Transport and Road Research Laboratory},
+  address     = {Crowthorne, Berkshire, UK},
+  number      = {LR 1014},
+  type        = {TRRL Laboratory Report},
+  year        = {1981}
+}
+
+@article{Robertson1991SCOOTMethod,
+  author  = {Robertson, D. I. and Bretherton, R. D.},
+  title   = {Optimizing networks of traffic signals in real time: the {SCOOT} method},
+  journal = {IEEE Transactions on Vehicular Technology},
+  volume  = {40},
+  number  = {1},
+  pages   = {11--15},
+  year    = {1991},
+  doi     = {10.1109/25.69966}
+}
+
+@article{Sims1980SCATS,
+  author  = {Sims, A. G. and Dobinson, K. W.},
+  title   = {The {S}ydney coordinated adaptive traffic ({SCAT}) system philosophy and benefits},
+  journal = {IEEE Transactions on Vehicular Technology},
+  volume  = {29},
+  number  = {2},
+  pages   = {130--137},
+  year    = {1980},
+  doi     = {10.1109/T-VT.1980.23833}
+}
+
+% No DOI: TRB began assigning DOIs to Transportation Research Record
+% articles only for later digitised volumes; issue 906 (1983) predates
+% that coverage (TRID view 196609 lists "DOI: Not listed").
+@article{Gartner1983OPAC,
+  author  = {Gartner, Nathan H.},
+  title   = {{OPAC}: A demand-responsive strategy for traffic signal control},
+  journal = {Transportation Research Record},
+  volume  = {906},
+  pages   = {75--81},
+  year    = {1983}
+}
+
+@article{Mirchandani2001RHODES,
+  author  = {Mirchandani, Pitu and Head, Larry},
+  title   = {A real-time traffic signal control system: architecture, algorithms, and analysis},
+  journal = {Transportation Research Part C: Emerging Technologies},
+  volume  = {9},
+  number  = {6},
+  pages   = {415--432},
+  year    = {2001},
+  doi     = {10.1016/S0968-090X(00)00047-4}
+}
+
+
+% ---------------------------------------------------------------------
+% Max-pressure and backpressure control
+% ---------------------------------------------------------------------
+
+@article{Tassiulas1992Stability,
+  author  = {Tassiulas, Leandros and Ephremides, Anthony},
+  title   = {Stability properties of constrained queueing systems and scheduling policies for
+             maximum throughput in multihop radio networks},
+  journal = {IEEE Transactions on Automatic Control},
+  volume  = {37},
+  number  = {12},
+  pages   = {1936--1948},
+  year    = {1992},
+  doi     = {10.1109/9.182479}
+}
+
+@article{Varaiya2013MaxPressure,
+  author  = {Varaiya, Pravin},
+  title   = {Max pressure control of a network of signalized intersections},
+  journal = {Transportation Research Part C: Emerging Technologies},
+  volume  = {36},
+  pages   = {177--195},
+  year    = {2013},
+  doi     = {10.1016/j.trc.2013.08.014}
+}
+
+@incollection{Varaiya2013MaxPressureChapter,
+  author    = {Varaiya, Pravin},
+  title     = {The Max-Pressure Controller for Arbitrary Networks of Signalized Intersections},
+  booktitle = {Advances in Dynamic Network Modeling in Complex Transportation Systems},
+  editor    = {Ukkusuri, Satish V. and Ozbay, Kaan},
+  series    = {Complex Networks and Dynamic Systems},
+  volume    = {2},
+  publisher = {Springer},
+  address   = {New York, NY, USA},
+  pages     = {27--66},
+  year      = {2013},
+  doi       = {10.1007/978-1-4614-6243-9_2}
+}
+
+@inproceedings{Wongpiromsarn2012Distributed,
+  author    = {Wongpiromsarn, Tichakorn and Uthaicharoenpong, Tawit and Wang, Yu and
+               Frazzoli, Emilio and Wang, Danwei},
+  title     = {Distributed traffic signal control for maximum network throughput},
+  booktitle = {2012 15th International IEEE Conference on Intelligent Transportation Systems (ITSC)},
+  pages     = {588--595},
+  year      = {2012},
+  doi       = {10.1109/ITSC.2012.6338817}
+}
+
+@article{Le2015Decentralized,
+  author  = {Le, Tung and Kov{\'a}cs, P{\'e}ter and Walton, Neil and Vu, Hai L. and
+             Andrew, Lachlan L. H. and Hoogendoorn, Serge S. P.},
+  title   = {Decentralized signal control for urban road networks},
+  journal = {Transportation Research Part C: Emerging Technologies},
+  volume  = {58},
+  pages   = {431--450},
+  year    = {2015},
+  doi     = {10.1016/j.trc.2014.11.009}
+}
+
+@article{Levin2020CyclicalMaxPressure,
+  author  = {Levin, Michael W. and Hu, Jeffrey and Odell, Michael},
+  title   = {Max-pressure signal control with cyclical phase structure},
+  journal = {Transportation Research Part C: Emerging Technologies},
+  volume  = {120},
+  pages   = {102828},
+  year    = {2020},
+  doi     = {10.1016/j.trc.2020.102828}
+}
+
+
+% ---------------------------------------------------------------------
+% Learning-based signal control
+% ---------------------------------------------------------------------
+
+% Year discrepancy across sources: ACM's DOI metadata and Semantic Scholar
+% give published-online 2021-01-17 (vol 22, no 2); DBLP's record key lists
+% 2020. We follow the canonical DOI record.
+@article{wei2021recent,
+  author  = {Wei, Hua and Zheng, Guanjie and Gayah, Vikash V. and Li, Zhenhui},
+  title   = {Recent Advances in Reinforcement Learning for Traffic Signal Control:
+             A Survey of Models and Evaluation},
+  journal = {ACM SIGKDD Explorations Newsletter},
+  volume  = {22},
+  number  = {2},
+  pages   = {12--18},
+  year    = {2021},
+  doi     = {10.1145/3447556.3447565}
+}
+
+@article{haydari2022deep,
+  author  = {Haydari, Ammar and Yilmaz, Yasin},
+  title   = {Deep Reinforcement Learning for Intelligent Transportation Systems: A Survey},
+  journal = {IEEE Transactions on Intelligent Transportation Systems},
+  volume  = {23},
+  number  = {1},
+  pages   = {11--32},
+  year    = {2022},
+  doi     = {10.1109/TITS.2020.3008612}
+}
+
+@inproceedings{wei2018intellilight,
+  author    = {Wei, Hua and Zheng, Guanjie and Yao, Huaxiu and Li, Zhenhui},
+  title     = {{IntelliLight}: A Reinforcement Learning Approach for Intelligent Traffic
+               Light Control},
+  booktitle = {Proceedings of the 24th ACM SIGKDD International Conference on Knowledge
+               Discovery and Data Mining},
+  pages     = {2496--2505},
+  year      = {2018},
+  doi       = {10.1145/3219819.3220096}
+}
+
+@inproceedings{chen2020thousand,
+  author    = {Chen, Chacha and Wei, Hua and Xu, Nan and Zheng, Guanjie and Yang, Ming and
+               Xiong, Yuanhao and Xu, Kai and Li, Zhenhui},
+  title     = {Toward a Thousand Lights: Decentralized Deep Reinforcement Learning for
+               Large-Scale Traffic Signal Control},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume    = {34},
+  pages     = {3414--3421},
+  year      = {2020},
+  doi       = {10.1609/aaai.v34i04.5744}
+}
+
+% Author list corrected against DBLP, the Crossref DOI record and the
+% authors' own copy: there is no "Yao" or "Zhang" on this paper.
+@inproceedings{wei2019presslight,
+  author    = {Wei, Hua and Chen, Chacha and Zheng, Guanjie and Wu, Kan and
+               Gayah, Vikash V. and Xu, Kai and Li, Zhenhui},
+  title     = {{PressLight}: Learning Max Pressure Control to Coordinate Traffic Signals
+               in Arterial Network},
+  booktitle = {Proceedings of the 25th ACM SIGKDD International Conference on Knowledge
+               Discovery and Data Mining},
+  pages     = {1290--1298},
+  year      = {2019},
+  doi       = {10.1145/3292500.3330949}
+}
+
+% Preprint only; no peer-reviewed version of this paper was found.
+@misc{genders2016using,
+  author        = {Genders, Wade and Razavi, Saiedeh},
+  title         = {Using a Deep Reinforcement Learning Agent for Traffic Signal Control},
+  year          = {2016},
+  eprint        = {1611.01142},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  note          = {Preprint, arXiv:1611.01142}
+}
+
+@article{noaeen2022reinforcement,
+  author  = {Noaeen, Mohammad and Naik, Atharva and Goodman, Liana and Crebo, Jared and
+             Abrar, Taimoor and Abad, Zahra Shakeri Hossein and Bazzan, Ana L. C. and
+             Far, Behrouz},
+  title   = {Reinforcement learning in urban network traffic signal control:
+             A systematic literature review},
+  journal = {Expert Systems with Applications},
+  volume  = {199},
+  pages   = {116830},
+  year    = {2022},
+  doi     = {10.1016/j.eswa.2022.116830}
+}
+
+
+% ---------------------------------------------------------------------
+% Object detection and tracking
+% ---------------------------------------------------------------------
+
+@inproceedings{redmon2016yolo,
+  author    = {Redmon, Joseph and Divvala, Santosh and Girshick, Ross and Farhadi, Ali},
+  title     = {You Only Look Once: Unified, Real-Time Object Detection},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages     = {779--788},
+  year      = {2016},
+  doi       = {10.1109/CVPR.2016.91}
+}
+
+@article{bochkovskiy2020yolov4,
+  author        = {Bochkovskiy, Alexey and Wang, Chien-Yao and Liao, Hong-Yuan Mark},
+  title         = {{YOLOv4}: Optimal Speed and Accuracy of Object Detection},
+  journal       = {arXiv preprint arXiv:2004.10934},
+  year          = {2020},
+  eprint        = {2004.10934},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV}
+}
+
+% Software citation. GitHub's auto-generated "cite this repository" button
+% for this project currently resolves to an unrelated newer paper, so this
+% entry is built from the CITATION.cff software-level metadata. No DOI exists.
+@misc{jocher2023yolov8,
+  author = {Jocher, Glenn and Chaurasia, Ayush and Qiu, Jing},
+  title  = {Ultralytics {YOLO}, version 8.0.0},
+  year   = {2023},
+  note   = {Software, AGPL-3.0. \url{https://github.com/ultralytics/ultralytics}}
+}
+
+% Preprint. No peer-reviewed venue found for YOLO11 as of verification.
+@article{khanam2024yolov11,
+  author        = {Khanam, Rahima and Hussain, Muhammad},
+  title         = {{YOLOv11}: An Overview of the Key Architectural Enhancements},
+  journal       = {arXiv preprint arXiv:2410.17725},
+  year          = {2024},
+  eprint        = {2410.17725},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV}
+}
+
+@article{terven2023comprehensive,
+  author  = {Terven, Juan and Cordova-Esparza, Diana-Margarita and
+             Romero-Gonzalez, Julio-Alejandro},
+  title   = {A Comprehensive Review of {YOLO} Architectures in Computer Vision:
+             From {YOLOv1} to {YOLOv8} and {YOLO-NAS}},
+  journal = {Machine Learning and Knowledge Extraction},
+  volume  = {5},
+  number  = {4},
+  pages   = {1680--1716},
+  year    = {2023},
+  doi     = {10.3390/make5040083}
+}
+
+% Published ECCV chapter has 8 authors; the arXiv preprint lists 10.
+@inproceedings{lin2014microsoft,
+  author    = {Lin, Tsung-Yi and Maire, Michael and Belongie, Serge and Hays, James and
+               Perona, Pietro and Ramanan, Deva and Doll{\'a}r, Piotr and
+               Zitnick, C. Lawrence},
+  title     = {{Microsoft COCO}: Common Objects in Context},
+  booktitle = {Computer Vision -- ECCV 2014},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {8693},
+  publisher = {Springer},
+  pages     = {740--755},
+  year      = {2014},
+  doi       = {10.1007/978-3-319-10602-1_48}
+}
+
+@inproceedings{bewley2016simple,
+  author    = {Bewley, Alex and Ge, Zongyuan and Ott, Lionel and Ramos, Fabio and
+               Upcroft, Ben},
+  title     = {Simple Online and Realtime Tracking},
+  booktitle = {2016 IEEE International Conference on Image Processing (ICIP)},
+  pages     = {3464--3468},
+  year      = {2016},
+  doi       = {10.1109/ICIP.2016.7533003}
+}
+
+@inproceedings{wojke2017simple,
+  author    = {Wojke, Nicolai and Bewley, Alex and Paulus, Dietrich},
+  title     = {Simple Online and Realtime Tracking with a Deep Association Metric},
+  booktitle = {2017 IEEE International Conference on Image Processing (ICIP)},
+  pages     = {3645--3649},
+  year      = {2017},
+  doi       = {10.1109/ICIP.2017.8296962}
+}
+
+
+% ---------------------------------------------------------------------
+% Camera-based signal control applications
+% ---------------------------------------------------------------------
+
+@inproceedings{papanashi2024adaptive,
+  author    = {Papanashi, Suhas and Chadaga, Manya and R, Kshithi and Huddar, Santosh S. and
+               Sreelakshmi, K. and Kumar P, Ramakanth},
+  title     = {Adaptive Traffic Signal Timing: Leveraging {YOLOv10} and Computer Vision for
+               Real-Time Optimization},
+  booktitle = {2024 8th International Conference on Computational System and Information
+               Technology for Sustainable Solutions (CSITSS)},
+  pages     = {1--6},
+  year      = {2024},
+  doi       = {10.1109/CSITSS64042.2024.10817018}
+}
+
+@article{alruyshid2025aibased,
+  author  = {Alruyshid, Mohanad Hilal and Lutfy, Omar Farouq and
+             Hammood, Dalal Abdulmohsin},
+  title   = {An {AI}-based traffic light control system using {YOLOv10} with emergency and
+             public bus prioritization: A case study in {Baghdad}},
+  journal = {International Journal of Transportation Development and Integration},
+  volume  = {9},
+  number  = {3},
+  pages   = {609--618},
+  year    = {2025},
+  doi     = {10.18280/ijtdi.090314}
+}
+
+@article{talaat2025smart,
+  author  = {Talaat, Fatma M. and El-Balka, Rana Mohamed and Sweidan, Sara and
+             Gamel, Samah Adel and Al-Zoghby, Aya M.},
+  title   = {Smart traffic management system using {YOLOv11} for real-time vehicle detection
+             and dynamic flow optimization in smart cities},
+  journal = {Neural Computing and Applications},
+  volume  = {37},
+  number  = {24},
+  pages   = {19957--19974},
+  year    = {2025},
+  doi     = {10.1007/s00521-025-11434-9}
+}
+
+@article{medvei2025deepsignal,
+  author  = {Medvei, Mirabela Melinda and Bordei, Alin-Viorel and
+             Ni{\c{t}}{\u{a}}, {\c{S}}tefania Loredana and {\c{T}}{\u{a}}pu{\c{s}}, Nicolae},
+  title   = {{DeepSIGNAL-ITS}: Deep learning signal intelligence for adaptive traffic signal
+             control in intelligent transportation systems},
+  journal = {Applied Sciences},
+  volume  = {15},
+  number  = {17},
+  pages   = {9396},
+  year    = {2025},
+  doi     = {10.3390/app15179396}
+}
+
+
+% ---------------------------------------------------------------------
+% Vision-based queue length and density estimation
+% ---------------------------------------------------------------------
+
+@article{umair2021efficient,
+  author  = {Umair, Muhammad and Farooq, Muhammad Umar and Raza, Rana Hammad and
+             Chen, Qian and Abdulhai, Baher},
+  title   = {Efficient video-based vehicle queue length estimation using computer vision and
+             deep learning for an urban traffic scenario},
+  journal = {Processes},
+  volume  = {9},
+  number  = {10},
+  pages   = {1786},
+  year    = {2021},
+  doi     = {10.3390/pr9101786}
+}
+
+@article{harilakshmi2023deep,
+  author  = {Harilakshmi, V. S. and Jansi Rani, P. Arockia},
+  title   = {Deep learning based artificial intelligent systems in road traffic density
+             estimation and congestion classification},
+  journal = {Indian Journal of Science and Technology},
+  volume  = {16},
+  number  = {24},
+  pages   = {1768--1776},
+  year    = {2023},
+  doi     = {10.17485/IJST/v16i24.1660}
+}
+
+@article{abewickrema2025ensemble,
+  author  = {Abewickrema, Wanuji and Yildirimoglu, Mehmet and Kim, Jiwon},
+  title   = {An ensemble deep learning framework for real-time queue length estimation at
+             signalized intersections},
+  journal = {Data Science for Transportation},
+  volume  = {7},
+  number  = {2},
+  pages   = {15},
+  year    = {2025},
+  doi     = {10.1007/s42421-025-00129-1}
+}
+
+
+% ---------------------------------------------------------------------
+% Emergency vehicle preemption and priority
+% ---------------------------------------------------------------------
+
+@article{louisell2004simple,
+  author  = {Louisell, Chuck and Collura, John and Teodorovic, Dusan and Tignor, Sam},
+  title   = {Simple worksheet method to evaluate emergency vehicle preemption and its impacts
+             on safety},
+  journal = {Transportation Research Record},
+  volume  = {1867},
+  number  = {1},
+  pages   = {151--162},
+  year    = {2004},
+  doi     = {10.3141/1867-18}
+}
+
+@article{humagain2020systematic,
+  author  = {Humagain, Subash and Sinha, Roopak and Lai, Edmund and Ranjitkar, Prakash},
+  title   = {A systematic review of route optimisation and pre-emption methods for emergency
+             vehicles},
+  journal = {Transport Reviews},
+  volume  = {40},
+  number  = {1},
+  pages   = {35--53},
+  year    = {2020},
+  doi     = {10.1080/01441647.2019.1649319}
+}
+
+@article{das2022traffic,
+  author  = {Das, Debashis and Altekar, Niraj Vasant and Head, K. Larry and Saleem, Faisal},
+  title   = {Traffic signal priority control strategy for connected emergency vehicles with
+             dilemma zone protection for freight vehicles},
+  journal = {Transportation Research Record},
+  volume  = {2676},
+  number  = {1},
+  pages   = {499--517},
+  year    = {2022},
+  doi     = {10.1177/03611981211039157}
+}
+
+
+% ---------------------------------------------------------------------
+% Heterogeneous traffic and passenger car units
+% ---------------------------------------------------------------------
+
+@article{chandra2003effect,
+  author  = {Chandra, Satish and Kumar, Upendra},
+  title   = {Effect of lane width on capacity under mixed traffic conditions in {India}},
+  journal = {Journal of Transportation Engineering},
+  volume  = {129},
+  number  = {2},
+  pages   = {155--160},
+  year    = {2003},
+  doi     = {10.1061/(ASCE)0733-947X(2003)129:2(155)}
+}
+
+@article{arasan2010microsimulation,
+  author  = {Arasan, V. Thamizh and Arkatkar, Shriniwas S.},
+  title   = {Microsimulation study of effect of volume and road width on {PCU} of vehicles
+             under heterogeneous traffic},
+  journal = {Journal of Transportation Engineering},
+  volume  = {136},
+  number  = {12},
+  pages   = {1110--1119},
+  year    = {2010},
+  doi     = {10.1061/(ASCE)TE.1943-5436.0000176}
+}
+
+@article{kumar2018new,
+  author  = {Kumar, Pallav and Arkatkar, Shriniwas and Joshi, Gaurang},
+  title   = {New approach for estimating passenger car units on multilane urban roads with
+             heterogeneous traffic conditions},
+  journal = {Journal of Transportation Engineering, Part A: Systems},
+  volume  = {144},
+  number  = {3},
+  pages   = {04018002},
+  year    = {2018},
+  doi     = {10.1061/JTEPBS.0000117}
+}
+
+
+% ---------------------------------------------------------------------
+% Local context: Kathmandu
+% ---------------------------------------------------------------------
+
+% No DOI: institutional conference proceedings, not indexed by Crossref.
+@inproceedings{shrestha2014development,
+  author    = {Shrestha, Sambriddhi and Marsani, Anil},
+  title     = {Development of saturation flow and delay model at signalised intersection of
+               {Kathmandu}},
+  booktitle = {Proceedings of the IOE Graduate Conference},
+  address   = {Kathmandu, Nepal},
+  pages     = {387--392},
+  year      = {2014}
+}
+
+@article{nepali2024assessment,
+  author  = {Nepali, Siddhartha and Bohara, Shashwot Singh and Lama, Nishan and
+             Thapa, Rabin},
+  title   = {Assessment of traffic characteristics at major urban road intersection of
+             {Kathmandu} valley},
+  journal = {Journal of Civil and Construction Engineering},
+  volume  = {10},
+  number  = {1},
+  year    = {2024},
+  doi     = {10.46610/JOCCE.2024.v010i01.003}
+}
+
+
+% ---------------------------------------------------------------------
+% Simulation and capacity reference works
+% ---------------------------------------------------------------------
+
+@inproceedings{lopez2018microscopic,
+  author    = {Lopez, Pablo Alvarez and Behrisch, Michael and Bieker-Walz, Laura and
+               Erdmann, Jakob and Fl{\"o}tter{\"o}d, Yun-Pang and Hilbrich, Robert and
+               L{\"u}cken, Leonhard and Rummel, Johannes and Wagner, Peter and
+               Wie{\ss}ner, Evamarie},
+  title     = {Microscopic Traffic Simulation using {SUMO}},
+  booktitle = {2018 21st International Conference on Intelligent Transportation Systems (ITSC)},
+  pages     = {2575--2582},
+  year      = {2018},
+  doi       = {10.1109/ITSC.2018.8569938}
+}
+
+@book{trb2022hcm,
+  author    = {{Transportation Research Board}},
+  title     = {Highway Capacity Manual, 7th Edition: A Guide for Multimodal Mobility Analysis},
+  publisher = {The National Academies Press},
+  address   = {Washington, DC, USA},
+  year      = {2022},
+  isbn      = {978-0-309-08766-7},
+  doi       = {10.17226/26432}
+}
+
+% No DOI: print monograph predating the DOI system.
+@book{daganzo1997fundamentals,
+  author    = {Daganzo, Carlos F.},
+  title     = {Fundamentals of Transportation and Traffic Operations},
+  publisher = {Pergamon},
+  address   = {Oxford, UK},
+  year      = {1997},
+  isbn      = {978-0-08-042785-0}
+}

@@ -1,0 +1,10 @@
+seed 0: adaptive=782  fixed=1592  veh-seconds waited  →  50.9% less waiting
+seed 1: adaptive=424  fixed=845  veh-seconds waited  →  49.8% less waiting
+seed 2: adaptive=436  fixed=2226  veh-seconds waited  →  80.4% less waiting
+seed 3: adaptive=676  fixed=1042  veh-seconds waited  →  35.2% less waiting
+seed 4: adaptive=474  fixed=836  veh-seconds waited  →  43.3% less waiting
+
+average wait-time reduction (adaptive vs fixed, identical arrivals): 51.9%
+per-vehicle wait   adaptive: p50 6s · p95 14s · max 30s
+per-vehicle wait   fixed:    p50 12s · p95 43s · max 58s
+microsim check PASSED: adaptive beats the fixed timer on identical arrivals.
