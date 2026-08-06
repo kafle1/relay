@@ -46,7 +46,7 @@ PROFILES = {
 }
 LEVELS = [0.6, 0.8, 1.0, 1.2, 1.4]
 
-TIMINGS = dict(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60, w_wait=0.4)
+TIMINGS = dict(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60)
 FIXED_GREEN = 13.0
 POLICIES = ("relay", "fixed_equal", "fixed_webster")
 _pct = pct        # re-exported for the other experiment scripts

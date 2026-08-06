@@ -76,7 +76,7 @@ class LiveCompare:
     """Headless adaptive-vs-fixed on identical arrivals → the live chart."""
     def __init__(self):
         self.J = four_way()
-        self.ad = Controller(self.J, Timings(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=45, w_wait=0.4))
+        self.ad = Controller(self.J, Timings(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=45))
         self.fx = FixedTimer(self.J, green=13.0)
         self.qa = {d: 0 for d in self.J.approaches}
         self.qf = {d: 0 for d in self.J.approaches}
@@ -159,12 +159,12 @@ async def ws(sock: WebSocket):
     # movement keys each running an independent starvation clock — at 45s a force fired every
     # ~8s, became the de-facto scheduler, and burned a third of wall time in clearance. 90 keeps
     # the hard no-starvation bound while the queue-weighted score does the actual scheduling.
-    # (The old "45 measured better" note predates the ped machinery and the multiplicative score.)
-    TUNED = dict(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=90, w_wait=0.4,
+    TUNED = dict(min_green=4, max_green=30, yellow=3, all_red=1.0, max_wait=90,
                  ped_max_wait=60, hysteresis=2.5)
     # hysteresis 2.5 (live only): a single class flicker moves a zone's PCU by ±0.7-2.0, and at
     # 1.0 that noise alone could flip best-phase and buy a 4s clearance. 2.5 is still far below
-    # the corridor-vs-trickle score gap, so real demand shifts switch exactly as before.
+    # the corridor-vs-trickle score gap, so real demand shifts switch exactly as before. This is
+    # only the floor — the controller adds the measured clearance cost on top of it under load.
     ctrl = Controller(four_way(), Timings(**TUNED))
     mdl, names = model, NAMES        # per-connection detector; the zones message may swap it
     mdl_path = MODEL_PATH

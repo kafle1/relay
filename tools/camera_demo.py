@@ -36,7 +36,7 @@ device = "mps" if torch.backends.mps.is_available() else "cpu"
 model = YOLO(model_path)
 percep = Perception(model, ZONES)
 ctrl = Controller(junction_from_dirs(ZONES.keys()),
-                  Timings(min_green=4, max_green=20, yellow=2, all_red=1, max_wait=30, w_wait=0.5))
+                  Timings(min_green=4, max_green=20, yellow=2, all_red=1, max_wait=30))
 
 cap = cv2.VideoCapture(src)
 if not cap.isOpened():

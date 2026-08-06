@@ -96,8 +96,8 @@ def fig_exp1():
 def fig_exp1_tail():
     s = load("exp1_summary.csv")
     profs = ["asymmetric", "balanced", "single"]
-    fig, ax = plt.subplots(1, 3, figsize=(7.1, 2.5), sharey=True)
-    fig.subplots_adjust(wspace=0.12)
+    fig, ax = plt.subplots(1, 3, figsize=(7.1, 2.7), sharey=True)
+    fig.subplots_adjust(wspace=0.12, top=0.74)
     width = 0.26
     for j, p in enumerate(profs):
         r = next(x for x in s if x["profile"] == p and float(x["level"]) == 1.0)
@@ -114,7 +114,8 @@ def fig_exp1_tail():
         ax[j].set_yscale("log")
     tidy_log(ax[0], [5, 10, 20, 50, 100, 300])
     ax[0].set_ylabel("Wait per vehicle (s)")
-    ax[2].legend(frameon=False, loc="upper left")
+    h, lb = ax[0].get_legend_handles_labels()
+    fig.legend(h, lb, frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.005))
     fig.savefig(os.path.join(FIGS, "exp1_tail.pdf"))
     plt.close(fig)
 
@@ -144,7 +145,8 @@ def fig_exp1b():
     ax[0].set_ylabel("Phase switches per hour")
     ax[1].set_xlabel("Demand multiplier")
     ax[1].set_ylabel("Fraction of time with a green")
-    ax[0].legend(frameon=False, loc="lower right")
+    h, lb = ax[0].get_legend_handles_labels()
+    fig.legend(h, lb, frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.01))
     fig.savefig(os.path.join(FIGS, "exp1b_switching.pdf"))
     plt.close(fig)
 
@@ -175,7 +177,10 @@ def fig_exp2():
         a.set_xlabel("Corridor demand (veh/h)")
         a.set_ylabel(ylab)
     ax[2].axhline(21.6, color="0.3", ls=":", lw=1)
-    ax[2].annotate("free flow", (1.55, 23.5), fontsize=7, color="0.3")
+    # widen past the last bar group, then pin the label in that gap: it can never land on a bar
+    ax[2].set_xlim(ax[2].get_xlim()[0], ax[2].get_xlim()[1] + 1.45)
+    ax[2].annotate("free flow", (0.99, 22.3), xycoords=ax[2].get_yaxis_transform(),
+                   ha="right", va="bottom", fontsize=7, color="0.3")
     ax[2].set_ylim(0, 60)
     handles, labels_ = ax[0].get_legend_handles_labels()
     fig.legend(handles, labels_, frameon=False, ncol=4, loc="upper center",
@@ -218,14 +223,18 @@ def fig_detector():
     aps = [f(row, f"mAP50_{c}") for c in classes]
     res = load("exp5b_resolution.csv")
     fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.4))
+    fig.subplots_adjust(wspace=0.34)
     ax[0].barh(classes, aps, color="#1b4965", edgecolor="none", height=0.6)
-    ax[0].axvline(f(row, "mAP50"), color=C["fixed_equal"], ls="--", lw=1,
-                  label=f"overall {f(row, 'mAP50'):.3f}")
+    overall = f(row, "mAP50")
+    ax[0].axvline(overall, color=C["fixed_equal"], ls="--", lw=1)
+    ax[0].annotate(f"overall {overall:.3f}", (overall, -0.45), xytext=(-3, 0),
+                   textcoords="offset points", fontsize=7, color=C["fixed_equal"],
+                   ha="right", va="center")
     for i, v in enumerate(aps):
         ax[0].annotate(f"{v:.3f}", (v + 0.012, i), va="center", fontsize=7)
-    ax[0].set_xlim(0, 1.12)
+    ax[0].set_xlim(0, 1.20)
+    ax[0].set_ylim(-0.6, len(classes) - 0.2)
     ax[0].set_xlabel("AP@50 on the held-out split")
-    ax[0].legend(frameon=False, loc="lower right")
     marks = {"levanhien": "o", "hcmc": "s"}
     names = {"levanhien": "Boulevard clip", "hcmc": "Dense mixed-traffic clip"}
     cols = {"levanhien": "#1b4965", "hcmc": "#c1666b"}
@@ -236,7 +245,7 @@ def fig_detector():
                    marker=marks[clip], ms=4, lw=1.3, color=cols[clip], label=names[clip])
     ax[1].axhline(1.0, color="0.4", ls=":", lw=0.9)
     ax[1].set_xlabel("Inference resolution (px)")
-    ax[1].set_ylabel("Vehicle count, relative to 640 px")
+    ax[1].set_ylabel("Vehicle count\n(relative to 640 px)")
     ax[1].set_xticks([640, 960, 1280, 1600])
     ax[1].legend(frameon=False, loc="upper left")
     fig.savefig(os.path.join(FIGS, "detector.pdf"))
@@ -265,10 +274,11 @@ def fig_paired():
         ax[j].set_xscale("log")
         ax[j].set_yscale("log")
         ax[j].set_title(PROF[p])
-        ax[j].set_xlabel("Fixed, Webster: mean delay (s)")
         if j == 0:
             ax[j].set_ylabel("R.E.L.A.Y.: mean delay (s)")
     ax[0].legend(frameon=False, fontsize=6.5, loc="upper left")
+    fig.supxlabel("Fixed, Webster: mean delay per vehicle (s)", y=0.02)
+    fig.subplots_adjust(bottom=0.20, wspace=0.30)
     fig.savefig(os.path.join(FIGS, "exp1_paired.pdf"))
     plt.close(fig)
 

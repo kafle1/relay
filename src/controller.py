@@ -5,6 +5,11 @@ One score:  score(phase) = PCU-demand × (1 + oldest_wait/max_wait) + ped_pressu
 (urgency multiplies real queues — capped at 2x — so synthetic aging can never outrank a loaded corridor)
 Guards: empty-phase skip · gap-out · min/max-green · max-wait force-serve · yellow+all-red clearance.
 
+It also measures the junction it is watching: arrival and discharge rate per arm, from the counts
+alone (_measure). Those feed two things a constant can't do — the green is sized from Webster's
+cycle on the measured saturation (_service_floor), and a phase change is priced at the clearance
+it costs (_switch_cost). Nothing about the site has to be configured or surveyed.
+
 Topology-agnostic: give it any set of conflict-free phases (2/3/4-arm, N lanes). It only consumes
 per-approach counts, so the same engine drives the sim and real CCTV.
 
@@ -28,10 +33,10 @@ class Timings:
     max_wait: float = 90.0       # hard anti-starvation: force-serve past this
     max_preempt: float = 60.0    # cap on holding green for an emergency (D38: never freeze the junction)
     emergency_hold: float = 2.5  # a detection latches "emergency present" for this long — survives a dropped frame
-    w_wait: float = 0.4          # legacy additive-aging weight — the score now ages by MULTIPLYING
-                                 # demand (≤2x at the force threshold); kept so existing Timings(**cfg)
-                                 # call sites stay valid. Fairness is owned by max_wait/ped_max_wait.
-    hysteresis: float = 1.0      # challenger must beat incumbent by this to switch (anti-thrash)
+    hysteresis: float = 1.0      # floor on the switch margin (anti-thrash on an idle junction)
+    flow_tau: float = 60.0       # time constant of the arrival/discharge estimators (_measure).
+                                 # Not a traffic constant — the controller measures both rates
+                                 # itself; this only sets how fast those estimates forget.
     emergency_boost: float = 1e6 # emergency dominates the score
     w_ped: float = 0.3           # a waiting pedestrian ≈ a motorcycle in pressure; aging closes the rest
     ped_max_wait: float = 60.0   # hard bound: no pedestrian waits longer than this for a walk window
@@ -108,9 +113,16 @@ class Controller:
         self.elapsed = self.t.all_red
         self.gap_timer = 0.0
         self.preempt_timer = 0.0
+        self.floor = self.t.min_green                 # green length decided at onset (_service_floor)
         self.wait = {a: 0.0 for a in junction.approaches}   # how long the arm's queue has waited
         self._empty_run = {a: 0.0 for a in junction.approaches}  # seconds the arm has read empty
         self.em_hold = {a: 0.0 for a in junction.approaches}  # debounce: survives a dropped detection frame
+        # self-calibration (_measure). Both start at zero and are learned from the counts, so on a
+        # fresh junction the two rules they feed simply don't bind until there is traffic to learn
+        # from — a couple of cycles.
+        self.arrival = {a: 0.0 for a in junction.approaches}   # PCU/s joining while the arm is red
+        self.discharge = {a: 0.0 for a in junction.approaches}  # PCU/s leaving while the arm is green
+        self._prev_pcu = {a: None for a in junction.approaches}
 
     # ── helpers ────────────────────────────────────────────────
     def _served(self, phase):
@@ -203,21 +215,90 @@ class Controller:
     def _score(self, phase, counts, emergencies, peds=None):
         peds = peds or {}
         boost = self.t.emergency_boost if any(self._has_emergency(a, emergencies) for a in self._served(phase)) else 0.0
-        # queue-weighted delay PER ARM: each arm's urgency multiplies ITS OWN demand (≤2x at the
-        # force threshold), never the whole phase's. Phase-level max(oldest) let a starving
-        # 1-PCU left bay DOUBLE a split-arm single's 12-PCU thru queue — the single outscored the
-        # paired corridor phase (whose wait had just reset), the controller served half the
-        # corridor at a time, and the measured live A/B collapsed to ▼6% with 42% of wall time in
-        # clearance (2026-07-10 pm). Additive aging (w_wait × wait) is worse still: 2 cars + 45s
-        # masqueraded as a phantom 18-PCU queue and rotated every phase at min-green cadence.
-        # Same shape for pedestrians (a waiting person ≈ a motorcycle, doubling as wait matures).
-        # Hard fairness lives in the force-serve rules (max_wait / ped_max_wait), not the score.
+        # Urgency multiplies each arm's OWN demand (≤2x at the force threshold), never the whole
+        # phase's. Aging the phase by its oldest arm let a starving 1-PCU left bay double a
+        # 12-PCU thru queue's score, so the junction served half a corridor at a time and the live
+        # A/B collapsed to 6% with 42% of wall time in clearance. Additive aging is worse again:
+        # 2 cars and 45s pass for a phantom 18-PCU queue. Pedestrians age the same way. Hard
+        # fairness lives in the force-serve rules, not here.
         demand = sum(self._pcu(a, counts)
                      * (1.0 + min(self.wait[a], self.t.max_wait) / self.t.max_wait)
                      for a in self._served(phase))
         ped = self.t.w_ped * self._ped_demand(phase, peds) \
             * (1.0 + min(self._ped_oldest(phase, peds), self.t.ped_max_wait) / self.t.ped_max_wait)
         return demand + boost + ped
+
+    def _measure(self, pcu_now, dt, served_now):
+        """Arrival and discharge rate per arm, learned from the counts. No traffic constants.
+
+        On red an arm can't discharge, so its queue growth IS the arrival rate. On green the queue
+        moves by arrivals minus departures, so departures = arrival rate minus the observed change.
+        flow_tau smooths both; a per-frame count is far too noisy to use raw.
+        """
+        alpha = min(1.0, dt / self.t.flow_tau)
+        for a in self.j.approaches:
+            cur, prev = pcu_now[a], self._prev_pcu[a]
+            if prev is None:
+                continue
+            rate = (cur - prev) / dt
+            # Clamp the running estimate, never the sample: per-step counts are whole vehicles, so
+            # clamping samples throws away only the low side. Measured discharge 0.79 vs a true 0.55.
+            if a in served_now:
+                # Gate on the queue BEFORE the step. Gating on the one after selects steps that had
+                # an arrival, which drags it the other way: measured 0.30 vs a true 0.52.
+                if prev > 0:
+                    self.discharge[a] = max(0.0, self.discharge[a]
+                                            + alpha * (self.arrival[a] - rate - self.discharge[a]))
+            else:
+                self.arrival[a] = max(0.0, self.arrival[a] + alpha * (rate - self.arrival[a]))
+
+    def _service_floor(self):
+        """How long this green is worth running, from Webster's cycle on the rates we measured.
+
+        C = (1.5L + 5) / (1 - Y), split by critical ratio. A fixed plan gets Y from a survey; we
+        get it from the estimators, so the junction sizes its own cycle.
+
+        Without this, every tick-level fairness rule collapses once demand passes capacity: all
+        arms sit past max_wait forever, whichever is on red always looks worse, and the green flips
+        at min-green. Measured at 2307 veh/h: 5.2s green per 4.5s clearance, 94s delay vs a fixed
+        plan's 19s. It's a floor, not a hold — empty-phase skip and emergency preempt sit above it,
+        and at light load it computes below min_green and never binds.
+        """
+        ratio = {}
+        for p in self.j.phases:
+            ratio[p] = max((self.arrival[a] / self.discharge[a]
+                            for a in self._served(p) if self.discharge[a] > 0), default=0.0)
+        # Count each arm once. Phase sets overlap on a movement junction (a split-arm phase
+        # re-serves what its thru/left phases cover) and summing all of them invents saturation.
+        covered, cycle_phases, Y = set(), [], 0.0
+        for p in sorted(self.j.phases, key=lambda n: -ratio[n]):
+            arms = self._served(p)
+            if arms & covered:
+                continue
+            covered |= arms
+            cycle_phases.append(p)
+            Y += ratio[p]
+        if Y <= 0.0 or Y >= 1.0:
+            # Y >= 1: no cycle length clears this demand and Webster's C doesn't exist. Longest
+            # green the anti-hog bound allows — maximises throughput, the usual fallback.
+            return self.t.max_green if Y >= 1.0 else self.t.min_green
+        L = max(2, len(cycle_phases)) * (self.t.yellow + self.t.all_red)
+        cycle = (1.5 * L + 5.0) / (1.0 - Y)
+        # Uncapped by max_green on purpose: that's an anti-hog bound, not a capacity one. Refusing
+        # a green the demand needs leaves the queue there next cycle, minor arms included.
+        return max(self.t.min_green, (cycle - L) * (ratio[self.phase] / Y))
+
+    def _switch_cost(self, counts):
+        """PCU thrown away by ending this green now rather than a moment later.
+
+        A change costs yellow + all_red of nobody discharging, so leaving forfeits what the served
+        arms would have cleared in that time — capped at what they still have queued, so a drained
+        phase costs nothing to leave and gap-out stays as sharp as it was. A flat hysteresis can't
+        do this: it's the same 1.0 PCU whether the junction is empty or full.
+        """
+        lost = self.t.yellow + self.t.all_red
+        return sum(min(self._pcu(a, counts), self.discharge[a] * lost)
+                   for a in self._served(self.phase))
 
     def _phase_for_emergency(self, emergencies):
         # simultaneous emergencies on conflicting phases: serve the longest-waiting one, not
@@ -230,10 +311,19 @@ class Controller:
         return max(cands)[1] if cands else None
 
     def _phase_for_starved(self, counts, factor=1.0):
-        # a lane that has REAL vehicles waiting past max_wait (x factor) → force-serve it.
+        # a lane with REAL vehicles waiting past max_wait (x factor) → force-serve it.
         # an empty lane can't starve, so it never triggers this (no green for an empty lane, ever).
+        # Two exclusions, both for the same reason: this rule serves the WORST-treated queue, it
+        # does not rotate. An arm on green is being served, not starved, and it must also be older
+        # than what we're already discharging. Without that, a saturated junction (every arm past
+        # max_wait, permanently) fires it every tick and pins each green to min_green — measured
+        # 5.1s green per 4.5s clearance and 99s delay against a fixed plan's 19s at 2307 veh/h.
+        # Self-balancing: our own clock unwinds as we discharge, so the red arm overtakes us.
+        serving = self._served(self.phase) if self.stage == self.GREEN else set()
+        oldest_served = max((self.wait[a] for a in serving if self._pcu(a, counts) > 0), default=0.0)
         starved = [a for a in self.j.approaches
-                   if self.wait[a] >= self.t.max_wait * factor and self._pcu(a, counts) > 0]
+                   if a not in serving and self.wait[a] > oldest_served
+                   and self.wait[a] >= self.t.max_wait * factor and self._pcu(a, counts) > 0]
         if not starved:
             return None
         worst = max(starved, key=lambda a: self.wait[a])
@@ -273,16 +363,27 @@ class Controller:
             self.em_hold[a] = self.t.emergency_hold if a.split(".")[0] in seen else max(0.0, self.em_hold[a] - dt)
         emergencies = {a for a in self.j.approaches if self.em_hold[a] > 0}
         served_now = self._served(self.phase) if self.stage == self.GREEN else set()
+        pcu_now = {a: self._pcu(a, counts) for a in self.j.approaches}
+        self._measure(pcu_now, dt, served_now)
 
-        # accrue waiting time; a served (green) approach's wait resets. An arm that stays EMPTY
-        # rests its clock too (3s debounce so a detection dropout can't wipe a real queue's
-        # guarantee): the clock answers "how long has the oldest vehicle waited", not "how long
-        # since this lane's last green" — without the reset, a lone car arriving on a long-vacant
-        # trickle arm inherited 90s of vacancy and force-preempted the loaded corridor INSTANTLY;
-        # six minor movement keys did that a few times a minute and the A/B collapsed to ▼6%.
+        # The clock is "how long has the oldest vehicle here waited", not "time since last green".
+        #  RED, vehicles → ages 1s/s.
+        #  RED, empty    → rests (3s debounce so a dropped frame can't wipe a real queue). Without
+        #                  it a lone car on a long-vacant arm inherited 90s of vacancy and instantly
+        #                  force-preempted the loaded corridor; the A/B collapsed to 6%.
+        #  GREEN         → unwinds by what actually discharged, hits zero only when the queue does.
+        #                  Resetting it on the green claimed everything still behind the stop line
+        #                  had stopped waiting, which under saturation just isn't true: the red
+        #                  phase always held the older clock, always won, and the green flipped at
+        #                  min-green forever. 7.4s green per 4.5s clearance, 36.4s delay vs 19.3s.
         for a in self.j.approaches:
             if a in served_now:
-                self.wait[a] = self._empty_run[a] = 0.0
+                self._empty_run[a] = 0.0
+                prev = self._prev_pcu[a]
+                if pcu_now[a] <= 0:
+                    self.wait[a] = 0.0
+                elif prev is not None and prev > 0:
+                    self.wait[a] *= max(0.0, 1.0 - max(0.0, prev - pcu_now[a]) / prev)
             elif self._present(a, counts):
                 self.wait[a] += dt
                 self._empty_run[a] = 0.0
@@ -290,6 +391,7 @@ class Controller:
                 self._empty_run[a] += dt
                 if self._empty_run[a] >= 3.0:
                     self.wait[a] = 0.0
+        self._prev_pcu = pcu_now
 
         self.elapsed += dt
 
@@ -317,6 +419,10 @@ class Controller:
             self.phase, self.stage, self.elapsed = self.target, self.GREEN, 0.0
             self.gap_timer = self.preempt_timer = 0.0
             self.target = None
+            # decide this green's length ONCE, from the queue we are about to serve. Recomputing it
+            # every tick chases a target that shrinks as the queue drains, which ends the green early
+            # for the exact reason it was extended.
+            self.floor = self._service_floor()
 
     def _begin_switch(self, target):
         if target is None or target == self.phase:
@@ -367,8 +473,11 @@ class Controller:
         if empty_now and best and best != self.phase:
             self._begin_switch(best); return
 
-        if self.elapsed < t.min_green:
-            return                                        # min-green is sacred for a phase actually serving traffic
+        # min-green, stretched to the green this junction's measured saturation is worth
+        # (_service_floor, set at onset). Emergency and empty-skip sit above and still use the
+        # bare min_green, so nothing waits on a floor meant for a busy junction.
+        if self.elapsed < self.floor:
+            return
 
         # hard anti-starvation
         starved = self._phase_for_starved(counts)
@@ -401,9 +510,13 @@ class Controller:
             if others:
                 self._begin_switch(max(others, key=lambda p: self._score(p, counts, emergencies, peds))); return
 
-        # demand-driven switch with hysteresis (anti-thrash); empty-phase skip is implicit (best has demand>0)
+        # demand-driven switch: the challenger must beat us by more than the clearance it costs to
+        # hand over (anti-thrash floor + the discharge those 4.5s would have produced). Empty-phase
+        # skip is implicit (best has demand>0) and costs nothing extra — a drained phase's
+        # _switch_cost is 0, so this collapses back to plain hysteresis exactly when it should.
         if best and best != self.phase and \
-           self._score(best, counts, emergencies, peds) > self._score(self.phase, counts, emergencies, peds) + t.hysteresis:
+           self._score(best, counts, emergencies, peds) > self._score(self.phase, counts, emergencies, peds) \
+           + t.hysteresis + self._switch_cost(counts):
             self._begin_switch(best)
 
     def signals(self):
@@ -431,7 +544,7 @@ def _run(ctrl, feed, emerg_feed=None, dt=0.5, steps=2000):
 
 
 def demo():
-    T = Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60, w_wait=0.4)
+    T = Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60)
 
     # invariant: never two conflicting greens; never green->green without yellow+all-red between
     c = Controller(four_way(), T)
@@ -468,11 +581,18 @@ def demo():
     c = Controller(four_way(), T)
     def feed_starve(_):
         return {"N": {"car": 2}, "S": {"car": 0}, "E": {"car": 8}, "W": {"car": 0}}
-    max_n_wait = 0.0
+    # Asserted on the OBSERVABLE (how long N goes without a green) rather than on c.wait["N"]:
+    # this feed never discharges, so a clock that follows the queue — which is what it now does —
+    # legitimately never zeroes here. The gap between greens is the thing starvation actually means.
+    max_n_gap, gap = 0.0, 0.0
     for i in range(1000):
-        c.tick(feed_starve(0), (), 0.5)
-        max_n_wait = max(max_n_wait, c.wait["N"])
-    assert max_n_wait <= T.max_wait + T.yellow + T.all_red + 6, f"VIOLATION: N starved, waited {max_n_wait:.1f}s"
+        sig = c.tick(feed_starve(0), (), 0.5)
+        if sig["signals"]["N"] == "green":
+            gap = 0.0
+        else:
+            gap += 0.5
+            max_n_gap = max(max_n_gap, gap)
+    assert max_n_gap <= T.max_wait + T.yellow + T.all_red + 6, f"VIOLATION: N starved, waited {max_n_gap:.1f}s"
 
     # invariant: MIN-GREEN honored — a green phase always lasts >= min_green
     c = Controller(four_way(), T)
@@ -551,7 +671,7 @@ def demo():
     assert all(d >= T.min_green - 1e-6 for d in ns_runs), f"VIOLATION: motorcycle green flashed: {ns_runs}"
 
     # MAX-PREEMPT bound (D38) — a continuous emergency must not freeze the junction past max_preempt
-    Tp = Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=300, w_wait=0.4, max_preempt=15)
+    Tp = Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=300, max_preempt=15)
     c = Controller(four_way(), Tp)
     held = 0.0
     for i in range(400):
@@ -605,7 +725,7 @@ def demo():
     print("controller self-check PASSED:")
     print("  ✓ no green->green without yellow+all-red clearance")
     print("  ✓ empty-phase skip (no green wasted on an empty lane while another waits)")
-    print(f"  ✓ no starvation (max N wait {max_n_wait:.1f}s <= {T.max_wait}s + slack)")
+    print(f"  ✓ no starvation (longest N ever went without green {max_n_gap:.1f}s <= {T.max_wait}s + slack)")
     print(f"  ✓ min-green honored (all green runs >= {T.min_green}s: {[round(d,1) for d in green_durations[:6]]}...)")
     print("  ✓ emergency preemption serves the ambulance")
     print("  ✓ emergency debounce survives a single dropped detection frame (flickering ambulance)")

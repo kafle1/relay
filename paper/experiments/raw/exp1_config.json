@@ -66,8 +66,7 @@
     "max_green": 30,
     "yellow": 3,
     "all_red": 1.5,
-    "max_wait": 60,
-    "w_wait": 0.4
+    "max_wait": 60
   },
   "fixed_green": 13.0,
   "sat_flow_veh_per_s": 0.55,

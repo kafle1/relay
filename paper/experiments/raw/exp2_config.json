@@ -171,8 +171,7 @@
     "max_green": 34,
     "yellow": 2,
     "all_red": 2.5,
-    "max_wait": 26,
-    "w_wait": 0.4
+    "max_wait": 26
   },
   "seconds": 2400.0,
   "warmup": 400.0,

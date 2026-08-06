@@ -88,7 +88,7 @@ def main():
         print(f"WARNING: {os.path.basename(args.model)} has no emergency-vehicle class {sorted(EMERGENCY)} "
               f"— ambulance preemption is inactive with this model.")
     ctrl = Controller(junction_from_dirs(zones.keys()),
-                      Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60, w_wait=0.4))
+                      Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60))
 
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():

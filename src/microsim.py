@@ -57,7 +57,7 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
     """Run both policies on identical Poisson arrivals. Returns (t, wait_adaptive, wait_fixed)."""
     random.seed(seed)
     J = four_way()
-    adaptive = Controller(J, Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60, w_wait=0.4))
+    adaptive = Controller(J, Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60))
     fixed = FixedTimer(J, green=13.0)
     if lam is None:
         # realistic Kathmandu-style imbalance: one axis busy, the cross axis light / often near-empty.

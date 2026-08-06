@@ -83,7 +83,7 @@ def main():
     if cfg["signalized"]:
         ctrl = Controller(junction_from_dirs(cfg["zones"].keys()),
                           Timings(min_green=5, max_green=25, yellow=3, all_red=1,
-                                  max_wait=40, w_wait=0.5))
+                                  max_wait=40))
 
     cap = cv2.VideoCapture(os.path.join(ROOT, cfg["src"]))
     if not cap.isOpened():

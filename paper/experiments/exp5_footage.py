@@ -77,7 +77,7 @@ def run(preset, cfg, model_path, device):
     percep = Perception(model, cfg["zones"])
     ctrl = (Controller(junction_from_dirs(cfg["zones"].keys()),
                        Timings(min_green=5, max_green=25, yellow=3, all_red=1,
-                               max_wait=40, w_wait=0.5))
+                               max_wait=40))
             if cfg["signalised"] else None)
     path = os.path.join(REPO, cfg["src"])
     cap = cv2.VideoCapture(path)

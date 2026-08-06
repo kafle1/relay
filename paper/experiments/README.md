@@ -29,6 +29,8 @@ export RELAY_FIGS=<paper>/figures
 .venv/bin/python <paper>/experiments/exp4_detector_val.py      # ~1 min  (needs MPS or CPU)
 .venv/bin/python <paper>/experiments/exp5_footage.py           # ~5 min
 .venv/bin/python <paper>/experiments/exp5b_resolution.py       # ~2 min
+.venv/bin/python <paper>/experiments/exp6_robustness.py        # ~4 min
+NOISE=0.20 .venv/bin/python <paper>/experiments/exp6_robustness.py   # ~4 min, noisy-count repeat
 .venv/bin/python <paper>/experiments/make_figures.py           # seconds
 ```
 

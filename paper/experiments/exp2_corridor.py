@@ -64,7 +64,7 @@ LINK_T = SPACING_M / FREE_FLOW_MS
 COUPLE = 0.4                # sim/network.js: pressure -= 0.4 * downstream queue
 PRESENCE_EPS = 0.05         # coupling discounts pressure magnitude; it must not erase presence
 # sim/network.js timing constants
-T_NET = dict(min_green=5, max_green=34, yellow=2, all_red=2.5, max_wait=26, w_wait=0.4)
+T_NET = dict(min_green=5, max_green=34, yellow=2, all_red=2.5, max_wait=26)
 
 SECONDS = 2400.0
 WARMUP = 400.0

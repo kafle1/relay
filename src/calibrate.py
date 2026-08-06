@@ -462,8 +462,9 @@ def save_topology(path, zones, lanes=None, meta=None):
 
 
 def load_topology(path):
-    """-> (zones, lanes, meta). Reads both the wrapped auto-calibration file and the flat
-    {"N": [[x,y],...]} file tools/draw_zones.py has always written."""
+    """-> (zones, lanes, meta). Reads either supported topology file: the wrapped one
+    tools/autocalibrate.py proposes, or the flat {"N": [[x,y],...]} one tools/draw_zones.py writes
+    when you click the zones yourself."""
     raw = json.load(open(path))
     if isinstance(raw, dict) and isinstance(raw.get("zones"), dict):
         zones, lanes, meta = raw["zones"], raw.get("lanes") or {}, raw.get("meta") or {}
@@ -605,7 +606,7 @@ def demo():
         assert validate_zones(bad) is not None, f"validate_zones accepted {bad!r}"
     assert validate_zones({"N": [], "S": [(0, 0), (1, 0), (1, 1)]}) is None   # [] disables an approach
 
-    # the file round-trips, and the legacy flat file still loads
+    # both topology formats load: the wrapped one and draw_zones.py's flat one
     d = tempfile.mkdtemp()
     p = os.path.join(d, "topo.json")
     save_topology(p, prop.zones, {"N": [[(0.1, 0.1), (0.2, 0.1), (0.2, 0.2), (0.1, 0.2)]]},
@@ -613,7 +614,7 @@ def demo():
     z, ln, meta = load_topology(p)
     assert z == {k: [tuple(pt) for pt in v] for k, v in prop.zones.items()}, "zones changed on round-trip"
     assert list(ln) == ["N"] and len(ln["N"][0]) == 4 and meta["source"] == "self-check"
-    flat = os.path.join(d, "legacy.json")
+    flat = os.path.join(d, "clicked.json")
     json.dump({"N": [[0.3, 0.02], [0.7, 0.02], [0.62, 0.42]]}, open(flat, "w"))
     z2, ln2, meta2 = load_topology(flat)
     assert z2 == {"N": [(0.3, 0.02), (0.7, 0.02), (0.62, 0.42)]} and ln2 == {} and meta2 == {}
@@ -630,7 +631,7 @@ def demo():
     print("  ✓ observed turn split reported per approach (through / left / right / U)")
     print("  ✓ deterministic (same traffic in, same config out)")
     print("  ✓ garbage in (no traffic, single point, NaN, junk boxes, bad zones) never raises")
-    print("  ✓ config round-trips, and legacy flat zones.json files still load")
+    print("  ✓ config round-trips, and hand-clicked flat zone files load too")
 
 
 if __name__ == "__main__":

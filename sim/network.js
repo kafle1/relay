@@ -839,6 +839,7 @@ function moveCars(dt) {
 // ─────────────────────────── decentralized signal control ───────────────────────────
 let simTime = 0, systemOn = true;
 const MIN_GREEN = 5, YELLOW = 2, ALLRED = 2.5, MAX_GREEN = 34, MAX_WAIT = 26, FIX_GREEN = 18, PREEMPT_HOLD = 2.5, MAX_PREEMPT = 25;
+const FLOW_TAU = 60;      // seconds of memory in the arrival/discharge estimators (src/controller.py)
 
 // PCU-weighted queue on each approach + which approaches have an ambulance closing in
 function computeQueues() {
@@ -862,6 +863,11 @@ class Controller {
     this.jid = jid; this.J = JUN[jid];
     this.pi = 0; this.pending = 0; this.sub = 'green'; this.t = 0; this.ge = 0;
     this.wait = Object.fromEntries(Object.keys(this.J.arms).map(a => [a, 0]));
+    // measured per arm, same as src/controller.py: nothing about the site is configured
+    this.arr = Object.fromEntries(Object.keys(this.J.arms).map(a => [a, 0]));
+    this.dis = Object.fromEntries(Object.keys(this.J.arms).map(a => [a, 0]));
+    this.prevQ = {};
+    this.floor = MIN_GREEN;                        // green length decided at onset
     this.preArm = null; this.preUntil = 0;
   }
   phaseOf(arm) { return this.J.phases.findIndex(p => p.includes(arm)); }
@@ -874,12 +880,43 @@ class Controller {
     }
     return s;
   }
+  // Webster's cycle on the rates we measured, split by critical ratio. Phases here are already
+  // disjoint, so Y is just their sum. Below saturation this lands under MIN_GREEN and never binds.
+  serviceFloor() {
+    const ratio = this.J.phases.map(p => Math.max(...p.map(a => this.dis[a] > 0 ? this.arr[a] / this.dis[a] : 0)));
+    const Y = ratio.reduce((a, b) => a + b, 0);
+    if (Y <= 0) return MIN_GREEN;
+    if (Y >= 1) return MAX_GREEN;                  // no cycle clears this demand; hold the longest green
+    const L = this.J.phases.length * (YELLOW + ALLRED);
+    const C = (1.5 * L + 5) / (1 - Y);
+    return Math.max(MIN_GREEN, (C - L) * ratio[this.pi] / Y);
+  }
+
+  // what handing over throws away: the served arms stop discharging for yellow + all-red,
+  // capped at what they still have queued, so leaving a drained phase is free
+  switchCost(Q) {
+    const lost = YELLOW + ALLRED;
+    return this.J.phases[this.pi].reduce((s, a) => s + Math.min(Q[a] || 0, this.dis[a] * lost), 0);
+  }
+
   startYellow(nextP) { this.pending = nextP; this.sub = 'yellow'; this.t = 0; }
   update(dt, allQ, amb) {
     const Q = allQ[this.jid], cur = this.J.phases[this.pi];
+    // one pass: learn this arm's rates, and age its queue. On green the clock unwinds by what
+    // actually discharged rather than resetting, so a queue that is not moving keeps its age.
+    const alpha = Math.min(1, dt / FLOW_TAU);
     for (const arm in this.J.arms) {
       const green = this.sub === 'green' && cur.includes(arm);
-      if (Q[arm] > 0.1 && !green) this.wait[arm] += dt; else if (green) this.wait[arm] = 0;
+      const prev = this.prevQ[arm], q = Q[arm] || 0;
+      this.prevQ[arm] = q;
+      if (prev !== undefined) {
+        const rate = (q - prev) / dt;
+        if (green) { if (prev > 0) this.dis[arm] = Math.max(0, this.dis[arm] + alpha * (this.arr[arm] - rate - this.dis[arm])); }
+        else this.arr[arm] = Math.max(0, this.arr[arm] + alpha * (rate - this.arr[arm]));
+      }
+      if (!green) this.wait[arm] = q > 0.1 ? this.wait[arm] + dt : 0;
+      else if (q <= 0.1) this.wait[arm] = 0;
+      else if (prev > 0) this.wait[arm] *= Math.max(0, 1 - Math.max(0, prev - q) / prev);
     }
     if (!systemOn) { this.updateFixed(dt); this.apply(); return; }
 
@@ -900,23 +937,34 @@ class Controller {
       if (preempt != null) {
         const want = this.phaseOf(preempt);
         if (want !== this.pi && this.ge >= 2) this.startYellow(want);
-      } else if (this.ge >= MIN_GREEN) {
-        const served = cur.every(a => Q[a] <= 0.1);
-        let forced = -1, worst = MAX_WAIT;
-        for (const arm in this.wait) if (this.wait[arm] > worst) { worst = this.wait[arm]; forced = this.phaseOf(arm); }
+      } else {
+        const served = cur.every(a => (Q[a] || 0) <= 0.1);
         let best = this.pi, bp = -Infinity;
         for (let p = 0; p < this.J.phases.length; p++) { const pr = this.pressure(p, allQ); if (pr > bp) { bp = pr; best = p; } }
-        let nextP = this.pi;
-        if (forced >= 0) nextP = forced;
-        else if (served || this.ge >= MAX_GREEN) nextP = best;
-        else if (best !== this.pi && this.pressure(best, allQ) > this.pressure(this.pi, allQ) + 1.5 && this.ge >= MIN_GREEN + 3) nextP = best;
-        if (nextP !== this.pi) this.startYellow(nextP);
-        else if (served) this.ge = MIN_GREEN;                // idle: don't burn toward max-green on an empty phase
+        // an empty phase has no vehicle to strand, so it yields without waiting out the floor
+        if (served && best !== this.pi && this.ge >= MIN_GREEN) { this.startYellow(best); this.apply(); return; }
+        if (this.ge >= this.floor) {
+          // force-serve the worst-treated queue: an arm on green is being served, not starved, and
+          // an empty arm cannot starve at all. Without both, a full junction just rotates.
+          const oldestServed = Math.max(0, ...cur.filter(a => (Q[a] || 0) > 0.1).map(a => this.wait[a]));
+          let forced = -1, worst = MAX_WAIT;
+          for (const arm in this.wait) {
+            if (cur.includes(arm) || (Q[arm] || 0) <= 0.1) continue;
+            if (this.wait[arm] > worst && this.wait[arm] > oldestServed) { worst = this.wait[arm]; forced = this.phaseOf(arm); }
+          }
+          let nextP = this.pi;
+          if (forced >= 0) nextP = forced;
+          else if (this.ge >= MAX_GREEN) nextP = best;
+          else if (best !== this.pi &&
+                   this.pressure(best, allQ) > this.pressure(this.pi, allQ) + 1.5 + this.switchCost(Q)) nextP = best;
+          if (nextP !== this.pi) this.startYellow(nextP);
+          else if (served) this.ge = this.floor;             // idle: don't burn toward max-green
+        }
       }
     } else if (this.sub === 'yellow') {
       if ((this.t += dt) >= YELLOW) { this.sub = 'allred'; this.t = 0; }
     } else {
-      if ((this.t += dt) >= ALLRED) { this.pi = this.pending; this.sub = 'green'; this.t = 0; this.ge = 0; }
+      if ((this.t += dt) >= ALLRED) { this.pi = this.pending; this.sub = 'green'; this.t = 0; this.ge = 0; this.floor = this.serviceFloor(); }
     }
     this.apply();
   }

@@ -45,6 +45,13 @@ ambulance button preempts each junction in sequence: a green wave down the corri
   + ped-pressure + emergency-boost` - with empty-phase skip, gap-out, min/max-green, yellow + all-red clearance,
   hard anti-starvation, and emergency preemption. Every safety invariant is asserted by a runnable
   self-check (`src/controller.py`).
+- **It measures the junction. Nothing is configured per site.** A queue on red can only grow, so its
+  growth is the arrival rate; on green, departures are that rate minus the observed change. Those two
+  numbers decide how long each green runs (its share of Webster's cycle at the *measured* saturation)
+  and how far a rival phase must be ahead to take it (the discharge those 4.5s of clearance would throw
+  away). No saturation-flow table, no traffic survey, nothing to calibrate on install. This is the part
+  that makes it work when the junction fills up: a plain max-pressure rule ends every green at the 5s
+  floor at saturation and loses to a fixed timer outright.
 - **Pedestrians are demand, not decoration:** people waiting to cross add pressure to the phase
   that would give them a walk window, no one waits past `ped_max_wait`, and a walk is never cut
   while someone is still on the zebra. (Lalitpur's system times vehicles only.)
@@ -85,12 +92,22 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 | Setting | Result | Nature |
 |---|---|---|
-| **Controlled benchmark** - identical arrivals through both controllers (`src/microsim.py`) | ~10–73% less waiting, avg ≈ 36% | reproducible offline benchmark, not the live demo; discharge bounded to physical saturation flow |
-| **Per-vehicle waits** (same benchmark) | typical wait halved: p50 6s vs 12s · p95 21s vs 43s · worst 38s vs 58s | fairness, not just throughput - the tail numbers means-only benchmarks never report |
+| **vs a properly timed fixed plan** - Webster cycle + splits from the true mean demand, 30 seeds/cell (`paper/experiments/exp1_single_junction.py`) | **28–44% less delay, every cell** | the honest headline. Webster is given perfect knowledge of average demand, which no real installation has |
+| **vs an equal-split timer** (same runs) | 28–96% less delay | the baseline most camera-based papers use; easy to beat, so it isn't the headline |
+| **Per-vehicle waits** (asymmetric, 1278 veh/h) | p95 14.5s vs 25.8s · worst 26.7s vs 50.1s | fairness, not just throughput - the tail numbers means-only benchmarks never report |
+| **Every demand shape and topology** - 72 cells, 7 shapes, 4-way + T, to 2462 veh/h (`exp6_robustness.py`) | **beats both baselines in 71 of 72**; worst cell vs equal-split still +26% | the one loss is an approach wanting 82% of all green, where the 60s fairness bound forbids a stable cycle and Webster wins by ignoring it |
+| **With a 20% miscounting detector** (same 72 cells) | unchanged: 71 of 72 | the estimators average over 60s, so count noise doesn't reach the decisions |
+| **Corridor**, 3 signals (`exp2_corridor.py`) | 45–58% less delay, ambulance crosses in 22–28s vs 30–54s | coordination term contributes ~0 (see below) |
+| **Ambulance to green** - 900 trials (`exp3_preemption.py`) | 4.09s mean, 13.99s worst against a 14.0s analytical bound | the bound is arithmetic from clearance + min-green, so it can be quoted to a fire service |
 | **Live interactive demo** - toggle R.E.L.A.Y. ON/OFF and measure on screen | typically 10–35% fewer queued (varies with the traffic you spawn) | measured live from the scene you're watching |
 | **Detector, synthetic held-out frames** | mAP@50 ≈ 0.88, precision 0.96 | synthetic-domain only |
 | **Detector, real footage** | cars: strong; dense two-wheeler swarms: undercounts (improves at `--imgsz 960`) | known limitation - regional fine-tune is the fix, documented below |
 | **Controller invariants** | all pass: clearance, empty-skip, min-green, no-starvation, preemption | asserted by `src/controller.py` |
+
+Two things the numbers say that don't flatter the design, kept here because they're in the paper:
+the corridor coupling term (each junction subtracting its neighbour's queue) changes delay by under
+1%, so the corridor gain is local adaptivity and not coordination; and the point-queue model can't
+produce the spillback that term exists to prevent, so it's unproven rather than disproven.
 
 *(Local anchor: measured studies of signalised intersections in the Kathmandu valley report
 saturation flows and delays well away from standard capacity guidance, and put the difference down
@@ -125,8 +142,15 @@ tools/
   train.py          fine-tune YOLO (sim-only or mixed)
   detect.py         run YOLO on an image, report vehicle detections
   camera_demo.py, draw_zones.py, verify_labels.py   webcam demo · zone setup · label QA
+paper/
+  main.tex/.pdf     the write-up: method, experiments, limitations
+  experiments/      every number in it, as a runnable script + the raw CSVs it wrote
 docs/               research synthesis · design spec · 96-case edge-case register
 ```
+
+The paper is [`paper/main.pdf`](paper/main.pdf). Every figure and table in it comes from
+[`paper/experiments/`](paper/experiments/) run against a clone of this repo - nothing in it is
+estimated or copied from this README.
 
 ## Auto-calibration: lanes and approaches
 
