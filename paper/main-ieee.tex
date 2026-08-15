@@ -936,6 +936,7 @@ Figure~\ref{fig:exp3} even though tail behaviour differs sharply. The claim thes
 bounded worst case, not a uniformly faster response.
 
 \subsection{Perception}
+\label{sec:perception}
 
 \begin{table*}[t]
 \centering
@@ -1083,6 +1084,47 @@ moves from $+27.1\%$ to $+26.1\%$, and the same single cell is the exception. Th
 Section~\ref{sec:estimation} smooth over a $\tau = 60$~s window, which is long relative to the noise,
 and the decisions they feed are floors and margins rather than instantaneous set points.
 
+That test is the easy one, and reported alone it would flatter the controller. A zero-mean
+error averages out over the smoothing window by construction, whereas
+Section~\ref{sec:perception} measures a \emph{biased} one: on motorcycle-dense footage the
+detector reports 26 vehicles in a scene holding several hundred, and sampled counts are still
+climbing 83\% between 640~px and 1600~px without converging. A biased estimator does not
+average out. We therefore repeat the full grid under count models that are wrong in the
+direction the detector is actually wrong. In every case the queues the controller is managing
+stay exact, so what is measured is the control response to a wrong observation.
+
+The first model saturates: the controller observes $\hat q = q/(1 + q/C)$, near-exact on a
+lightly loaded approach and increasingly short as the approach fills, which is the shape of the
+measured failure. At both $C = 15$ and $C = 30$~vehicles the result is unchanged, 71 of 72
+cells, a worst margin against the equal-split plan of $+26.6\%$, and a mean cost across the grid
+of $-0.3$ percentage points. The largest loss in any single cell is 1.6 points. The one cell the
+controller loses in fact improves, from $-26.6\%$ to $-4.2\%$, because compressing the dominant
+approach's count stops the policy contending so hard against the fairness bound.
+
+The second model is a flat multiplicative loss, $\hat q = \lfloor \kappa q \rceil$ applied
+equally to every approach. Down to $\kappa = 0.6$ it costs nothing measurable: 71 of 72 cells at
+$\kappa = 0.9$, $0.8$, $0.7$ and $0.6$, with a mean cost of at most $0.1$ percentage points.
+This is a property of the formulation rather than a lucky range. The degree of saturation of
+Section~\ref{sec:floor} is a ratio of an arrival estimate to a discharge estimate, both derived
+from the same count sequence, so a uniform scale factor cancels before it reaches a decision.
+
+At $\kappa = 0.5$ the controller collapses, to 50 of 72 cells and a mean cost of 32.7 points,
+falling behind even the equal-split plan in the worst cell ($-11.1\%$). The discontinuity
+between $0.6$ and $0.5$ is not a magnitude effect. At $\kappa = 0.5$ a lone vehicle rounds to
+zero, so an occupied approach reports empty and empty-phase skipping declines to serve it; at
+$\kappa = 0.6$ it survives rounding. Repeating $\kappa = 0.5$ with the single change that an
+occupied approach may never report empty restores the result completely: 71 of 72 cells, worst
+margin $+26.4\%$, mean cost $0.2$ points. The 50\% magnitude error was never the problem.
+
+We state the resulting requirement precisely, because it is narrower and more testable than
+"the detector must be accurate". What this controller needs from perception is an unbiased
+\emph{presence} signal at short queue lengths, not an accurate absolute count. A detector that
+undercounts a crowd by an order of magnitude is tolerable, because both the pressure ordering
+and the saturation ratio survive it; a detector that cannot distinguish an empty approach from
+one holding a single vehicle is not, whatever its aggregate accuracy. That is a condition a
+field trial can check on a candidate detector before any signal is connected to it, and it is a
+condition the perception stack of Section~\ref{sec:perception} has not yet been shown to meet.
+
 \section{Limitations}
 \label{sec:limitations}
 
@@ -1119,6 +1161,14 @@ chosen to reflect a motorcycle-dominated mix rather than estimated from local fi
 Because they directly scale the pressure in Equation~\eqref{eq:vehpressure}, a mis-specified motorcycle
 weight biases every phase comparison at a junction whose approaches differ in class mixture, and we ran
 no sensitivity analysis over them.
+
+\textbf{The loop is never closed.} Control results come from simulated counts and perception
+results from recorded footage, and at no point in this work does the detector drive the controller.
+The two halves are evaluated against each other only through the count-error models of
+Section~\ref{sec:robustness}, which is an argument about robustness rather than a demonstration of
+the assembled system. Those models are chosen to match the error the detector measurably makes and
+the controller survives them, but a genuine end-to-end run, detector to signal head on the same
+footage, is the obvious next experiment and it is not in this paper.
 
 \textbf{Four narrower gaps.} The evaluated junctions have two stages, so although the controller
 generates movement-level phasing and protected-left stages, the results do not exercise them; a junction
