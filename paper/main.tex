@@ -1080,46 +1080,43 @@ moves from $+27.1\%$ to $+26.1\%$, and the same single cell is the exception. Th
 Section~\ref{sec:estimation} smooth over a $\tau = 60$~s window, which is long relative to the noise,
 and the decisions they feed are floors and margins rather than instantaneous set points.
 
-That test is the easy one, and reported alone it would flatter the controller. A zero-mean
-error averages out over the smoothing window by construction, whereas
-Section~\ref{sec:perception} measures a \emph{biased} one: on motorcycle-dense footage the
-detector reports 26 vehicles in a scene holding several hundred, and sampled counts are still
-climbing 83\% between 640~px and 1600~px without converging. A biased estimator does not
-average out. We therefore repeat the full grid under count models that are wrong in the
-direction the detector is actually wrong. In every case the queues the controller is managing
-stay exact, so what is measured is the control response to a wrong observation.
+That test is the easy one. A zero-mean error averages out over the smoothing window by
+construction, whereas Section~\ref{sec:perception} measures a \emph{biased} one: the detector
+reports 26 vehicles in a scene holding several hundred, and counts still climb 83\% between 640~px
+and 1600~px without converging. We therefore repeat the grid under two count models that are wrong
+in the direction the detector is wrong. Queues stay exact in both, so what is measured is the
+control response to a wrong observation.
 
-The first model saturates: the controller observes $\hat q = q/(1 + q/C)$, near-exact on a
-lightly loaded approach and increasingly short as the approach fills, which is the shape of the
-measured failure. At both $C = 15$ and $C = 30$~vehicles the result is unchanged, 71 of 72
-cells, a worst margin against the equal-split plan of $+26.6\%$, and a mean cost across the grid
-of $-0.3$ percentage points. The largest loss in any single cell is 1.6 points. The one cell the
-controller loses in fact improves, from $-26.6\%$ to $-4.2\%$, because compressing the dominant
-approach's count stops the policy contending so hard against the fairness bound.
+The first saturates, $\hat q = q/(1 + q/C)$: near-exact on a light approach, increasingly short as
+it fills, which is the shape of the measured failure. At $C = 15$ and $C = 30$ the result is
+unchanged, 71 of 72 cells, worst margin $+26.6\%$ against the equal-split plan, and a mean cost
+across the grid of $-0.3$ percentage points. The largest single-cell loss is 1.6 points. Saturation
+preserves the ordering of approaches and stays accurate where the estimators work, distorting only
+a tail that was going to be served anyway. The one cell the controller loses improves under it,
+from $-26.6\%$ to $-4.2\%$, because compressing the dominant approach's count stops the policy
+contending against the fairness bound.
 
-The second model is a flat multiplicative loss, $\hat q = \lfloor \kappa q \rceil$ applied
-equally to every approach. Down to $\kappa = 0.6$ it costs nothing measurable: 71 of 72 cells at
-$\kappa = 0.9$, $0.8$, $0.7$ and $0.6$, with a mean cost of at most $0.1$ percentage points.
-This is a property of the formulation rather than a lucky range. The degree of saturation of
-Section~\ref{sec:floor} is a ratio of an arrival estimate to a discharge estimate, both derived
-from the same count sequence, so a uniform scale factor cancels before it reaches a decision.
+The second is a flat multiplicative loss, $\hat q = \lfloor \kappa q \rceil$. Down to $\kappa = 0.6$
+it costs nothing measurable: 71 of 72 cells at $\kappa = 0.9$, $0.8$, $0.7$ and $0.6$, mean cost at
+most $0.1$ points. That is a property of the formulation, not a lucky range. The degree of
+saturation in Section~\ref{sec:floor} is a ratio of an arrival estimate to a discharge estimate
+drawn from the same counts, so a uniform scale factor cancels before it reaches a decision.
 
-At $\kappa = 0.5$ the controller collapses, to 50 of 72 cells and a mean cost of 32.7 points,
-falling behind even the equal-split plan in the worst cell ($-11.1\%$). The discontinuity
-between $0.6$ and $0.5$ is not a magnitude effect. At $\kappa = 0.5$ a lone vehicle rounds to
-zero, so an occupied approach reports empty and empty-phase skipping declines to serve it; at
-$\kappa = 0.6$ it survives rounding. Repeating $\kappa = 0.5$ with the single change that an
-occupied approach may never report empty restores the result completely: 71 of 72 cells, worst
-margin $+26.4\%$, mean cost $0.2$ points. The 50\% magnitude error was never the problem.
+At $\kappa = 0.5$ the controller collapses to 50 of 72 cells and a mean cost of 32.7 points, behind
+even the equal-split plan in the worst cell ($-11.1\%$). The discontinuity is not a magnitude
+effect. At $\kappa = 0.5$ a lone vehicle rounds to zero, an occupied approach reports empty, and
+empty-phase skipping declines to serve it; at $\kappa = 0.6$ it survives rounding. Repeating
+$\kappa = 0.5$ with the single change that an occupied approach may never report empty restores the
+result completely: 71 of 72 cells, worst margin $+26.4\%$, mean cost 0.2 points. The 50\% magnitude
+error was never the problem.
 
-We state the resulting requirement precisely, because it is narrower and more testable than
-"the detector must be accurate". What this controller needs from perception is an unbiased
-\emph{presence} signal at short queue lengths, not an accurate absolute count. A detector that
-undercounts a crowd by an order of magnitude is tolerable, because both the pressure ordering
-and the saturation ratio survive it; a detector that cannot distinguish an empty approach from
-one holding a single vehicle is not, whatever its aggregate accuracy. That is a condition a
-field trial can check on a candidate detector before any signal is connected to it, and it is a
-condition the perception stack of Section~\ref{sec:perception} has not yet been shown to meet.
+The requirement this yields is narrower and more testable than "the detector must be accurate".
+What the controller needs is an unbiased \emph{presence} signal at short queue lengths, not an
+accurate absolute count. A detector that undercounts a crowd by an order of magnitude is tolerable,
+because both the pressure ordering and the saturation ratio survive it; one that cannot separate an
+empty approach from a nearly empty one is not, whatever its aggregate accuracy. That is a condition
+a field trial can check on a candidate detector before a signal is connected to it, and it is one
+the stack of Section~\ref{sec:perception} has not been shown to meet.
 
 \section{Limitations}
 \label{sec:limitations}
