@@ -40,6 +40,12 @@ NOISE = float(os.environ.get("NOISE", 0.0))
 KEEP = float(os.environ.get("UNDERCOUNT", 1.0))    # fraction of vehicles the detector sees
 SATCAP = float(os.environ.get("SATCAP", 0.0))      # counts saturate toward this ceiling
 PRESERVE_PRESENCE = os.environ.get("PRESERVE_PRESENCE", "") == "1"
+
+_models = [n for n, on in (("NOISE", NOISE > 0), ("UNDERCOUNT", KEEP < 1.0), ("SATCAP", SATCAP > 0)) if on]
+if len(_models) > 1:
+    sys.exit(f"set one count-error model, not {' and '.join(_models)}")
+if PRESERVE_PRESENCE and KEEP >= 1.0:
+    sys.exit("PRESERVE_PRESENCE only applies to UNDERCOUNT; set UNDERCOUNT too or drop it")
 TIMINGS = dict(min_green=5, max_green=45, yellow=3, all_red=1.5, max_wait=60)
 FIXED_GREEN = 13.0
 LEVELS = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
@@ -102,7 +108,7 @@ def saturate(counts, cap):
 
 
 def observe(counts):
-    """Whatever error model this run is configured for. Exactly one applies."""
+    """Whatever count-error model this run is configured for, checked at import to be exactly one."""
     if SATCAP > 0:
         return saturate(counts, SATCAP)
     if KEEP < 1.0:
