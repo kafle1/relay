@@ -763,28 +763,14 @@ averaging 50.0~s, 50.1~s and 26.7~s. Under a single dominant approach the contra
 and 36.3~s at the 95th percentile against 17.0~s under \relay, and worst waits of 361.5~s and 72.9~s
 against 36.9~s, consistent with the forced-service rule at $R = 60$~s. The tail improves in every cell,
 which matters more than the mean for a policy whose fairness claim is a bound rather than an average.
-Figure~\ref{fig:exp1paired} shows the same comparison unaggregated, one point per seed.
+Figure~S1 in the supplementary material shows the same comparison unaggregated, one point per seed.
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{exp1_paired.pdf}
-\caption{Experiment 1, unaggregated. Each point is one seed at one demand level, plotting \relay's
-mean delay against the Webster plan's mean delay on the identical arrival stream. Points below the
-diagonal favour \relay. Colour encodes the demand multiplier from 0.6 (dark) to 1.4 (light).}
-\label{fig:exp1paired}
-\end{figure*}
+
 
 \subsection{Switching, clearance, and what saturation costs an unconstrained policy}
 \label{sec:discussion}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{exp1b_switching.pdf}
-\caption{Experiment 1b. Left: phase changes per hour. Right: the fraction of wall time during which
-a green is displayed, the complement of which is time spent in yellow and all-red clearance. The
-dashed line is the equal-split fixed plan, whose behaviour is independent of demand by construction.}
-\label{fig:exp1b}
-\end{figure*}
+
 
 Balanced saturated demand is where an unconstrained pressure policy fails, and the failure is worth
 stating precisely because it motivates three of the rules in Section~\ref{sec:control}. No phase
@@ -803,7 +789,7 @@ Sections~\ref{sec:floor} and~\ref{sec:cost} recover it with a cycle measured rat
 and the starvation rule of Section~\ref{sec:control} serves the worst-treated queue instead of
 rotating among equally starved ones. Each is separately necessary; none requires a site survey.
 
-Figure~\ref{fig:exp1b} shows what the resulting policy does. \relay{} switches more often than the
+Figure~S2 in the supplementary material shows what the resulting policy does. \relay{} switches more often than the
 fixed plan under balanced demand, 282 to 331 per hour against 204, and displays green for less of the
 wall clock, 0.585 to 0.646 against 0.743, while reducing delay by 28.4\% to 38.5\%. Displayed green
 time is therefore not the objective: a fixed plan spends its green where the demand is not, and
@@ -938,36 +924,11 @@ bounded worst case, not a uniformly faster response.
 \subsection{Perception}
 \label{sec:perception}
 
-\begin{table*}[t]
-\centering
-\caption{Experiment 4. Detector performance on the system's held-out split: 97 images, 4990 labelled
-instances. The checkpoint evaluated is the one shipped with the system, a 2.59-million parameter
-model. P and R are precision and recall at the operating point the validator reports.}
-\label{tab:detector}
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\begin{tabular}{lccccccccc}
-\toprule
-& \multicolumn{4}{c}{Overall} & \multicolumn{5}{c}{AP@50 by class} \\
-\cmidrule(lr){2-5}\cmidrule(lr){6-10}
-Model & mAP@50 & mAP@50-95 & P & R & car & motorcycle & bus & truck & ambulance \\
-\midrule
-Shipped fine-tune & 0.954 & 0.809 & 0.950 & 0.886 & 0.985 & 0.851 & 0.981 & 0.964 & 0.987 \\
-\bottomrule
-\end{tabular}
-\end{table*}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{detector.pdf}
-\caption{Experiment 4. Left: per-class average precision at IoU 0.5 on the held-out split, with the
-overall mean average precision marked. Right: sampled vehicle count as a function of inference
-resolution, normalised to the count at 640~px. Neither curve has flattened by 1600~px, which is
-direct evidence that vehicles are still being missed.}
-\label{fig:detector}
-\end{figure*}
 
-Table~\ref{tab:detector} reports mean average precision of 0.954 at IoU 0.5 and 0.809 averaged over
+
+
+Table~S1 in the supplementary material reports mean average precision of 0.954 at IoU 0.5 and 0.809 averaged over
 IoU 0.5 to 0.95, with precision 0.950 and recall 0.886. Per-class average precision exceeds 0.96 for
 cars, buses, trucks and ambulances and is lowest for motorcycles at 0.851, the expected ordering given
 that two-wheelers are the smallest and most frequently occluded class. An important caveat concerns what
@@ -987,31 +948,11 @@ what the control loop needs, since decision epochs are governed by the 5~s minim
 the frame rate, and perception is decoupled from control so a latency spike delays a count update rather
 than blocking a decision.
 
-\begin{figure*}[t]
-\centering
-\begin{subfigure}{\textwidth}
-\includegraphics[width=\textwidth]{frame_levanhien_22s.png}
-\caption{Signalised boulevard. The controller is running on these counts: the near boulevard approach
-holds 8 vehicles and 6.7~\pcu{} and has green, the crossing street holds 3 vehicles and 1.6~\pcu{}
-and is red, and the header reports the real inference latency for the frame.}
-\end{subfigure}
-\vspace{0.5em}
-\begin{subfigure}{\textwidth}
-\includegraphics[width=\textwidth]{frame_hcmc_18s.png}
-\caption{Dense motorcycle-dominated traffic. The failure mode is visible: 26 vehicles are detected in
-a scene containing several hundred, so the reported \pcu{} demand of 7.7 and 9.6 for the two halves
-is a severe underestimate. No controller decision is shown, because the junction depicted is not
-signal-controlled in the way the two zones imply.}
-\end{subfigure}
-\caption{Experiment 4. The perception stack on real fixed-camera footage. Both frames are direct
-output of the system, with detections, approach polygons and per-approach \pcu{} demand as computed
-at run time.}
-\label{fig:frames}
-\end{figure*}
 
-Figure~\ref{fig:frames} shows annotated frames from both clips, and the second shows the main
+
+Figure~S4 in the supplementary material shows annotated frames from both clips, and the second shows the main
 perception weakness plainly. To quantify rather than assert it, we measured how the count changes with
-inference resolution (Figure~\ref{fig:detector}, right). On the dense clip the mean sampled vehicle
+inference resolution (Figure~S3 in the supplementary material, right). On the dense clip the mean sampled vehicle
 count rises from 21.4 at 640~px to 26.5 at 960~px, 33.2 at 1280~px and 39.1 at 1600~px, an increase of
 83\% with no sign of convergence, and motorcycles alone rise by 120\%; on the sparser boulevard clip
 the count rises from 4.85 to 10.0. A count that keeps growing with resolution has not converged, so the
@@ -1084,46 +1025,43 @@ moves from $+27.1\%$ to $+26.1\%$, and the same single cell is the exception. Th
 Section~\ref{sec:estimation} smooth over a $\tau = 60$~s window, which is long relative to the noise,
 and the decisions they feed are floors and margins rather than instantaneous set points.
 
-That test is the easy one, and reported alone it would flatter the controller. A zero-mean
-error averages out over the smoothing window by construction, whereas
-Section~\ref{sec:perception} measures a \emph{biased} one: on motorcycle-dense footage the
-detector reports 26 vehicles in a scene holding several hundred, and sampled counts are still
-climbing 83\% between 640~px and 1600~px without converging. A biased estimator does not
-average out. We therefore repeat the full grid under count models that are wrong in the
-direction the detector is actually wrong. In every case the queues the controller is managing
-stay exact, so what is measured is the control response to a wrong observation.
+That test is the easy one. A zero-mean error averages out over the smoothing window by
+construction, whereas Section~\ref{sec:perception} measures a \emph{biased} one: the detector
+reports 26 vehicles in a scene holding several hundred, and counts still climb 83\% between 640~px
+and 1600~px without converging. We therefore repeat the grid under two count models that are wrong
+in the direction the detector is wrong. Queues stay exact in both, so what is measured is the
+control response to a wrong observation.
 
-The first model saturates: the controller observes $\hat q = q/(1 + q/C)$, near-exact on a
-lightly loaded approach and increasingly short as the approach fills, which is the shape of the
-measured failure. At both $C = 15$ and $C = 30$~vehicles the result is unchanged, 71 of 72
-cells, a worst margin against the equal-split plan of $+26.6\%$, and a mean cost across the grid
-of $-0.3$ percentage points. The largest loss in any single cell is 1.6 points. The one cell the
-controller loses in fact improves, from $-26.6\%$ to $-4.2\%$, because compressing the dominant
-approach's count stops the policy contending so hard against the fairness bound.
+The first saturates, $\hat q = q/(1 + q/C)$: near-exact on a light approach, increasingly short as
+it fills, which is the shape of the measured failure. At $C = 15$ and $C = 30$ the result is
+unchanged, 71 of 72 cells, worst margin $+26.6\%$ against the equal-split plan, and a mean cost
+across the grid of $-0.3$ percentage points. The largest single-cell loss is 1.6 points. Saturation
+preserves the ordering of approaches and stays accurate where the estimators work, distorting only
+a tail that was going to be served anyway. The one cell the controller loses improves under it,
+from $-26.6\%$ to $-4.2\%$, because compressing the dominant approach's count stops the policy
+contending against the fairness bound.
 
-The second model is a flat multiplicative loss, $\hat q = \lfloor \kappa q \rceil$ applied
-equally to every approach. Down to $\kappa = 0.6$ it costs nothing measurable: 71 of 72 cells at
-$\kappa = 0.9$, $0.8$, $0.7$ and $0.6$, with a mean cost of at most $0.1$ percentage points.
-This is a property of the formulation rather than a lucky range. The degree of saturation of
-Section~\ref{sec:floor} is a ratio of an arrival estimate to a discharge estimate, both derived
-from the same count sequence, so a uniform scale factor cancels before it reaches a decision.
+The second is a flat multiplicative loss, $\hat q = \lfloor \kappa q \rceil$. Down to $\kappa = 0.6$
+it costs nothing measurable: 71 of 72 cells at $\kappa = 0.9$, $0.8$, $0.7$ and $0.6$, mean cost at
+most $0.1$ points. That is a property of the formulation, not a lucky range. The degree of
+saturation in Section~\ref{sec:floor} is a ratio of an arrival estimate to a discharge estimate
+drawn from the same counts, so a uniform scale factor cancels before it reaches a decision.
 
-At $\kappa = 0.5$ the controller collapses, to 50 of 72 cells and a mean cost of 32.7 points,
-falling behind even the equal-split plan in the worst cell ($-11.1\%$). The discontinuity
-between $0.6$ and $0.5$ is not a magnitude effect. At $\kappa = 0.5$ a lone vehicle rounds to
-zero, so an occupied approach reports empty and empty-phase skipping declines to serve it; at
-$\kappa = 0.6$ it survives rounding. Repeating $\kappa = 0.5$ with the single change that an
-occupied approach may never report empty restores the result completely: 71 of 72 cells, worst
-margin $+26.4\%$, mean cost $0.2$ points. The 50\% magnitude error was never the problem.
+At $\kappa = 0.5$ the controller collapses to 50 of 72 cells and a mean cost of 32.7 points, behind
+even the equal-split plan in the worst cell ($-11.1\%$). The discontinuity is not a magnitude
+effect. At $\kappa = 0.5$ a lone vehicle rounds to zero, an occupied approach reports empty, and
+empty-phase skipping declines to serve it; at $\kappa = 0.6$ it survives rounding. Repeating
+$\kappa = 0.5$ with the single change that an occupied approach may never report empty restores the
+result completely: 71 of 72 cells, worst margin $+26.4\%$, mean cost 0.2 points. The 50\% magnitude
+error was never the problem.
 
-We state the resulting requirement precisely, because it is narrower and more testable than
-"the detector must be accurate". What this controller needs from perception is an unbiased
-\emph{presence} signal at short queue lengths, not an accurate absolute count. A detector that
-undercounts a crowd by an order of magnitude is tolerable, because both the pressure ordering
-and the saturation ratio survive it; a detector that cannot distinguish an empty approach from
-one holding a single vehicle is not, whatever its aggregate accuracy. That is a condition a
-field trial can check on a candidate detector before any signal is connected to it, and it is a
-condition the perception stack of Section~\ref{sec:perception} has not yet been shown to meet.
+The requirement this yields is narrower and more testable than "the detector must be accurate".
+What the controller needs is an unbiased \emph{presence} signal at short queue lengths, not an
+accurate absolute count. A detector that undercounts a crowd by an order of magnitude is tolerable,
+because both the pressure ordering and the saturation ratio survive it; one that cannot separate an
+empty approach from a nearly empty one is not, whatever its aggregate accuracy. That is a condition
+a field trial can check on a candidate detector before a signal is connected to it, and it is one
+the stack of Section~\ref{sec:perception} has not been shown to meet.
 
 \section{Limitations}
 \label{sec:limitations}
