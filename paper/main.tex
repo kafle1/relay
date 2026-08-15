@@ -48,7 +48,7 @@ degree of saturation, and a phase change is priced at the discharge its clearanc
 We evaluate it in a seeded point-queue microsimulation against an equal-split fixed-time plan and against
 a deliberately favourable reference whose cycle and splits come from Webster's formulae applied to the
 true mean demand. Across 30 seeds per cell, three demand shapes and five demand levels, mean delay falls
-by 27.9\% to 44.3\% against the Webster plan and by 27.9\% to 96.1\% against the equal-split plan, with
+by 28.4\% to 44.3\% against the Webster plan and by 27.9\% to 96.1\% against the equal-split plan, with
 the 95th-percentile wait cut from 25.8~s to 14.5~s at 1278~veh/h. A wider robustness sweep of 72 cells,
 spanning seven demand shapes, two junction topologies and loads to 2462~veh/h, beats both baselines in 71;
 the exception is a single approach demanding 82\% of all green, where no cycle short enough to respect the
@@ -710,7 +710,7 @@ Single     & 767  & 14.4 (2.2)  & 8.8 (0.5)  & 5.4 (0.4)  & $+62.5$ (4.0) & $+39
 \end{table}
 
 Table~\ref{tab:exp1} and Figure~\ref{fig:exp1} give the single-junction results. \relay{} reduces mean
-delay against both baselines in all fifteen cells, by 27.9\% to 44.3\% against the Webster plan and by
+delay against both baselines in all fifteen cells, by 28.4\% to 44.3\% against the Webster plan and by
 27.9\% to 96.1\% against the equal-split plan.
 
 Under asymmetric demand, the regime the system is designed for, \relay{} reduces mean delay by 54.1\%
@@ -1058,7 +1058,7 @@ T-junction & Balanced   & $+37.1$ & $+37.0$ & $+39.6$ \\
 \end{table}
 
 Table~\ref{tab:exp6} reports the wider grid. \relay{} reduces mean delay against both fixed-time
-baselines in 71 of 72 cells, spanning 547 to 2462~veh/h, and never falls below $+26.1\%$ against the
+baselines in 71 of 72 cells, spanning 432 to 2462~veh/h, and never falls below $+26.1\%$ against the
 equal-split plan anywhere in the grid.
 
 The single exception is the single-dominant-approach shape at the highest load, where the dominant
@@ -1150,7 +1150,7 @@ junction's capacity on amber. Neither requires a traffic survey, a saturation-fl
 per-site constant, which matters for a deployment context where those are exactly what is unavailable.
 
 Measured against a fixed-time plan granted the true mean demand, the controller reduces mean delay in
-every cell of both the primary grid and a wider 72-cell robustness grid but one, by 27.9\% to 44.3\% at a
+every cell of both the primary grid and a wider 72-cell robustness grid but one, by 28.4\% to 44.3\% at a
 single junction and 44.6\% to 57.9\% across a three-junction corridor, cuts the 95th-percentile and
 worst-case waits proportionally further than it cuts the mean, and brings an emergency vehicle to green
 within a worst case of 13.99~s against an analytical bound of 14.0~s. The single exception is an
