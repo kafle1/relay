@@ -92,3 +92,31 @@ process) and `microsim.SAT` (the saturation discharge rate). It **adds**, for th
 - **The `single` demand profile at multiplier 1.4 is the one cell where R.E.L.A.Y. loses badly to
   the Webster plan** (`-33.0 +/- 36.4` per cent). This is `max_green = 30 s` capping the adaptive
   green while Webster allocates 51.2 s. It is reported in the paper rather than dropped.
+
+## Checking the paper against the data
+
+`verify_claims.py` reads the numerical claims out of `../main.tex` and recomputes each one from the
+CSVs in `raw/`. Run it before any submission and after any edit that touches a number:
+
+```bash
+python3 paper/experiments/verify_claims.py
+```
+
+It exits non-zero if a claim drifts from the data, if `main.tex` is missing, or if a claim it
+expects has disappeared from the text. A missing claim is a failure rather than a skip: a checker
+that quietly verifies nothing is worse than no checker. It caught two real errors, a vs-Webster
+minimum taken from the wrong column and a robustness grid lower bound quoted 115 veh/h too high.
+
+## Count-error models in Experiment 6
+
+`NOISE` applies zero-mean Gaussian miscounting, which averages out over the estimators' 60 s window
+and is therefore the easy case. Two biased models test the error the perception stack actually has:
+
+```bash
+SATCAP=15     python3 paper/experiments/exp6_robustness.py   # seen = q/(1+q/C), saturating
+UNDERCOUNT=0.5 python3 paper/experiments/exp6_robustness.py  # seen = round(0.5*q), flat loss
+UNDERCOUNT=0.5 PRESERVE_PRESENCE=1 python3 paper/experiments/exp6_robustness.py
+```
+
+Set exactly one; the script rejects an ambiguous combination rather than silently choosing. Defaults
+are inert, so an unset run reproduces the published CSV exactly.
