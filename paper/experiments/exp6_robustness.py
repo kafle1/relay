@@ -36,6 +36,10 @@ os.makedirs(OUT, exist_ok=True)
 SECONDS, WARMUP, DT = 1800.0, 300.0, 0.5
 SEEDS = list(range(int(os.environ.get("NSEEDS", 25))))
 NOISE = float(os.environ.get("NOISE", 0.0))
+# Biased detector models. Defaults are inert, so an unset run reproduces the paper.
+KEEP = float(os.environ.get("UNDERCOUNT", 1.0))    # fraction of vehicles the detector sees
+SATCAP = float(os.environ.get("SATCAP", 0.0))      # counts saturate toward this ceiling
+PRESERVE_PRESENCE = os.environ.get("PRESERVE_PRESENCE", "") == "1"
 TIMINGS = dict(min_green=5, max_green=45, yellow=3, all_red=1.5, max_wait=60)
 FIXED_GREEN = 13.0
 LEVELS = [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
@@ -57,11 +61,53 @@ POLICIES = ("relay", "fixed_equal", "fixed_webster")
 
 
 def miscount(counts, frac):
-    """What the detector reports, not what is on the road."""
+    """What the detector reports, not what is on the road.
+
+    Zero-mean Gaussian. Symmetric error averages out over the estimator's 60 s window, so this
+    is the easy case and it is not the error the perception stack actually makes.
+    """
     if frac <= 0:
         return counts
     return {a: max(0, int(round(q + random.gauss(0.0, frac * max(1.0, q)))))
             for a, q in counts.items()}
+
+
+def undercount(counts, keep):
+    """A detector that systematically sees only a fraction of what is there.
+
+    Section 7.5 measures this rather than Gaussian noise: on motorcycle-dense footage the stack
+    reports 26 vehicles in a scene holding several hundred, and sampled counts still climb 83%
+    between 640 px and 1600 px inference without converging. A biased estimator does not average
+    out, so it is the case worth testing.
+    """
+    if keep >= 1.0:
+        return counts
+    if PRESERVE_PRESENCE:
+        # Same magnitude bias, but an occupied approach never reads empty. Isolates "the count
+        # is wrong" from "the approach looks empty when it is not".
+        return {a: (max(1, int(round(q * keep))) if q > 0 else 0) for a, q in counts.items()}
+    return {a: max(0, int(round(q * keep))) for a, q in counts.items()}
+
+
+def saturate(counts, cap):
+    """A detector whose count saturates as the scene fills.
+
+    Closer to the measured failure than a flat fraction: near-exact on a light approach, badly
+    short on a heavy one, which is exactly the regime where the controller's decisions matter.
+    Seen count is q / (1 + q/cap), so it is asymptotic to `cap` however many vehicles arrive.
+    """
+    if cap <= 0:
+        return counts
+    return {a: max(0, int(round(q / (1.0 + q / cap)))) for a, q in counts.items()}
+
+
+def observe(counts):
+    """Whatever error model this run is configured for. Exactly one applies."""
+    if SATCAP > 0:
+        return saturate(counts, SATCAP)
+    if KEEP < 1.0:
+        return undercount(counts, KEEP)
+    return miscount(counts, NOISE)
 
 
 def run_all(junction, lam, seed):
@@ -84,7 +130,7 @@ def run_all(junction, lam, seed):
         for p in POLICIES:
             seen = {a: qs[p].q[a] for a in junction.approaches}
             if p == "relay":
-                seen = miscount(seen, NOISE)
+                seen = observe(seen)
             out = ctrl[p].tick(seen, (), DT)
             green = ({a for a, s in out["signals"].items() if s == "green"}
                      if isinstance(out, dict) else out)
@@ -123,7 +169,12 @@ def main():
                       f"vs webster {red['fixed_webster']:+6.1f}%"
                       f"{'   <-- LOSES' if min(red.values()) <= 0 else ''}", flush=True)
 
-    suffix = f"_noise{NOISE:g}" if NOISE else ""
+    if SATCAP > 0:
+        suffix = f"_satcap{SATCAP:g}"
+    elif KEEP < 1.0:
+        suffix = f"_undercount{KEEP:g}" + ("_presence" if PRESERVE_PRESENCE else "")
+    else:
+        suffix = f"_noise{NOISE:g}" if NOISE else ""
     with open(os.path.join(OUT, f"exp6_robustness{suffix}.csv"), "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         w.writeheader()
@@ -132,6 +183,7 @@ def main():
         json.dump({"seconds": SECONDS, "warmup": WARMUP, "dt": DT, "seeds": SEEDS,
                    "levels": LEVELS, "four_way_shapes": FOUR_WAY, "t_shapes": TEE,
                    "timings": TIMINGS, "fixed_green": FIXED_GREEN, "noise": NOISE,
+                   "undercount_keep": KEEP, "saturation_cap": SATCAP,
                    "cells": len(rows), "losing_cells": len(losing)}, fh, indent=2)
 
     print(f"\ncells {len(rows)}   cells losing to either baseline {len(losing)}")
