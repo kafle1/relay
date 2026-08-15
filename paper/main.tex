@@ -1171,7 +1171,11 @@ The controller, perception stack and simulation harness are available at
 produced every table and figure, the raw per-run result files, the captured invariant-check output
 and the figure generation script are distributed with this manuscript in the \texttt{experiments/}
 directory. Re-running the experiment scripts and then the figure script reproduces every number and
-every panel reported here.
+every panel reported here. The reproduction is exact rather than statistical: every run is seeded,
+and re-running Experiment 6 from a clean clone returns all 72 cells identical to the values reported
+here. A checker, \texttt{experiments/verify\_claims.py}, reads the numerical claims out of this
+manuscript and recomputes each one from the raw result files, so a figure quoted in the text and the
+data behind it cannot drift apart unnoticed.
 
 \section*{Declarations}
 
