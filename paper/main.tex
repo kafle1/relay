@@ -39,8 +39,8 @@ configured saturation flow, and uses them to size each green from Webster's cycl
 saturation and to price a phase change at the discharge its clearance forfeits. We evaluate against
 equal-split and demand-optimal Webster fixed plans, plain max-pressure, self-organising traffic lights and
 vehicle-actuated control in a seeded point-queue simulation, and against Webster, max-pressure and gap-actuated
-control in SUMO with a motorcycle-dominated fleet and a sublane model. In the point-queue grid of
-\GridCells{} cells across seven demand shapes, two topologies and loads to \GridDemandHigh{}~veh/h, mean
+control in SUMO with a motorcycle-dominated fleet and a sublane model. In a point-queue grid of
+\GridCells{} cells spanning nine demand shapes on two topologies and loads to \GridDemandHigh{}~veh/h, mean
 delay falls against the Webster plan in every cell but one, by up to \ExpOneMaxWebster\%, and against
 actuated control in \PolActuatedWins{} of \GridCells{} cells; the worst cell is analysed and traced to lost
 time near capacity rather than to the fairness bound. In SUMO the controller reduces delay in every one of
@@ -448,8 +448,9 @@ Parameter values are listed in Table~\ref{tab:params}.
 
 \begin{table}[t]
 \centering
-\caption{Controller parameters. The single-junction column is used in Experiments 1, 3, 6, 7 and 8; the
-corridor column is the configuration of the system's network demonstration, used in Experiments 2 and 9.}
+\caption{Controller parameters. The single-junction column is used in Experiments 1, 3, 6, 7, 8 and 10, with
+$g_{\max} = 30$~s in Experiments 1 and 3 and 45~s in the others; the corridor column is the configuration of
+the system's network demonstration, used in Experiments 2 and 9.}
 \label{tab:params}
 \small
 \begin{tabular}{llcc}
@@ -576,9 +577,10 @@ warm-up, 20 seeds, three demand levels, and one emergency vehicle released from 
 record the delay until that approach displays green and replay the identical trial against the equal-split
 plan, which has no preemption path; 300 trials at each of three demand levels.
 
-\textbf{Experiments 4 and 5: perception.} The shipped detector is evaluated on the system's held-out split, the
-full stack is run over 60~s of two real fixed-camera clips at 960~px on an Apple M3 Pro, and the count is
-measured as a function of inference resolution with smoothing disabled.
+\textbf{Experiment 4: detector.} The shipped detector is evaluated on the system's held-out split.
+
+\textbf{Experiment 5: footage.} The full stack is run over 60~s of two real fixed-camera clips at 960~px on an
+Apple M3 Pro, and the count is measured as a function of inference resolution with smoothing disabled.
 
 \textbf{Experiment 6: robustness grid.} Seven demand shapes on the four-way junction plus two on a three-arm T,
 each at eight load levels running past the point where a fixed plan saturates: \GridCells{} cells of
@@ -796,15 +798,15 @@ count update rather than a decision.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{detector.pdf}
-\caption{Experiment 4. Left: per-class AP at IoU 0.5. Right: sampled count against inference resolution,
-normalised to 640~px. Neither curve has flattened by 1600~px.}
+\caption{Left: Experiment 4, per-class AP at IoU 0.5. Right: Experiment 5, sampled count against inference
+resolution, normalised to 640~px. Neither curve has flattened by 1600~px.}
 \label{fig:detector}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{frame_hcmc_18s.png}
-\caption{Experiment 4. The stack on dense motorcycle-dominated footage. The failure mode is visible: a few
+\caption{Experiment 5. The stack on dense motorcycle-dominated footage. The failure mode is visible: a few
 dozen vehicles are detected in a scene containing several hundred, so the reported \pcu{} demand is a severe
 underestimate. This is the error Experiment 6b models.}
 \label{fig:frames}
@@ -1071,7 +1073,8 @@ arrivals, and a field trial.
 The controller, perception stack, simulation harness, SUMO harness, experiment scripts, raw per-run result
 files and figure and table generators are available at \url{https://github.com/kafle1/relay} under the AGPL-3.0
 licence. Every number in this manuscript is a macro generated from the raw result files by
-\url{experiments/make_numbers.py}, and \url{experiments/verify_claims.py} regenerates and checks them.
+\texttt{paper/experiments/make\_numbers.py}, and \texttt{paper/experiments/verify\_claims.py} regenerates and
+checks them.
 
 \section*{Declarations}
 
