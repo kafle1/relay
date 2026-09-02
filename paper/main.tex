@@ -714,7 +714,7 @@ detectors in the road, sizes its greens from a measured cycle, and carries preem
 \subsection{Microsimulation}
 \label{sec:sumo}
 
-Fig.~\ref{fig:exp8} gives the microsimulation result, with per-cell values in supplementary Table~S6. \relay{} reduces mean time loss
+Supplementary Fig.~S6 and Table~S6 give the microsimulation result. \relay{} reduces mean time loss
 in every one of the \SumoWebsterRuns{} paired runs against each of the three baselines: by \SumoWebsterMin\% to
 \SumoWebsterMax\% against the Webster plan, \SumoMaxpressureMin\% to \SumoMaxpressureMax\% against max-pressure,
 and \SumoActuatedMin\% to \SumoActuatedMax\% against SUMO's actuated program. The margin over actuated control is larger than in the point-queue harness, and the reason is visible in the traffic: with a
@@ -722,21 +722,14 @@ motorcycle-dominated fleet a gap-actuated detector sees a continuous stream of s
 green to its maximum on the busy approach, whereas the measured-cycle floor sizes the green to the degree of
 saturation and hands over sooner. The reduction falls with load in every profile, as it does in the point-queue grid.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.86\columnwidth]{exp8_sumo.pdf}
-\caption{Experiment 8. Left: mean time loss per vehicle in SUMO by policy and demand. Right: 95th-percentile
-and worst time loss at the highest load, where \relay's tail is no longer the shortest.}
-\label{fig:exp8}
-\end{figure}
-
 One result goes the other way. At the highest load the worst observed time loss is
 \SumoHighMaxRelay~s under \relay{} against \SumoHighMaxWebster~s under Webster and \SumoHighMaxActuated~s under
 actuated control, averaged over the three profiles, and the 95th percentile is \SumoHighPNinetyFiveRelay~s
 against \SumoHighPNinetyFiveWebster~s. In the point-queue harness the fairness bound held the tail; in SUMO it
-does not, because the bound applies to what the camera sees. A vehicle beyond the 80~m detection zone is on no wait clock, and under saturation the queue extends past the zone, so the vehicles that wait longest are
-precisely the ones the controller cannot count. This is a real limitation of camera-based control with a fixed field of view, and the strongest argument
-here for a wider or second camera at a junction expected to saturate. At light and moderate load, where the queue sits inside the zone, the tail is
+does not, because the bound applies to what the camera sees. A vehicle beyond the 80~m detection zone is on no
+wait clock, and under saturation the queue extends past the zone, so the vehicles that wait longest are
+precisely the ones the controller cannot count. That is the strongest argument here for a wider or second
+camera at a junction expected to saturate. At light and moderate load, where the queue sits inside the zone, the tail is
 shortest under \relay{} (\SumoLowPNinetyFiveRelay~s against \SumoLowPNinetyFiveWebster~s at the lightest load).
 
 The SUMO corridor (Experiment 9, supplementary Table~S7) settles the coupling question the point-queue
@@ -744,7 +737,9 @@ corridor left open. With links short enough
 that a downstream queue physically blocks an upstream discharge, disabling the coupling term changes mean time
 loss by \ScorrLowRedIsolated\%, \ScorrMidRedIsolated\% and \ScorrHighRedIsolated\% at the three levels, at most
 \ScorrCoupleAbsMax\%. The corridor gain over the coordinated Webster plan, \ScorrRedCoordMin\% to
-\ScorrRedCoordMax\%, is therefore attributable to local adaptivity alone in both traffic models; the aggregate downstream queue is too weak a proxy for the movement-specific pressure difference to add anything measurable, and the design would lose nothing by dropping it.
+\ScorrRedCoordMax\%, is therefore attributable to local adaptivity alone in both traffic models: the aggregate
+downstream queue is too weak a proxy for the movement-specific pressure difference, and the design would lose
+nothing by dropping it.
 
 \subsection{Sensitivity}
 \label{sec:sensitivity}
@@ -772,9 +767,9 @@ waiting longest are beyond the detection zone. Any camera-based controller share
 stated to an authority as a condition on camera placement rather than hidden in a mean.
 
 \textbf{Perception was not validated against human ground truth.} The held-out split mixes synthetic frames
-with pseudo-labelled real frames, so mAP measures agreement with the labelling process; Experiment 6b bounds
-the consequence for control, but the magnitude of the undercount on the target city's junctions is unknown
-and a human-annotated set is required before any absolute demand claim can be made.
+with pseudo-labelled real frames, so mAP measures agreement with the labelling process. Experiment 6b bounds
+the consequence for control, but the undercount on the target city's junctions is unknown, and a
+human-annotated set is needed before any absolute demand claim.
 
 \textbf{Narrower gaps.} The microsimulation uses SUMO defaults and a fleet plausible for the region rather
 than one fitted to a Kathmandu junction, so it establishes that the advantage survives car-following, lane
@@ -788,10 +783,9 @@ be removed or replaced by a movement-level pressure difference.
 
 We have described a single-camera adaptive signal controller for heterogeneous urban traffic and evaluated it
 in a seeded point-queue simulation, in SUMO with a motorcycle-dominated fleet, and on real fixed-camera
-footage. Its distinguishing feature is that it measures the
-junction rather than being told about it: arrival and discharge rates estimated from the same counts the
-detector produces size each green from Webster's cycle on the measured degree of saturation and set the margin
-a competing phase must clear.
+footage. Its distinguishing feature is that it measures the junction rather than being told about it:
+arrival and discharge rates estimated from the detector's own counts size each green from Webster's cycle on
+the measured degree of saturation and set the margin a competing phase must clear.
 
 Against a fixed plan granted the true mean demand the controller reduces mean delay in every cell of the
 primary grid and in every one of the \GridCells{} cells of the robustness grid, the weakest of them near
@@ -806,15 +800,21 @@ arrivals, and a field trial.
 
 \section*{Data, Code and Declarations}
 
-The controller, perception stack, simulation and SUMO harnesses, experiment scripts, raw per-run result
-files and the figure and table generators are available at \url{https://github.com/kafle1/relay} under the
-AGPL-3.0 licence; every number in this manuscript is a macro generated from the raw result files by
-\texttt{paper/experiments/make\_numbers.py}, and \texttt{paper/experiments/verify\_claims.py} regenerates and
-checks them. The author declares no competing interests and received no funding. No human subjects or
-personal data were involved: the footage is publicly available recorded video of public roads, used only for
-aggregate counting, with no identification of individuals or vehicles attempted.
+The controller, perception stack, simulation and SUMO harnesses, experiment scripts, raw per-run result files
+and the figure and table generators are at \url{https://github.com/kafle1/relay} under AGPL-3.0. Every number
+here is a macro generated from the raw files by \texttt{make\_numbers.py}, and \texttt{verify\_claims.py}
+rechecks them. The author declares no competing interests and received no funding. No human subjects or
+personal data were involved: the footage is public video of public roads, used only for aggregate counting,
+with no identification of individuals or vehicles attempted.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
+
+\begin{IEEEbiographynophoto}{Niraj Kafle}
+received the bachelor's degree in computing from Phoenix College of Management, Lincoln University
+College, Kathmandu, Nepal. He is an independent researcher in Kathmandu and runs a technology training
+academy there. His work is on open-source perception and control for cities that cannot afford the sensor
+plant such methods normally assume.
+\end{IEEEbiographynophoto}
 
 \end{document}
