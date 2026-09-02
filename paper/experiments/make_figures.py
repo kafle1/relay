@@ -8,7 +8,6 @@ Usage:  .venv/bin/python experiments/make_figures.py
 """
 import csv
 import os
-import statistics
 
 import matplotlib
 matplotlib.use("Agg")
@@ -39,9 +38,9 @@ plt.rcParams.update({
 })
 C = {"relay": "#1b4965", "fixed_equal": "#c1666b", "fixed_webster": "#e8a33d",
      "relay_coupled": "#1b4965", "relay_isolated": "#5fa8d3", "fixed_coord": "#7a5c99"}
-LBL = {"relay": "R.E.L.A.Y.", "fixed_equal": "Fixed, equal split",
-       "fixed_webster": "Fixed, Webster", "relay_coupled": "R.E.L.A.Y. (coupled)",
-       "relay_isolated": "R.E.L.A.Y. (isolated)", "fixed_coord": "Fixed, coordinated"}
+LBL = {"relay": "RELAY", "fixed_equal": "Fixed, equal split",
+       "fixed_webster": "Fixed, Webster", "relay_coupled": "RELAY (coupled)",
+       "relay_isolated": "RELAY (isolated)", "fixed_coord": "Fixed, coordinated"}
 PROF = {"asymmetric": "Asymmetric demand", "balanced": "Balanced demand",
         "single": "Single dominant approach"}
 
@@ -197,11 +196,11 @@ def fig_exp3():
     fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.4))
     bins = np.arange(0, 25.5, 1.0)
     ax[0].hist(lf, bins=bins, color=C["fixed_equal"], alpha=0.75, label="Fixed, equal split")
-    ax[0].hist(la, bins=bins, color=C["relay"], alpha=0.8, label="R.E.L.A.Y. preemption")
+    ax[0].hist(la, bins=bins, color=C["relay"], alpha=0.8, label="RELAY preemption")
     ax[0].set_xlabel("Time to green for the emergency approach (s)")
     ax[0].set_ylabel("Trials")
     ax[0].legend(frameon=False)
-    for v, c, lb in ((la, C["relay"], "R.E.L.A.Y. preemption"),
+    for v, c, lb in ((la, C["relay"], "RELAY preemption"),
                      (lf, C["fixed_equal"], "Fixed, equal split")):
         xs = np.sort(v)
         ax[1].step(xs, np.arange(1, len(xs) + 1) / len(xs), color=c, lw=1.4, label=lb)
@@ -275,7 +274,7 @@ def fig_paired():
         ax[j].set_yscale("log")
         ax[j].set_title(PROF[p])
         if j == 0:
-            ax[j].set_ylabel("R.E.L.A.Y.: mean delay (s)")
+            ax[j].set_ylabel("RELAY: mean delay (s)")
     ax[0].legend(frameon=False, fontsize=6.5, loc="upper left")
     fig.supxlabel("Fixed, Webster: mean delay per vehicle (s)", y=0.02)
     fig.subplots_adjust(bottom=0.20, wspace=0.30)
@@ -283,8 +282,86 @@ def fig_paired():
     plt.close(fig)
 
 
+# ── Figure: adaptive baselines over the 72-cell grid ─────────────────────────
+def fig_exp7():
+    rows = sorted(load("exp7_policies.csv"), key=lambda r: f(r, "total_demand_vph"))
+    fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.5))
+    x = np.arange(len(rows))
+    cols = {"fixed_webster": "#e8a33d", "maxpressure": "#7a5c99", "sotl": "#c1666b", "actuated": "#1b4965"}
+    names = {"fixed_webster": "Fixed, Webster", "maxpressure": "Max-pressure", "sotl": "SOTL", "actuated": "Actuated"}
+    for p, c in cols.items():
+        ax.plot(x, [f(r, f"red_vs_{p}") for r in rows], marker="o", ms=2.2, lw=0.8, color=c, label=names[p])
+    ax.axhline(0, color="0.3", lw=0.8)
+    ax.set_xlabel("Grid cell, ordered by total demand")
+    ax.set_ylabel("Delay reduction by RELAY (%)")
+    ax.legend(frameon=False, fontsize=7, ncol=4, loc="upper center", bbox_to_anchor=(0.5, -0.22))
+    fig.savefig(os.path.join(FIGS, "exp7_policies.pdf"))
+    plt.close(fig)
+
+
+# ── Figure: SUMO single junction ─────────────────────────────────────────────
+def fig_exp8():
+    s = load("exp8_sumo_summary.csv")
+    fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.5))
+    cols = {"webster": "#e8a33d", "maxpressure": "#7a5c99", "actuated": "#5fa8d3", "relay": "#1b4965"}
+    names = {"webster": "Fixed, Webster", "maxpressure": "Max-pressure", "actuated": "Actuated (SUMO)", "relay": "RELAY"}
+    profs = ["asymmetric", "balanced", "single"]
+    w = 0.2
+    for i, p in enumerate(cols):
+        for j, prof in enumerate(profs):
+            sub = [r for r in s if r["profile"] == prof]
+            xs = [j * 4 + k + (i - 1.5) * w for k in range(len(sub))]
+            ax[0].bar(xs, [f(r, f"{p}_mean_delay_mean") for r in sub], width=w, color=cols[p],
+                      yerr=[f(r, f"{p}_mean_delay_sd") for r in sub], label=names[p] if j == 0 else None, error_kw={"lw": 0.6})
+    ax[0].set_xticks([j * 4 + 1 for j in range(3)])
+    ax[0].set_xticklabels([PROF[p].replace(" demand", "").replace(" approach", "") for p in profs], fontsize=7.5)
+    ax[0].set_ylabel("Mean time loss per vehicle (s)")
+    ax[0].legend(frameon=False, fontsize=6.5, ncol=2)
+    ax[0].set_title("Three load levels per profile (m = 0.6, 1.0, 1.4)")
+    high = [r for r in s if abs(f(r, "level") - 1.4) < 1e-9]
+    x = np.arange(len(high))
+    for i, p in enumerate(cols):
+        ax[1].bar(x + (i - 1.5) * w, [f(r, f"{p}_p95_delay_mean") for r in high], width=w, color=cols[p], alpha=0.55)
+        ax[1].bar(x + (i - 1.5) * w, [f(r, f"{p}_max_delay_mean") for r in high], width=w, color="none", edgecolor=cols[p], lw=0.9)
+    ax[1].set_xticks(x)
+    ax[1].set_xticklabels([r["profile"] for r in high], fontsize=7.5)
+    ax[1].set_ylabel("Time loss at m = 1.4 (s)")
+    ax[1].set_title("95th percentile (filled) and worst (outline)")
+    fig.subplots_adjust(wspace=0.3)
+    fig.savefig(os.path.join(FIGS, "exp8_sumo.pdf"))
+    plt.close(fig)
+
+
+# ── Figure: sensitivity to R and to the motorcycle weight ────────────────────
+def fig_exp10():
+    rows = load("exp10_sensitivity.csv")
+    fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.4))
+    rw = [r for r in rows if r["sweep"] == "max_wait"]
+    for lv, c in ((1.4, "#5fa8d3"), (1.8, "#1b4965")):
+        sub = [r for r in rw if abs(f(r, "level") - lv) < 1e-9]
+        xs = [float(r["value"]) if r["value"] != "inf" else 400.0 for r in sub]
+        ax[0].plot(xs, [f(r, "relay_mean_wait") for r in sub], marker="o", ms=3, color=c, label=f"mean, m = {lv}")
+        ax[0].plot(xs, [f(r, "relay_max_wait") for r in sub], marker="s", ms=3, ls="--", color=c, label=f"worst, m = {lv}")
+    ax[0].set_xscale("log")
+    ax[0].set_xticks([30, 60, 120, 400]); ax[0].set_xticklabels(["30", "60", "120", "none"])
+    ax[0].set_xlabel("Fairness bound R (s)")
+    ax[0].set_ylabel("Wait under RELAY (s)")
+    ax[0].legend(frameon=False, fontsize=6.5, ncol=2)
+    wm = [r for r in rows if r["sweep"] == "w_motorcycle"]
+    for shape, c in (("asymmetric", "#1b4965"), ("balanced", "#e8a33d"), ("single", "#c1666b")):
+        sub = [r for r in wm if r["shape"] == shape]
+        ax[1].plot([f(r, "value") for r in sub], [f(r, "red_vs_webster") for r in sub], marker="o", ms=3, color=c, label=PROF[shape])
+    ax[1].set_xlabel("Motorcycle PCU weight")
+    ax[1].set_ylabel("Reduction vs Webster (%)")
+    ax[1].set_ylim(0, 50)
+    ax[1].legend(frameon=False, fontsize=6.5)
+    fig.subplots_adjust(wspace=0.3)
+    fig.savefig(os.path.join(FIGS, "exp10_sensitivity.pdf"))
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    for fn in (fig_exp1, fig_exp1_tail, fig_exp1b, fig_exp2, fig_exp3, fig_detector, fig_paired):
+    for fn in (fig_exp1, fig_exp1_tail, fig_exp1b, fig_exp2, fig_exp3, fig_detector, fig_paired, fig_exp7, fig_exp8, fig_exp10):
         fn()
         print("ok", fn.__name__)
     print("figures written to", FIGS)

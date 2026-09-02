@@ -50,7 +50,6 @@ class LaneSet:
     lanes: list = field(default_factory=list)
     confidence: float = 0.0
     stop_line: list = None
-    vanishing_point: tuple = None
     flow: tuple = None
     support: dict = field(default_factory=dict)
     reason: str = ""
@@ -443,7 +442,6 @@ def detect_lanes(plate, poly=None, flow=None, toward=(0.5, 0.5), min_conf=MIN_CO
     return LaneSet(
         lanes=lanes, confidence=conf,
         stop_line=[(min(max(x / w, 0.0), 1.0), min(max(y / h, 0.0), 1.0)) for x, y in sl] if sl else None,
-        vanishing_point=(round(vp[0] / w, 4), round(vp[1] / h, 4)) if vp else None,
         flow=(u[0] / w, u[1] / h),
         support={"segments": int(len(segs)), "boundaries": len(kept), "paint_px": paint_px,
                  "interpolated": interp, "lane_width": round(typical / max(width, 1e-6), 3),

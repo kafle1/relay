@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""R.E.L.A.Y. perception core — frames in, per-approach vehicle counts out.
+"""R.E.L.A.Y. perception core, frames in, per-approach vehicle counts out.
 
 Source-agnostic: the same class serves real CCTV clips, live streams, and the synthetic feed.
 Handles the perception edge cases from docs/edge-cases.md: per-class confidence, centroid-in-zone
@@ -7,17 +7,19 @@ assignment, ~1s temporal smoothing, corrupt-frame tolerance, and a staleness fla
 """
 import time
 
+import cv2
+
 from controller import PCU  # single source of truth for PCU weights (controller.py owns it)
 
-# per-class confidence: lower for two-wheelers (small, easily missed — edge case A2).
+# per-class confidence: lower for two-wheelers (small, easily missed, edge case A2).
 # ambulance runs a HIGH gate: it is the one class that moves signals by itself (emergency
-# preempt), and a marginal read — a white motorcycle, a van roofline — as "ambulance" hijacks
+# preempt), and a marginal read, a white motorcycle, a van roofline, as "ambulance" hijacks
 # the junction for tens of seconds. Real sirens measure ≥0.9 on the fine-tune; 0.68 costs
 # nothing there and silences the impostors (at 0.55, ~0.8% of boxes on an ambulance-free scene
-# still read "ambulance" — measured live). A below-gate ambulance still counts as traffic
-# demand via whatever its second-best read is on the next frame — never as an emergency.
+# still read "ambulance", measured live). A below-gate ambulance still counts as traffic
+# demand via whatever its second-best read is on the next frame, never as an emergency.
 # truck runs 0.5: at the 0.38 default the live cross-check read ~5x the trucks actually present
-# (phantoms on cars/buses at conf 0.4-0.5; real trucks read 0.7-0.98) — and every phantom truck
+# (phantoms on cars/buses at conf 0.4-0.5; real trucks read 0.7-0.98), and every phantom truck
 # injects 2.0 PCU of fake demand into the controller.
 CONF = {"motorcycle": 0.24, "bicycle": 0.24, "ambulance": 0.68, "truck": 0.5, "default": 0.38}
 EMERGENCY = {"ambulance"}
@@ -34,7 +36,7 @@ def iou(a, b):
 
 def cross_class_dedupe(dets, thr=0.5):
     """One vehicle, one box: per-class NMS still leaves a stacked car+truck+motorcycle trio on a
-    single far-queue vehicle — keep the most confident. Runs AFTER the PCU/confidence filters,
+    single far-queue vehicle, keep the most confident. Runs AFTER the PCU/confidence filters,
     unlike agnostic NMS inside predict(), where a person box (discarded later anyway) or a
     below-gate detection could suppress the real vehicle box and erase or relabel it."""
     kept = []
@@ -88,13 +90,13 @@ class Perception:
             return self.counts(), set(), []            # reuse last smoothed counts
         h, w = frame.shape[:2]
         if not h or not w:
-            return self.counts(), set(), []            # degenerate frame — keep last counts
+            return self.counts(), set(), []            # degenerate frame, keep last counts
         raw = {a: {} for a in self.zones}
         raw_lane = {a: [{} for _ in polys] for a, polys in self.lanes.items()}
         seen = {a: [0, 0] for a in self.lanes}          # [landed in a lane, landed in the approach]
         dets, emergencies = [], set()
         for b in (res.boxes or []):
-            # only classes with a PCU weight count — anything else (person, dog, ...) is ignored,
+            # only classes with a PCU weight count, anything else (person, dog, ...) is ignored,
             # never relabeled. Stock COCO and our fine-tune both emit PCU names directly.
             name = self.names.get(int(b.cls), "")
             if name not in PCU:
@@ -144,10 +146,6 @@ class Perception:
     def counts(self):
         return {a: dict(c) for a, c in self.smoothed.items()}
 
-    def lane_counts(self):
-        """{approach: [{class: n} per lane]}. Only for approaches that have lanes attached."""
-        return {a: [dict(c) for c in per_lane] for a, per_lane in self.lane_smoothed.items()}
-
     def lane_queues(self):
         """{approach: [PCU per lane]}. Per-lane demand is what a saturation-flow estimate or a
         per-movement phase needs: six vehicles in one lane and six across three discharge very
@@ -162,5 +160,16 @@ class Perception:
         return {a: round(v, 3) for a, v in self._cover.items()}
 
     def stale(self, max_age=3.0):
-        """True if perception hasn't produced counts recently (controller should fall back — C30)."""
+        """True if perception hasn't produced counts recently (controller should fall back, C30)."""
         return (time.monotonic() - self.last_update) > max_age
+
+
+def draw_chip(img, x, y, text, fg=(240, 240, 240), bg=(28, 28, 30), scale=0.52, pad=7):
+    """Small translucent label chip; returns the x just past its right edge, for chaining."""
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+    ov = img.copy()
+    cv2.rectangle(ov, (x, y), (x + tw + 2 * pad, y + th + 2 * pad), bg, -1)
+    cv2.addWeighted(ov, 0.82, img, 0.18, 0, img)
+    cv2.putText(img, text, (x + pad, y + th + pad - 1), cv2.FONT_HERSHEY_SIMPLEX,
+                scale, fg, 1, cv2.LINE_AA)
+    return x + tw + 2 * pad

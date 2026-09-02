@@ -26,19 +26,9 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from calibrate import Tracker, propose, save_topology, validate_zones   # noqa: E402
 from controller import junction_from_dirs                              # noqa: E402
 from lanes import MIN_CONFIDENCE, detect, road_plate                   # noqa: E402
-from perception import Perception                                      # noqa: E402
+from perception import Perception, draw_chip                           # noqa: E402
 
 ARM_COL = {"N": (110, 230, 130), "S": (0, 200, 250), "E": (250, 170, 90), "W": (200, 120, 250)}
-
-
-def chip(img, x, y, text, fg=(240, 240, 240), bg=(28, 28, 30), scale=0.52, pad=7):
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
-    ov = img.copy()
-    cv2.rectangle(ov, (x, y), (x + tw + 2 * pad, y + th + 2 * pad), bg, -1)
-    cv2.addWeighted(ov, 0.82, img, 0.18, 0, img)
-    cv2.putText(img, text, (x + pad, y + th + pad - 1), cv2.FONT_HERSHEY_SIMPLEX,
-                scale, fg, 1, cv2.LINE_AA)
-    return x + tw + 2 * pad
 
 
 def preview(plate, prop, lanesets, tracks, path, title):
@@ -80,14 +70,14 @@ def preview(plate, prop, lanesets, tracks, path, title):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
         lane_txt = (f"{len(ls.lanes)} lanes @{ls.confidence:.2f}" if ls and ls.trusted()
                     else "approach-level")
-        chip(img, min(max(int(min(p[0] for p in poly) * w), 4), w - 260),
+        draw_chip(img, min(max(int(min(p[0] for p in poly) * w), 4), w - 260),
              min(max(int(min(p[1] for p in poly) * h) + 4, 4), h - 30),
              f"{a}: {info['trajectories']} tracks - {lane_txt}", fg=col, scale=0.5)
     cx, cy = int(prop.center[0] * w), int(prop.center[1] * h)
     cv2.drawMarker(img, (cx, cy), (60, 60, 245), cv2.MARKER_CROSS, 26, 2, cv2.LINE_AA)
-    x = chip(img, 14, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.62)
-    x = chip(img, x + 8, 12, title)
-    chip(img, x + 8, 12, "proposed topology - review before deploying")
+    x = draw_chip(img, 14, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.62)
+    x = draw_chip(img, x + 8, 12, title)
+    draw_chip(img, x + 8, 12, "proposed topology - review before deploying")
     cv2.imwrite(path, img)
 
 

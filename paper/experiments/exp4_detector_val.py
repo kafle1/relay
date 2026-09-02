@@ -11,7 +11,6 @@ Usage:  .venv/bin/python experiments/exp4_detector_val.py  (run from the repo cl
 import csv
 import json
 import os
-import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if not os.path.exists(os.path.join(REPO, "src", "controller.py")):
@@ -25,7 +24,15 @@ NAMES = {0: "car", 1: "motorcycle", 2: "bus", 3: "truck", 4: "ambulance"}
 
 def build_local_yaml():
     """Rewrite the dataset split lists so they point at the workspace copy, then emit a yaml."""
-    ref_root = "/Users/nirajkafle/Desktop/niraj/dev-projects/trafficmgmt/dataset"
+    ref_root = os.path.join(REPO, "dataset")
+    try:
+        with open(os.path.join(REPO, "dataset", "train.txt")) as fh:
+            first = fh.readline().strip()
+        idx = first.find("/dataset")
+        if idx != -1:
+            ref_root = first[:idx + len("/dataset")]
+    except OSError:
+        pass
     for split in ("train", "val"):
         src = os.path.join(ref_root, f"{split}.txt")
         with open(src) as fh:

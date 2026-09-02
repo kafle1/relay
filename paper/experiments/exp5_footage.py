@@ -30,7 +30,7 @@ import torch                                                     # noqa: E402
 from ultralytics import YOLO                                     # noqa: E402
 
 from controller import Controller, Timings, junction_from_dirs, PCU   # noqa: E402
-from perception import Perception                                     # noqa: E402
+from perception import Perception, draw_chip                          # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get("RELAY_OUT", os.path.join(HERE, "raw"))
@@ -61,17 +61,6 @@ BOX = {"car": (90, 220, 110), "motorcycle": (40, 170, 255), "bus": (250, 200, 90
 GREEN, YEL, RED = (90, 220, 110), (40, 210, 250), (70, 70, 240)
 
 
-def chip(img, x, y, text, scale=0.52, fg=(240, 240, 240), bg=(22, 22, 26)):
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
-    pad = 6
-    ov = img.copy()
-    cv2.rectangle(ov, (x, y), (x + tw + 2 * pad, y + th + 2 * pad), bg, -1)
-    cv2.addWeighted(ov, 0.82, img, 0.18, 0, img)
-    cv2.putText(img, text, (x + pad, y + th + pad - 1), cv2.FONT_HERSHEY_SIMPLEX,
-                scale, fg, 1, cv2.LINE_AA)
-    return x + tw + 2 * pad + 8
-
-
 def run(preset, cfg, model_path, device):
     model = YOLO(model_path)
     percep = Perception(model, cfg["zones"])
@@ -83,7 +72,9 @@ def run(preset, cfg, model_path, device):
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         raise SystemExit(f"cannot open {path}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not 1 <= fps <= 120:   # 0/NaN/negative/huge from broken metadata, assume 25
+        fps = 25
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.set(cv2.CAP_PROP_POS_MSEC, cfg["start"] * 1000)
@@ -130,9 +121,9 @@ def run(preset, cfg, model_path, device):
                 cv2.rectangle(img, (x1, y1), (x2, y2), col, 2, cv2.LINE_AA)
                 cv2.putText(img, b["cls"], (x1, max(12, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX,
                             0.40, col, 1, cv2.LINE_AA)
-            x = chip(img, 12, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.58)
-            x = chip(img, x, 12, cfg["caption"])
-            chip(img, x, 12, f"YOLO {infer_ms:.0f} ms, {len(boxes)} vehicles")
+            x = draw_chip(img, 12, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.58)
+            x = draw_chip(img, x + 8, 12, cfg["caption"])
+            draw_chip(img, x + 8, 12, f"YOLO {infer_ms:.0f} ms, {len(boxes)} vehicles")
             for a, poly in cfg["zones"].items():
                 c = counts.get(a, {})
                 pcu = sum(PCU.get(k, 1.0) * v for k, v in c.items())
@@ -141,9 +132,9 @@ def run(preset, cfg, model_path, device):
                 txt = f"{cfg['label'][a]}: {sum(c.values()):.0f} veh, {pcu:.1f} PCU"
                 if state:
                     txt += f"  [{state['signals'][a]}]"
-                chip(img, px, py, txt, scale=0.46)
+                draw_chip(img, px, py, txt, scale=0.46)
             if state:
-                chip(img, 12, h - 34, f"phase {state['phase']} {state['stage']}"
+                draw_chip(img, 12, h - 34, f"phase {state['phase']} {state['stage']}"
                                       f"  elapsed {state['elapsed']:.1f} s", scale=0.5)
             fp = os.path.join(FIGS, f"frame_{preset}_{int(t_clip)}s.png")
             cv2.imwrite(fp, img, [cv2.IMWRITE_PNG_COMPRESSION, 6])
@@ -167,8 +158,7 @@ def run(preset, cfg, model_path, device):
             "infer_ms_max": round(max(lat), 2),
             "throughput_fps": round(1000.0 / statistics.fmean(lat), 2),
             "boxes_mean": round(statistics.fmean(nb), 2), "boxes_max": max(nb),
-            "phase_switches": len({(r["phase"], i) for i, r in enumerate(rows)}) if False else
-                              sum(1 for a, b in zip(rows, rows[1:]) if a["phase"] != b["phase"])}
+            "phase_switches": sum(1 for a, b in zip(rows, rows[1:]) if a["phase"] != b["phase"])}
 
 
 def main():

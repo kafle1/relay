@@ -104,7 +104,10 @@ def main():
             r["level_name"] = name
             rows.append(r)
         got = [r["latency_relay"] for r in rows if r["level_name"] == name and r["latency_relay"] is not None]
-        print(f"{name}: n={len(got)} mean={statistics.fmean(got):.2f}s max={max(got):.2f}s", flush=True)
+        if got:
+            print(f"{name}: n={len(got)} mean={statistics.fmean(got):.2f}s max={max(got):.2f}s", flush=True)
+        else:
+            print(f"{name}: n=0 (no calls resolved)", flush=True)
 
     with open(os.path.join(OUT, "exp3_preemption.csv"), "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
@@ -119,14 +122,17 @@ def main():
         paired = [(r["latency_fixed"], r["latency_relay"]) for r in sel
                   if r["latency_relay"] is not None and r["latency_fixed"] is not None]
         entry = dict(level=name, n=len(sel), n_resolved_relay=len(la), n_resolved_fixed=len(lf),
-                     relay_mean=round(statistics.fmean(la), 3),
+                     relay_mean=round(statistics.fmean(la), 3) if la else 0.0,
                      relay_sd=round(statistics.stdev(la), 3) if len(la) > 1 else 0.0,
-                     relay_p50=round(_pct(la, 50), 2), relay_p95=round(_pct(la, 95), 2),
-                     relay_max=round(max(la), 2), relay_min=round(min(la), 2),
-                     fixed_mean=round(statistics.fmean(lf), 3),
+                     relay_p50=round(_pct(la, 50), 2) if la else 0.0,
+                     relay_p95=round(_pct(la, 95), 2) if la else 0.0,
+                     relay_max=round(max(la), 2) if la else 0.0,
+                     relay_min=round(min(la), 2) if la else 0.0,
+                     fixed_mean=round(statistics.fmean(lf), 3) if lf else 0.0,
                      fixed_sd=round(statistics.stdev(lf), 3) if len(lf) > 1 else 0.0,
-                     fixed_p50=round(_pct(lf, 50), 2), fixed_p95=round(_pct(lf, 95), 2),
-                     fixed_max=round(max(lf), 2),
+                     fixed_p50=round(_pct(lf, 50), 2) if lf else 0.0,
+                     fixed_p95=round(_pct(lf, 95), 2) if lf else 0.0,
+                     fixed_max=round(max(lf), 2) if lf else 0.0,
                      already_green_frac=round(statistics.fmean([r["already_green"] for r in sel]), 4))
         if paired:
             entry["mean_saving_s"] = round(statistics.fmean([f - a for f, a in paired]), 3)

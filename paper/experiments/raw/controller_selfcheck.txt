@@ -2,8 +2,8 @@
 controller self-check PASSED:
   ✓ no green->green without yellow+all-red clearance
   ✓ empty-phase skip (no green wasted on an empty lane while another waits)
-  ✓ no starvation (max N wait 39.0s <= 60s + slack)
-  ✓ min-green honored (all green runs >= 5s: [6.0, 5.0, 5.0, 5.0, 5.0, 5.0]...)
+  ✓ no starvation (longest N ever went without green 34.5s <= 60s + slack)
+  ✓ min-green honored (all green runs >= 5s: [6.0, 12.5, 13.0, 13.0, 13.0, 11.5]...)
   ✓ emergency preemption serves the ambulance
   ✓ emergency debounce survives a single dropped detection frame (flickering ambulance)
   ✓ lone motorcycle gets a full green window (presence, not PCU, decides 'empty')

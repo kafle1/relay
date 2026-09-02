@@ -90,24 +90,28 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ## Measured results - what each number is (and is not)
 
+Every number below comes from a script under `paper/experiments/` and is regenerated from the raw
+result files by `make_numbers.py`; the paper's `verify_claims.py` fails if the text and the data
+drift apart.
+
 | Setting | Result | Nature |
 |---|---|---|
-| **vs a properly timed fixed plan** - Webster cycle + splits from the true mean demand, 30 seeds/cell (`paper/experiments/exp1_single_junction.py`) | **28–44% less delay, every cell** | the honest headline. Webster is given perfect knowledge of average demand, which no real installation has |
-| **vs an equal-split timer** (same runs) | 28–96% less delay | the baseline most camera-based papers use; easy to beat, so it isn't the headline |
-| **Per-vehicle waits** (asymmetric, 1278 veh/h) | p95 14.5s vs 25.8s · worst 26.7s vs 50.1s | fairness, not just throughput - the tail numbers means-only benchmarks never report |
-| **Every demand shape and topology** - 72 cells, 7 shapes, 4-way + T, to 2462 veh/h (`exp6_robustness.py`) | **beats both baselines in 71 of 72**; worst cell vs equal-split still +26% | the one loss is an approach wanting 82% of all green, where the 60s fairness bound forbids a stable cycle and Webster wins by ignoring it |
-| **With a 20% miscounting detector** (same 72 cells) | unchanged: 71 of 72 | the estimators average over 60s, so count noise doesn't reach the decisions |
-| **Corridor**, 3 signals (`exp2_corridor.py`) | 45–58% less delay, ambulance crosses in 22–28s vs 30–54s | coordination term contributes ~0 (see below) |
-| **Ambulance to green** - 900 trials (`exp3_preemption.py`) | 4.09s mean, 13.99s worst against a 14.0s analytical bound | the bound is arithmetic from clearance + min-green, so it can be quoted to a fire service |
-| **Live interactive demo** - toggle R.E.L.A.Y. ON/OFF and measure on screen | typically 10–35% fewer queued (varies with the traffic you spawn) | measured live from the scene you're watching |
-| **Detector, synthetic held-out frames** | mAP@50 ≈ 0.88, precision 0.96 | synthetic-domain only |
-| **Detector, real footage** | cars: strong; dense two-wheeler swarms: undercounts (improves at `--imgsz 960`) | known limitation - regional fine-tune is the fix, documented below |
-| **Controller invariants** | all pass: clearance, empty-skip, min-green, no-starvation, preemption | asserted by `src/controller.py` |
+| **vs a properly timed fixed plan** - Webster cycle + splits from the true mean demand, 30 seeds/cell (`exp1_single_junction.py`) | **28-44% less delay, every cell** | the honest headline. Webster is given perfect knowledge of average demand, which no real installation has |
+| **vs an equal-split timer** (same runs) | 27-96% less delay | the baseline most camera-based papers use; easy to beat, so it isn't the headline |
+| **Per-vehicle waits** (asymmetric, 1278 veh/h) | p95 and worst wait roughly halved against both fixed plans | fairness, not just throughput - the tail numbers means-only benchmarks never report |
+| **Every demand shape and topology** - 72 cells, 7 shapes, 4-way + T, 432 to 2462 veh/h (`exp6_robustness.py`) | **beats both fixed plans in all 72 cells**; the closest is parity (+1.4%) at one approach demanding 82% of all green | an earlier version lost that cell by 27%; the cause was a discontinuity in the measured-cycle floor near capacity, not the fairness bound, and the paper reports the correction |
+| **Adaptive baselines on the same 72 cells** (`exp7_policies.py`) | beats plain max-pressure and SOTL in all 72, vehicle-actuated control in 64, never by less than -1.3% | actuated control is the serious competitor; the difference is in the tails (p95 wait 20 s vs 24 s) |
+| **With the detector's actual error** (`exp6b_biased_counts.py`) | unaffected by a saturating undercount or a 20-40% flat undercount; collapses only when a lone vehicle rounds to zero | the requirement this yields: an unbiased presence signal at short queues, not accurate counts |
+| **SUMO microsimulation**, motorcycle-dominated fleet, sublane model, turning conflicts (`exp8_sumo.py`) | less delay in every one of 90 paired runs vs Webster (23-56%), max-pressure (22-36%) and SUMO's actuated program (18-57%) | at the highest load the worst-case wait is longer than the fixed plans', because the fairness bound reaches only as far as the camera sees |
+| **SUMO corridor**, 150 m links (`exp9_sumo_corridor.py`) | coupling term changes delay by at most 3.9%, both ways | the corridor gain is local adaptivity; the coupling term should go |
+| **Ambulance to green** - 900 trials (`exp3_preemption.py`) | 4.1 s mean, 13.99 s worst against a 14.0 s analytical bound | the bound is arithmetic from clearance + min-green, so it can be quoted to a fire service |
+| **Sensitivity** (`exp10_sensitivity.py`) | fairness bound R from 30 s to none: no change in mean delay; motorcycle PCU weight 0.2 to 1.0: under 1 point | the design is not tuned to either |
+| **Detector, held-out split** (`exp4_detector_val.py`) | mAP@50 0.954, precision 0.950 | mixed synthetic and pseudo-labelled split, not human ground truth |
+| **Detector, real footage** | dense two-wheeler swarms: counts still rising at 1600 px inference | known limitation, modelled in `exp6b` rather than hidden |
+| **Controller invariants** | all twelve pass: clearance, empty-skip, min-green, no-starvation, preemption, pedestrian bounds | asserted by `src/controller.py` |
 
-Two things the numbers say that don't flatter the design, kept here because they're in the paper:
-the corridor coupling term (each junction subtracting its neighbour's queue) changes delay by under
-1%, so the corridor gain is local adaptivity and not coordination; and the point-queue model can't
-produce the spillback that term exists to prevent, so it's unproven rather than disproven.
+The manuscript with all of this is `paper/main.pdf`; `paper/experiments/README.md` says how to
+re-run everything.
 
 *(Local anchor: measured studies of signalised intersections in the Kathmandu valley report
 saturation flows and delays well away from standard capacity guidance, and put the difference down

@@ -4,7 +4,7 @@
 Every frame goes through the same perception stack the live demo uses; where the
 clip has competing signalized streams (levanhien) the controller runs too and its
 live decision is painted on the zones. Unsignalized clips (roundabout, arterial)
-get detection + PCU flow counts only — no fake signal decisions.
+get detection + PCU flow counts only, no fake signal decisions.
 
 Usage: python tools/analyze_footage.py <preset> [--start S] [--dur S] [--out path]
 Presets: levanhien | hcmc | hanoi | dhaka
@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from controller import Controller, Timings, junction_from_dirs  # noqa: E402
-from perception import PCU, Perception                          # noqa: E402
+from perception import PCU, Perception, draw_chip                # noqa: E402
 
 PRESETS = {
     # signalized boulevard survey cam: near approach vs far cross street (zones match sim/real.html)
@@ -56,16 +56,6 @@ BOX = {"car": (89, 199, 52), "motorcycle": (10, 159, 255), "bicycle": (10, 214, 
 GREEN, RED, YEL = (110, 230, 130), (80, 80, 245), (0, 210, 250)
 
 
-def chip(img, x, y, text, fg=(240, 240, 240), bg=(28, 28, 30), scale=0.52, pad=7):
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
-    ov = img.copy()
-    cv2.rectangle(ov, (x, y), (x + tw + 2 * pad, y + th + 2 * pad), bg, -1)
-    cv2.addWeighted(ov, 0.82, img, 0.18, 0, img)
-    cv2.putText(img, text, (x + pad, y + th + pad - 1), cv2.FONT_HERSHEY_SIMPLEX,
-                scale, fg, 1, cv2.LINE_AA)
-    return x + tw + 2 * pad
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("preset", choices=PRESETS)
@@ -88,7 +78,9 @@ def main():
     cap = cv2.VideoCapture(os.path.join(ROOT, cfg["src"]))
     if not cap.isOpened():
         sys.exit(f"cannot open {cfg['src']}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not 1 <= fps <= 120:   # 0/NaN/negative/huge from broken metadata, assume 25
+        fps = 25
     cap.set(cv2.CAP_PROP_POS_MSEC, args.start * 1000)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     out_path = args.out or os.path.join(ROOT, "docs", "clips", f"{args.preset}_analyzed.mp4")
@@ -128,9 +120,9 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.42, col, 1, cv2.LINE_AA)
 
         # header: brand + clip story + honest telemetry
-        x = chip(frame, 14, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.62)
-        x = chip(frame, x + 8, 12, cfg["title"])
-        chip(frame, x + 8, 12, f"YOLO {infer_ms:.0f} ms - {len(boxes)} vehicles")
+        x = draw_chip(frame, 14, 12, "R.E.L.A.Y.", fg=(120, 235, 160), scale=0.62)
+        x = draw_chip(frame, x + 8, 12, cfg["title"])
+        draw_chip(frame, x + 8, 12, f"YOLO {infer_ms:.0f} ms - {len(boxes)} vehicles")
 
         # per-zone count chips pinned to each zone's top-left corner
         for a, poly in cfg["zones"].items():
@@ -140,11 +132,11 @@ def main():
             px = int(min(p[0] for p in poly) * w) + 6
             py = int(min(p[1] for p in poly) * h) + 6
             sig = f" - {state['signals'].get(a, 'red').upper()}" if state else ""
-            chip(frame, px, py, f"{cfg['names'][a]}: {n:.0f} veh (PCU {pcu:.1f}){sig}", scale=0.5)
+            draw_chip(frame, px, py, f"{cfg['names'][a]}: {n:.0f} veh (PCU {pcu:.1f}){sig}", scale=0.5)
 
         if state:
             served = " + ".join(cfg["names"].get(p, p) for p in str(state.get("phase", "")).split("+"))
-            chip(frame, 14, h - 44, f"decision: serving {served}  |  camera > counts > signal, live",
+            draw_chip(frame, 14, h - 44, f"decision: serving {served}  |  camera > counts > signal, live",
                  fg=(120, 235, 160))
         vw.write(frame)
         if i % 150 == 0:

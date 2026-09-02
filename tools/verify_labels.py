@@ -21,7 +21,11 @@ if os.path.exists(lbl_path):
         p = line.split()
         if len(p) != 5:
             continue
-        c = int(p[0]); cx, cy, bw, bh = map(float, p[1:])
+        c = int(p[0])
+        if c >= len(names):
+            print(f"skip: {img_path} has unknown class id {c}")
+            continue
+        cx, cy, bw, bh = map(float, p[1:])
         x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
         x2, y2 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
         cv2.rectangle(im, (x1, y1), (x2, y2), colors[c], 2)

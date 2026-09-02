@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""R.E.L.A.Y. core system — the full stack on ANY fixed-camera junction footage.
+"""R.E.L.A.Y. core system, the full stack on ANY fixed-camera junction footage.
 
   video (real CCTV clip, stream, or 3D-generated footage)
     → Perception (YOLO + zones + lanes + smoothing)
@@ -71,7 +71,7 @@ def main():
         zones = QUADRANTS
     zones = {k: [tuple(p) for p in v] for k, v in zones.items()}
     # refuse garbage zones up front (edge case 63): [] disables an approach, anything else
-    # must be a real polygon in normalized coords — a silent never-matching zone is worse than an error.
+    # must be a real polygon in normalized coords, a silent never-matching zone is worse than an error.
     bad = validate_zones(zones)
     if bad:
         sys.exit(bad)
@@ -86,7 +86,7 @@ def main():
         print("lanes from config:", {a: len(p) for a, p in lane_polys.items()})
     if not any(name in EMERGENCY for name in percep.names.values()):
         print(f"WARNING: {os.path.basename(args.model)} has no emergency-vehicle class {sorted(EMERGENCY)} "
-              f"— ambulance preemption is inactive with this model.")
+              f", ambulance preemption is inactive with this model.")
     ctrl = Controller(junction_from_dirs(zones.keys()),
                       Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=60))
 
@@ -94,10 +94,10 @@ def main():
     if not cap.isOpened():
         sys.exit(f"cannot open {args.video}")
     fps = cap.get(cv2.CAP_PROP_FPS)
-    if not 1 <= fps <= 120:                      # 0/NaN/negative/90000 — broken metadata, assume 25
+    if not 1 <= fps <= 120:                      # 0/NaN/negative/90000, broken metadata, assume 25
         fps = 25
     out_path = args.out or os.path.splitext(args.video)[0] + "_relay_system.mp4"
-    out = None                                   # created from the first real frame — stream headers lie about size
+    out = None                                   # created from the first real frame, stream headers lie about size
 
     decisions, switches, n, fails = [], 0, 0, 0
     prev_phase = None
@@ -136,7 +136,7 @@ def main():
             counts, emergencies, boxes = percep.read(frame, device=args.device, imgsz=args.imgsz)
             lane_q = percep.lane_queues()
             stale = percep.stale()
-            # camera stale (C30): don't trust it — feed the controller empty counts so aging +
+            # camera stale (C30): don't trust it, feed the controller empty counts so aging +
             # max-wait round-robins the phases safely instead of freezing on last-known demand.
             state = ctrl.tick({a: {} for a in zones} if stale else counts, emergencies, 1.0 / fps)
             if state["phase"] != prev_phase:

@@ -2,7 +2,7 @@
 """Pseudo-label real CCTV frames with stock YOLO so the fine-tune can mix real + synthetic domains.
 
 Stock YOLO11s is already strong on real daytime CCTV (verified), so its high-confidence detections
-become free labels for the real domain — no manual annotation. Merged with the sim's auto-labels,
+become free labels for the real domain, no manual annotation. Merged with the sim's auto-labels,
 one detector learns BOTH domains ("same YOLO on real footage and on the synthetic feed").
 
 Usage: .venv/bin/python tools/pseudo_label.py <frames_dir> [conf]

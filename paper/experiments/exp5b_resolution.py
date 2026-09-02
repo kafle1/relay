@@ -46,7 +46,9 @@ def frames_of(path, fps_target):
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         raise SystemExit(f"cannot open {path}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not 1 <= fps <= 120:   # 0/NaN/negative/huge from broken metadata, assume 25
+        fps = 25
     step = max(1, int(fps * fps_target))
     out, i = [], 0
     while i < int(DUR * fps):

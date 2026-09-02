@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Headless queue microsimulation: adaptive (R.E.L.A.Y.) vs a fixed timer, on IDENTICAL arrivals.
 
-This is the honest, apples-to-apples benefit measurement — you can't counterfactually re-time real
+This is the honest, apples-to-apples benefit measurement, you can't counterfactually re-time real
 cars, so we feed the *same* arrival stream through both signal policies and compare total waiting.
 
 Run `python src/microsim.py` to print the measured wait-time reduction.
@@ -15,7 +15,7 @@ SAT = 0.55   # vehicles discharged per second per approach while green (≈1.8s 
 
 
 def poisson(mean):
-    """Knuth — small means, so this is cheap."""
+    """Knuth, small means, so this is cheap."""
     if mean <= 0:
         return 0
     if mean > 500:                       # exp(-mean) underflows to 0.0 and the loop never terminates
@@ -111,7 +111,7 @@ def simulate(seconds=240, dt=0.5, seed=0, lam=None):
         wait_f += sum(qf.values()) * dt
         ts.append(round(i * dt, 1)); wa_hist.append(round(wait_a, 1)); wf_hist.append(round(wait_f, 1))
 
-    # vehicles still queued at the end have waited at least this long — dropping them would
+    # vehicles still queued at the end have waited at least this long, dropping them would
     # flatter both policies, so they count with their wait-so-far
     end = seconds
     for d in J.approaches:
@@ -149,7 +149,7 @@ if __name__ == "__main__":
               f"veh-seconds waited  →  {r['reduction_pct']}% less waiting")
     avg = sum(reds) / len(reds)
     print(f"\naverage wait-time reduction (adaptive vs fixed, identical arrivals): {avg:.1f}%")
-    # per-vehicle percentiles — the fairness story a mean can't tell (nobody gets forgotten)
+    # per-vehicle percentiles, the fairness story a mean can't tell (nobody gets forgotten)
     print(f"per-vehicle wait   adaptive: p50 {_pct(pool_a, 50):.0f}s · p95 {_pct(pool_a, 95):.0f}s · max {max(pool_a, default=0):.0f}s")
     print(f"per-vehicle wait   fixed:    p50 {_pct(pool_f, 50):.0f}s · p95 {_pct(pool_f, 95):.0f}s · max {max(pool_f, default=0):.0f}s")
     assert avg > 0, "adaptive should reduce waiting vs a fixed timer"

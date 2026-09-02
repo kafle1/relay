@@ -27,3 +27,11 @@ paper/*.log
 paper/*.out
 paper/*.blg
 paper/*.synctex.gz
+
+# paper build artefacts
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/experiments/__pycache__/

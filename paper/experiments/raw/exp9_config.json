@@ -1,0 +1,51 @@
+{
+  "seconds": 2400.0,
+  "warmup": 400.0,
+  "spacing_m": 150.0,
+  "outer_m": 300.0,
+  "detect_m": 80.0,
+  "couple": 0.4,
+  "levels": [
+    0.6,
+    1.0,
+    1.4
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "routes_veh_s": {
+    "W_E": 0.13,
+    "E_W": 0.11,
+    "S1_E": 0.03,
+    "S2_E": 0.03,
+    "N2_W": 0.028,
+    "N3_W": 0.028
+  },
+  "timings": {
+    "min_green": 5,
+    "max_green": 34,
+    "yellow": 2,
+    "all_red": 2.5,
+    "gap_time": 2.5,
+    "max_wait": 26,
+    "max_preempt": 60.0,
+    "emergency_hold": 2.5,
+    "hysteresis": 1.0,
+    "flow_tau": 60.0,
+    "max_cycle": 120.0,
+    "emergency_boost": 1000000.0,
+    "w_ped": 0.3,
+    "ped_max_wait": 60.0,
+    "walk_hold": 12.0
+  },
+  "saturation_pcu_h_lane": 1531.1
+}

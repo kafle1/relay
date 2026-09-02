@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-"""R.E.L.A.Y. adaptive signal controller — weighted max-pressure with the safety + fairness rules.
+"""R.E.L.A.Y. adaptive signal controller, weighted max-pressure with the safety + fairness rules.
 
 One score:  score(phase) = PCU-demand × (1 + oldest_wait/max_wait) + ped_pressure + emergency_boost
-(urgency multiplies real queues — capped at 2x — so synthetic aging can never outrank a loaded corridor)
+(urgency multiplies real queues, capped at 2x, so synthetic aging can never outrank a loaded corridor)
 Guards: empty-phase skip · gap-out · min/max-green · max-wait force-serve · yellow+all-red clearance.
 
 It also measures the junction it is watching: arrival and discharge rate per arm, from the counts
-alone (_measure). Those feed two things a constant can't do — the green is sized from Webster's
+alone (_measure). Those feed two things a constant can't do, the green is sized from Webster's
 cycle on the measured saturation (_service_floor), and a phase change is priced at the clearance
 it costs (_switch_cost). Nothing about the site has to be configured or surveyed.
 
@@ -17,7 +17,7 @@ Run `python src/controller.py` for a self-check that asserts the core invariants
 """
 from dataclasses import dataclass
 
-# passenger-car-unit weights (Kathmandu mix — motorcycle far below a car)
+# passenger-car-unit weights (Kathmandu mix, motorcycle far below a car)
 # single source of truth: perception.py imports this rather than keeping its own copy.
 PCU = {"car": 1.0, "motorcycle": 0.3, "bus": 2.5, "truck": 2.5, "ambulance": 2.0, "bicycle": 0.2,
        "autorickshaw": 0.8}
@@ -28,22 +28,25 @@ class Timings:
     min_green: float = 5.0       # never flicker / strand a vehicle mid-box
     max_green: float = 45.0      # anti-hog: yield even if still busiest
     yellow: float = 3.0
-    all_red: float = 1.5         # clearance — no conflicting greens ever overlap
+    all_red: float = 1.5         # clearance, no conflicting greens ever overlap
     gap_time: float = 2.5        # end green early if served lanes stay empty this long
     max_wait: float = 90.0       # hard anti-starvation: force-serve past this
     max_preempt: float = 60.0    # cap on holding green for an emergency (D38: never freeze the junction)
-    emergency_hold: float = 2.5  # a detection latches "emergency present" for this long — survives a dropped frame
+    emergency_hold: float = 2.5  # a detection latches "emergency present" for this long, survives a dropped frame
     hysteresis: float = 1.0      # floor on the switch margin (anti-thrash on an idle junction)
     flow_tau: float = 60.0       # time constant of the arrival/discharge estimators (_measure).
-                                 # Not a traffic constant — the controller measures both rates
+                                 # Not a traffic constant, the controller measures both rates
                                  # itself; this only sets how fast those estimates forget.
+    max_cycle: float = 120.0     # longest cycle the measured-saturation floor may size (_service_floor).
+                                 # Webster's C blows up as Y -> 1 and a noisy Y estimate near capacity
+                                 # would swing the green between enormous and the bare minimum.
     emergency_boost: float = 1e6 # emergency dominates the score
     w_ped: float = 0.3           # a waiting pedestrian ≈ a motorcycle in pressure; aging closes the rest
     ped_max_wait: float = 60.0   # hard bound: no pedestrian waits longer than this for a walk window
     walk_hold: float = 12.0      # max extra green held for people still ON a zebra, past min_green.
                                  # One crossing takes ~10s; unbounded (max_green) holding let a
                                  # re-windowed ped stream pin a trickle road green for 30-45s while
-                                 # the loaded corridor drowned — the sim's cars hard-yield to
+                                 # the loaded corridor drowned, the sim's cars hard-yield to
                                  # walkers anyway, so a bounded hold is safe by construction.
 
 
@@ -91,11 +94,11 @@ def junction_from_dirs(dirs):
     if not phases:
         raise ValueError(
             f"junction_from_dirs: no usable approaches in {sorted(dirs) or ['(empty)']} "
-            f"— accepted keys are N, S, E, W, optionally suffixed .thru / .left"
+            f", accepted keys are N, S, E, W, optionally suffixed .thru / .left"
         )
     # split-arm phases stay in NORMAL selection, not just emergencies: serving one arm's thru+left
     # together is how an imbalanced load drains efficiently (measured: excluding them forced the
-    # dedicated paired-left phases to serve 1-2 cars each on a starvation clock — 37% of green went
+    # dedicated paired-left phases to serve 1-2 cars each on a starvation clock, 37% of green went
     # to left bays and the A/B inverted hard).
     return Junction(good, phases)
 
@@ -119,24 +122,25 @@ class Controller:
         self.em_hold = {a: 0.0 for a in junction.approaches}  # debounce: survives a dropped detection frame
         # self-calibration (_measure). Both start at zero and are learned from the counts, so on a
         # fresh junction the two rules they feed simply don't bind until there is traffic to learn
-        # from — a couple of cycles.
+        # from, a couple of cycles.
         self.arrival = {a: 0.0 for a in junction.approaches}   # PCU/s joining while the arm is red
         self.discharge = {a: 0.0 for a in junction.approaches}  # PCU/s leaving while the arm is green
         self._prev_pcu = {a: None for a in junction.approaches}
+        self._prev_served = set()                               # who had green during the last step
 
     # ── helpers ────────────────────────────────────────────────
     def _served(self, phase):
         return set(self.j.phases[phase])
 
     def _arms(self, phase):
-        # physical arms this phase serves — approaches may be per-movement keys ("N.left"),
+        # physical arms this phase serves, approaches may be per-movement keys ("N.left"),
         # while peds, zebras and ambulance announcements live at arm level ("N")
         return {a.split(".")[0] for a in self._served(phase)}
 
     def _frees(self, phase, arm):
         """True when this phase gives arm X a usable walk window: X's zebra carries NO through
-        vehicle movement. X's own approach must be red (X not served) AND the opposing approach —
-        whose STRAIGHT flow exits over X's zebra — must not be served either. Turning traffic
+        vehicle movement. X's own approach must be red (X not served) AND the opposing approach ,
+        whose STRAIGHT flow exits over X's zebra, must not be served either. Turning traffic
         across an open walk yields to walkers (normal permissive interaction); a straight platoon
         does not, and counting those unservable walkers held split-arm greens forever while the
         walk stream throttled the very flow being served (the live A/B inversion, round two)."""
@@ -151,7 +155,7 @@ class Controller:
         return float(c)
 
     def _present(self, approach, counts):
-        """Any vehicle at all — PCU weighs road space, not existence: a lone motorcycle (0.3 PCU)
+        """Any vehicle at all, PCU weighs road space, not existence: a lone motorcycle (0.3 PCU)
         is not an empty lane and must get its full green window."""
         c = counts.get(approach, 0)
         if isinstance(c, dict):
@@ -165,7 +169,7 @@ class Controller:
         return sum(self._pcu(a, counts) for a in self._served(phase))
 
     # ── pedestrians ────────────────────────────────────────────
-    # People crossing arm X walk while X's vehicle signal is red — so any phase that does NOT
+    # People crossing arm X walk while X's vehicle signal is red, so any phase that does NOT
     # serve X serves them. Ped input is transponder-style ({arm: {n, wait, crossing}}), like a
     # push-button or ped-detector; the controller never trusts it blindly (_clean_peds).
 
@@ -184,7 +188,7 @@ class Controller:
             except (TypeError, ValueError):
                 continue
             # 180s clamp: an unservable walk request (client bug, stuck ped) must never grow an
-            # unbounded aging term — past 3 minutes the number carries no extra meaning anyway
+            # unbounded aging term, past 3 minutes the number carries no extra meaning anyway
             wait = min(max(wait, 0.0), 180.0) if wait == wait else 0.0   # NaN → 0
             if n or crossing:
                 out[a] = {"n": n, "wait": wait, "crossing": crossing}
@@ -204,7 +208,7 @@ class Controller:
 
     def _phase_for_ped_starved(self, peds):
         # someone has waited past ped_max_wait to cross arm X → force a phase with X red.
-        # Single-phase junctions have no such phase (needs a dedicated ped stage) — returns None.
+        # Single-phase junctions have no such phase (needs a dedicated ped stage), returns None.
         starved = [a for a, p in peds.items() if p["n"] and p["wait"] >= self.t.ped_max_wait]
         if not starved:
             return None
@@ -228,12 +232,17 @@ class Controller:
             * (1.0 + min(self._ped_oldest(phase, peds), self.t.ped_max_wait) / self.t.ped_max_wait)
         return demand + boost + ped
 
-    def _measure(self, pcu_now, dt, served_now):
+    def _measure(self, pcu_now, dt, served_prev):
         """Arrival and discharge rate per arm, learned from the counts. No traffic constants.
 
         On red an arm can't discharge, so its queue growth IS the arrival rate. On green the queue
         moves by arrivals minus departures, so departures = arrival rate minus the observed change.
         flow_tau smooths both; a per-frame count is far too noisy to use raw.
+
+        The change between two counts was produced under the signal state of the step that has
+        just ended, so the sample is attributed to that state, not to the one being decided now.
+        Attributing it to the current state charged the first green step with a red step's growth
+        and the first red step with a green step's discharge; measured 0.49 against a true 0.55.
         """
         alpha = min(1.0, dt / self.t.flow_tau)
         for a in self.j.approaches:
@@ -243,7 +252,7 @@ class Controller:
             rate = (cur - prev) / dt
             # Clamp the running estimate, never the sample: per-step counts are whole vehicles, so
             # clamping samples throws away only the low side. Measured discharge 0.79 vs a true 0.55.
-            if a in served_now:
+            if a in served_prev:
                 # Gate on the queue BEFORE the step. Gating on the one after selects steps that had
                 # an arrival, which drags it the other way: measured 0.30 vs a true 0.52.
                 if prev > 0:
@@ -261,7 +270,7 @@ class Controller:
         Without this, every tick-level fairness rule collapses once demand passes capacity: all
         arms sit past max_wait forever, whichever is on red always looks worse, and the green flips
         at min-green. Measured at 2307 veh/h: 5.2s green per 4.5s clearance, 94s delay vs a fixed
-        plan's 19s. It's a floor, not a hold — empty-phase skip and emergency preempt sit above it,
+        plan's 19s. It's a floor, not a hold, empty-phase skip and emergency preempt sit above it,
         and at light load it computes below min_green and never binds.
         """
         ratio = {}
@@ -278,21 +287,26 @@ class Controller:
             covered |= arms
             cycle_phases.append(p)
             Y += ratio[p]
-        if Y <= 0.0 or Y >= 1.0:
-            # Y >= 1: no cycle length clears this demand and Webster's C doesn't exist. Longest
-            # green the anti-hog bound allows — maximises throughput, the usual fallback.
-            return self.t.max_green if Y >= 1.0 else self.t.min_green
+        if Y <= 0.0:
+            return self.t.min_green
         L = max(2, len(cycle_phases)) * (self.t.yellow + self.t.all_red)
-        cycle = (1.5 * L + 5.0) / (1.0 - Y)
-        # Uncapped by max_green on purpose: that's an anti-hog bound, not a capacity one. Refusing
-        # a green the demand needs leaves the queue there next cycle, minor arms included.
+        # C = (1.5L + 5) / (1 - Y) diverges as Y -> 1 and does not exist past it. The cycle is
+        # clamped at max_cycle, the longest a fixed plan would be given, and past capacity the
+        # greens are split in proportion to the ratios, which is what a plan designer does too.
+        # An earlier version fell back to max_green there; with a noisy Y estimate sitting near 1
+        # the floor then swung between a 200 s green and a 45 s one, the effective cycle shortened,
+        # and the extra clearance time was the whole margin at 2300 veh/h (measured: 98 s mean
+        # delay against the fixed plan's 66 s).
+        cycle = self.t.max_cycle if Y >= 1.0 else min(self.t.max_cycle, (1.5 * L + 5.0) / (1.0 - Y))
+        # Not capped by max_green: that's an anti-hog bound, not a capacity one. Refusing a green the
+        # demand needs leaves the queue there next cycle, minor arms included.
         return max(self.t.min_green, (cycle - L) * (ratio[self.phase] / Y))
 
     def _switch_cost(self, counts):
         """PCU thrown away by ending this green now rather than a moment later.
 
         A change costs yellow + all_red of nobody discharging, so leaving forfeits what the served
-        arms would have cleared in that time — capped at what they still have queued, so a drained
+        arms would have cleared in that time, capped at what they still have queued, so a drained
         phase costs nothing to leave and gap-out stays as sharp as it was. A flat hysteresis can't
         do this: it's the same 1.0 PCU whether the junction is empty or full.
         """
@@ -303,7 +317,7 @@ class Controller:
     def _phase_for_emergency(self, emergencies):
         # simultaneous emergencies on conflicting phases: serve the longest-waiting one, not
         # whichever phase happens to come first in dict order. Coverage first: on a movement
-        # junction the split-arm phase serves BOTH of the arm's latched keys — green whichever
+        # junction the split-arm phase serves BOTH of the arm's latched keys, green whichever
         # lane the ambulance is actually in.
         cands = [((sum(a in emergencies for a in self._served(n)),
                    max((self.wait[a] for a in self._served(n) if a in emergencies), default=0.0)), n)
@@ -316,7 +330,7 @@ class Controller:
         # Two exclusions, both for the same reason: this rule serves the WORST-treated queue, it
         # does not rotate. An arm on green is being served, not starved, and it must also be older
         # than what we're already discharging. Without that, a saturated junction (every arm past
-        # max_wait, permanently) fires it every tick and pins each green to min_green — measured
+        # max_wait, permanently) fires it every tick and pins each green to min_green, measured
         # 5.1s green per 4.5s clearance and 99s delay against a fixed plan's 19s at 2307 veh/h.
         # Self-balancing: our own clock unwinds as we discharge, so the red arm overtakes us.
         serving = self._served(self.phase) if self.stage == self.GREEN else set()
@@ -329,7 +343,7 @@ class Controller:
         worst = max(starved, key=lambda a: self.wait[a])
         # among the phases serving the starved key, batch anticipatorily: prefer the phase that
         # also serves keys about to starve (within ~25s of the threshold), score breaks ties.
-        # At saturation both left bays age together — serving S.left via the split-arm single
+        # At saturation both left bays age together, serving S.left via the split-arm single
         # resets only S, N.left forces a SECOND single ~20s later: two clearances at half-corridor
         # discharge where NS.left clears both in one. The near-starved window keeps the light-
         # regime behavior (sibling bay fresh → the single still wins, measured better there:
@@ -351,12 +365,12 @@ class Controller:
     def tick(self, counts, emergencies, dt, peds=None):
         """counts: {approach: {class:n} | number}; emergencies: iterable of approaches with an emergency
         detected THIS frame. A hit latches that approach's hold for emergency_hold seconds, decaying by dt
-        each tick — a single dropped detection mid-hold can't make the controller abandon the preempt.
-        peds (optional): {approach: {"n": waiting, "wait": longest_wait_s, "crossing": on_zebra}} —
+        each tick, a single dropped detection mid-hold can't make the controller abandon the preempt.
+        peds (optional): {approach: {"n": waiting, "wait": longest_wait_s, "crossing": on_zebra}} ,
         pedestrian demand to CROSS that arm's road (served by any phase holding that arm red).
         Returns the signal state dict {approach: 'green'|'yellow'|'red'} plus phase/stage."""
         peds = self._clean_peds(peds)
-        # announcements arrive at arm level ("N") — latch every movement key of that arm: the
+        # announcements arrive at arm level ("N"), latch every movement key of that arm: the
         # ambulance may be sitting in the turn bay OR the through lanes, and we can't tell which
         seen = {str(e).split(".")[0] for e in (emergencies or ())}
         for a in self.j.approaches:
@@ -364,7 +378,8 @@ class Controller:
         emergencies = {a for a in self.j.approaches if self.em_hold[a] > 0}
         served_now = self._served(self.phase) if self.stage == self.GREEN else set()
         pcu_now = {a: self._pcu(a, counts) for a in self.j.approaches}
-        self._measure(pcu_now, dt, served_now)
+        self._measure(pcu_now, dt, self._prev_served)
+        self._prev_served = served_now
 
         # The clock is "how long has the oldest vehicle here waited", not "time since last green".
         #  RED, vehicles → ages 1s/s.
@@ -434,9 +449,9 @@ class Controller:
         t = self.t
         peds = peds or {}
         served = self._served(self.phase)
-        # "empty" means no vehicles AT ALL — PCU-weighted demand would flag a lone motorcycle
+        # "empty" means no vehicles AT ALL, PCU-weighted demand would flag a lone motorcycle
         # (0.3 PCU) as empty and flash its green away, stranding it forever.
-        # A phase whose red arms have people waiting/on the zebra is serving THEM — not empty:
+        # A phase whose red arms have people waiting/on the zebra is serving THEM, not empty:
         # gap-out must not cut a walk window while someone is still crossing.
         empty_now = (not any(self._present(a, counts) for a in served)
                      and self._ped_demand(self.phase, peds) == 0)
@@ -445,7 +460,7 @@ class Controller:
         # EMERGENCY preempt (respect min-green unless our lane is already empty; never skip clearance).
         # Crossing-axis sirens are SEQUENCED, never raced: while our own phase still holds a live
         # emergency, we keep it (bounded by max_preempt below). Re-picking "longest waiting" every
-        # tick flip-flopped NS↔EW at min-green cadence — burning clearance on every flip — and
+        # tick flip-flopped NS↔EW at min-green cadence, burning clearance on every flip, and
         # neither ambulance ever reached its line.
         em_phase = self._phase_for_emergency(emergencies)
         own_emergency = any(a in emergencies for a in served)
@@ -461,7 +476,7 @@ class Controller:
                 self._begin_switch(hard_starved); return
             if self.preempt_timer < t.max_preempt:
                 return
-            # preempt cap hit (D38: never freeze the junction) — drop the boost so the normal
+            # preempt cap hit (D38: never freeze the junction), drop the boost so the normal
             # rules below can actually move the green; with it, our own phase always scores best
             emergencies = ()
         else:
@@ -484,13 +499,13 @@ class Controller:
         if starved and starved != self.phase:
             self._begin_switch(starved); return
 
-        # pedestrian anti-starvation: below vehicle starvation and emergencies, above everything else —
+        # pedestrian anti-starvation: below vehicle starvation and emergencies, above everything else ,
         # a person waiting past ped_max_wait forces the phase that turns their arm red (walk window)
         ped_starved = self._phase_for_ped_starved(peds)
         if ped_starved and ped_starved != self.phase:
             self._begin_switch(ped_starved); return
 
-        # hold the walk while someone is still ON the zebra — score-driven switches must not hand
+        # hold the walk while someone is still ON the zebra, score-driven switches must not hand
         # green back to a busy road mid-crossing. Bounded by walk_hold past min_green (one full
         # crossing), never by max_green: a re-windowed ped stream must not pin an empty road green.
         # Emergency and vehicle starvation sit above this line and still override.
@@ -502,7 +517,7 @@ class Controller:
         if self.gap_timer >= t.gap_time and best and best != self.phase:
             self._begin_switch(best); return
 
-        # max-green: yield even if still busiest — to the best OTHER phase with demand
+        # max-green: yield even if still busiest, to the best OTHER phase with demand
         # (gating on best != phase makes the cap dead whenever we still score highest)
         if self.elapsed >= t.max_green:
             others = [p for p in self.j.phases if p != self.phase
@@ -512,7 +527,7 @@ class Controller:
 
         # demand-driven switch: the challenger must beat us by more than the clearance it costs to
         # hand over (anti-thrash floor + the discharge those 4.5s would have produced). Empty-phase
-        # skip is implicit (best has demand>0) and costs nothing extra — a drained phase's
+        # skip is implicit (best has demand>0) and costs nothing extra, a drained phase's
         # _switch_cost is 0, so this collapses back to plain hysteresis exactly when it should.
         if best and best != self.phase and \
            self._score(best, counts, emergencies, peds) > self._score(self.phase, counts, emergencies, peds) \
@@ -567,7 +582,7 @@ def demo():
     assert saw_clearance, "VIOLATION: green->green without clearance"
     assert switches > 0, "should alternate phases under full demand"
 
-    # invariant: EMPTY-PHASE SKIP — NS empty, EW busy → NS never green while EW has demand
+    # invariant: EMPTY-PHASE SKIP, NS empty, EW busy → NS never green while EW has demand
     c = Controller(four_way(), T)
     def feed_ew_only(_):
         return {"N": {"car": 0}, "S": {"car": 0}, "E": {"car": 6}, "W": {"car": 6}}
@@ -577,12 +592,12 @@ def demo():
     )
     assert not ns_green_while_ew_waiting, "VIOLATION: gave green to an empty lane while a full lane waited"
 
-    # invariant: NO STARVATION — E continuously fed, N has 2 cars waiting → N served within max_wait(+slack)
+    # invariant: NO STARVATION, E continuously fed, N has 2 cars waiting → N served within max_wait(+slack)
     c = Controller(four_way(), T)
     def feed_starve(_):
         return {"N": {"car": 2}, "S": {"car": 0}, "E": {"car": 8}, "W": {"car": 0}}
     # Asserted on the OBSERVABLE (how long N goes without a green) rather than on c.wait["N"]:
-    # this feed never discharges, so a clock that follows the queue — which is what it now does —
+    # this feed never discharges, so a clock that follows the queue, which is what it now does ,
     # legitimately never zeroes here. The gap between greens is the thing starvation actually means.
     max_n_gap, gap = 0.0, 0.0
     for i in range(1000):
@@ -594,7 +609,7 @@ def demo():
             max_n_gap = max(max_n_gap, gap)
     assert max_n_gap <= T.max_wait + T.yellow + T.all_red + 6, f"VIOLATION: N starved, waited {max_n_gap:.1f}s"
 
-    # invariant: MIN-GREEN honored — a green phase always lasts >= min_green
+    # invariant: MIN-GREEN honored, a green phase always lasts >= min_green
     c = Controller(four_way(), T)
     hist = _run(c, feed_full, dt=0.5, steps=600)
     green_durations = []
@@ -607,7 +622,7 @@ def demo():
                 green_durations.append(dur); dur = 0.0
     assert all(d >= T.min_green - 1e-6 for d in green_durations), f"VIOLATION: green shorter than min_green: {green_durations}"
 
-    # EMERGENCY preempt — ambulance on N (while EW green) → N gets green within a few seconds
+    # EMERGENCY preempt, ambulance on N (while EW green) → N gets green within a few seconds
     c = Controller(four_way(), T)
     def feed_amb(_):
         return {"N": {"ambulance": 1}, "S": {}, "E": {"car": 6}, "W": {"car": 6}}
@@ -618,7 +633,7 @@ def demo():
             served_n = True; break
     assert served_n, "VIOLATION: ambulance not served promptly"
 
-    # EMERGENCY DEBOUNCE — ambulance detected every tick except every 10th (dropout) → hold must not
+    # EMERGENCY DEBOUNCE, ambulance detected every tick except every 10th (dropout) → hold must not
     # be abandoned mid-preempt just because one frame missed the detection.
     c = Controller(four_way(), T)
     def feed_amb_flicker(_):
@@ -636,7 +651,7 @@ def demo():
             abandoned = True; break
     assert not abandoned, "VIOLATION: a single dropped detection frame abandoned the emergency preempt"
 
-    # CROSSING SIRENS SEQUENCE, NEVER RACE — emergencies on conflicting phases (N and E) held
+    # CROSSING SIRENS SEQUENCE, NEVER RACE, emergencies on conflicting phases (N and E) held
     # simultaneously must not flip-flop the green at min_green cadence: the served siren keeps its
     # phase (bounded by max_preempt), then the other corridor gets its turn. Both must be served.
     c = Controller(four_way(), T)
@@ -655,7 +670,7 @@ def demo():
     assert greens["NS"] > 0 and greens["EW"] > 0, "VIOLATION: one crossing siren was never served"
     print(f"  ✓ crossing sirens sequenced, not raced ({switches} rotations in 180s, both corridors served)")
 
-    # LOW-PCU PRESENCE — a lone motorcycle (0.3 PCU) is not an "empty" lane: it must get a full
+    # LOW-PCU PRESENCE, a lone motorcycle (0.3 PCU) is not an "empty" lane: it must get a full
     # min_green window, not a one-tick flash (empty-phase skip must key on presence, not PCU)
     c = Controller(four_way(), T)
     def feed_moto(_):
@@ -670,7 +685,7 @@ def demo():
     assert ns_runs, "VIOLATION: lone motorcycle never served"
     assert all(d >= T.min_green - 1e-6 for d in ns_runs), f"VIOLATION: motorcycle green flashed: {ns_runs}"
 
-    # MAX-PREEMPT bound (D38) — a continuous emergency must not freeze the junction past max_preempt
+    # MAX-PREEMPT bound (D38), a continuous emergency must not freeze the junction past max_preempt
     Tp = Timings(min_green=5, max_green=30, yellow=3, all_red=1.5, max_wait=300, max_preempt=15)
     c = Controller(four_way(), Tp)
     held = 0.0
@@ -679,7 +694,7 @@ def demo():
         held = held + 0.5 if s["signals"]["N"] == "green" else 0.0
         assert held <= Tp.max_preempt + Tp.min_green + 2, f"VIOLATION: emergency froze the junction {held:.1f}s"
 
-    # MAX-GREEN cap — yields even while still the busiest phase
+    # MAX-GREEN cap, yields even while still the busiest phase
     c = Controller(four_way(), T)
     def feed_hog(_):
         return {"N": {"car": 9}, "S": {"car": 9}, "E": {"car": 2}, "W": {}}
@@ -692,7 +707,7 @@ def demo():
             runs.append(dur); dur = 0.0
     assert all(d <= T.max_green + 1.0 for d in runs), f"VIOLATION: max_green not enforced: {runs}"
 
-    # PEDESTRIAN WAIT bound — heavy N-S flow, empty cross street, one person waiting to cross
+    # PEDESTRIAN WAIT bound, heavy N-S flow, empty cross street, one person waiting to cross
     # the N-S road (arm N). Their walk window (EW phase → N red) must open within ped_max_wait+slack.
     c = Controller(four_way(), T)
     ped_wait, walked_at = 0.0, None
@@ -706,7 +721,7 @@ def demo():
     assert walked_at is not None and walked_at <= T.ped_max_wait + slack, \
         f"VIOLATION: pedestrian waited {ped_wait:.1f}s with no walk window"
 
-    # WALK HOLD — while that person is ON the zebra, the busy road must not get green back
+    # WALK HOLD, while that person is ON the zebra, the busy road must not get green back
     # (bounded by max_green; here the crossing takes ~8s, far below it)
     cut = False
     for j in range(16):
@@ -716,7 +731,7 @@ def demo():
             cut = True; break
     assert not cut, "VIOLATION: walk window cut while someone was still on the zebra"
 
-    # GARBAGE PED INPUT — junk shapes/values must be ignored, never crash or distort
+    # GARBAGE PED INPUT, junk shapes/values must be ignored, never crash or distort
     c = Controller(four_way(), T)
     for junk in ({"N": {"n": -5, "wait": float("nan")}}, {"X": {"n": 3}}, {"N": "lots"},
                  {"N": {"n": 1e9, "wait": -1}}, "peds", 42):
