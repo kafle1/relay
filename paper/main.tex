@@ -869,17 +869,25 @@ discontinuity and brought the cell to within a few per cent of the plan with no 
 sequence because it is the kind of error a per-cell evaluation exists to catch, and because a mean over the grid
 would have hidden it.
 
-Repeating the grid with 20\% zero-mean Gaussian miscounting leaves the picture unchanged, \GridNoiseWins{} of
-\GridCells{} cells won with a worst cell of $\GridNoiseWorstWebster\%$ against Webster. That test is weak,
-because the estimators smooth over a $\tau = 60$~s window that averages zero-mean noise away. Experiment 6b
-applies the error the detector actually makes. Table~\ref{tab:exp6b} shows the controller is unaffected by a
-saturating undercount and by a flat multiplicative loss down to 40\% of the true count, because the degree of
-saturation in~\eqref{eq:floor} is a ratio of arrival and discharge estimates drawn from the same counts, so a
-uniform scale factor cancels, and the phase comparison in~\eqref{eq:score} is invariant to a common scale. It
-collapses only when a lone vehicle rounds to zero and an occupied approach reads empty, because the empty-phase
-skip and the wait clock are keyed on presence; giving presence a floor of one restores the result completely.
-The requirement this yields for the perception stack is narrow and testable: the controller needs an unbiased
-presence signal at short queues, not accurate absolute counts.
+Repeating the grid with 20\% zero-mean Gaussian miscounting leaves the picture almost unchanged,
+\GridNoiseWins{} of \GridCells{} cells won with a worst cell of $\GridNoiseWorstWebster\%$ against Webster,
+the one loss being the beyond-capacity cell again. That test is weak, because the estimators smooth
+over a $\tau = 60$~s window that averages zero-mean noise away. Experiment 6b applies the error the
+detector actually makes (Table~\ref{tab:exp6b}). Under a saturating undercount the controller wins
+\BiasSaturatingQEightWins{} and \BiasSaturatingQFourWins{} of \GridCells{} cells with mean reductions of
+\BiasSaturatingQEightMeanWebster\% and \BiasSaturatingQFourMeanWebster\%; the single loss in each is the
+beyond-capacity cell, where compressing a long queue distorts the saturation estimate the cycle is sized
+from. A flat multiplicative loss of 20 or 40\% changes nothing (\BiasScaleZeroEightWins{} and
+\BiasScaleZeroSixWins{} cells, means of \BiasScaleZeroEightMeanWebster\% and \BiasScaleZeroSixMeanWebster\%),
+because the degree of saturation in~\eqref{eq:floor} is a ratio of arrival and discharge estimates drawn
+from the same counts, so a uniform scale cancels, and the phase comparison in~\eqref{eq:score} is invariant
+to a common scale. A loss of 60\% collapses to \BiasScaleZeroFourWins{} cells, but not because of the
+scale: at that factor a queue of one vehicle rounds to zero, and the models in which a lone vehicle reads
+as none fail the same way (\BiasFloorZeroEightWins{} cells) whatever their scale, because the empty-phase
+skip and the wait clock are keyed on presence. Giving presence a floor of one restores every one of them
+(\BiasScaleZeroFourKeepOneWins, \BiasFloorZeroEightKeepOneWins{} and \BiasFloorZeroSixKeepOneWins{} cells). The
+requirement this yields for the perception stack is narrow and testable: the controller needs an
+unbiased presence signal at short queues, not accurate absolute counts.
 
 \begin{table}[t]
 \centering

@@ -5,7 +5,7 @@ For an entry with a DOI: fetch the record and compare title and year. For an ent
 one: search Crossref by title and report the best match so a DOI can be added or the entry
 questioned. Nothing is rewritten; the output is a table to act on.
 
-Usage:  python check_bib.py refs.bib [--fix-years]
+Usage:  python check_bib.py refs.bib
 """
 import json
 import re

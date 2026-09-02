@@ -15,12 +15,7 @@ controller under test: ``tick(counts, emergencies, dt)`` returning the set of gr
 
 The fixed-time plans (equal split and Webster) live in ``microsim.py`` and ``relay_bench.py``.
 """
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.environ.get("RELAY_REPO", os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))))), "src"))
-from controller import PCU   # noqa: E402
+from controller import PCU   # the caller puts src/ on sys.path, as relay_bench does
 
 
 class _Staged:
@@ -70,9 +65,10 @@ class MaxPressure(_Staged):
 
 
 class SOTL(_Staged):
-    """Threshold theta in vehicle-seconds; a green shorter than min_green is never cut, and a
-    green is kept while fewer than ``mu`` vehicles are approaching (platoon is let through)
-    unless the red side's integrated demand has grown past the threshold anyway."""
+    """Threshold theta in vehicle-seconds; a green shorter than min_green is never cut; a green
+    is kept while fewer than ``mu`` vehicles are being served (the platoon is let through)
+    unless it has run to max_green; and a green with nothing to serve is given up as soon as
+    a red approach has demand, which is the rule Cools et al. add so a green is never wasted."""
 
     def __init__(self, junction, theta=40.0, mu=3, **kw):
         super().__init__(junction, **kw)

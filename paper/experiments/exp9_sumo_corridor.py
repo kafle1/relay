@@ -167,7 +167,7 @@ def counts_for(j):
     return out
 
 
-def run(policy, level, seed):
+def run(policy, level, seed, sat_pcu_h_lane):
     work = tempfile.mkdtemp(prefix="relay_corr_")
     net = build_network(work)
     rou = os.path.join(work, "c.rou.xml")
@@ -183,7 +183,7 @@ def run(policy, level, seed):
             ctrl = {j: Controller(junctions[j], T_NET) for j in JUNCTIONS}
             couple = COUPLE if policy == "relay_coupled" else 0.0
         else:
-            sat = SAT_PCU
+            sat = sat_pcu_h_lane
             plans = {}
             for j in JUNCTIONS:
                 lam = {a: pcu_h[(j, a)] for a in JUNCTIONS[j]}
@@ -246,22 +246,18 @@ def _stats(path):
             "n_vehicles": n, "throughput_vph": n / (SECONDS - WARMUP) * 3600.0}
 
 
-SAT_PCU = 1531.0
-
-
 def one(job):
-    policy, level, seed = job
+    policy, level, seed, sat = job
     t0 = time.time()
-    r = run(policy, level, seed)
+    r = run(policy, level, seed, sat)
     r.update(policy=policy, level=level, seed=seed, wall_s=round(time.time() - t0, 1))
     return r
 
 
 def main():
-    global SAT_PCU
-    SAT_PCU = sb.measure_saturation()
-    print(f"saturation {SAT_PCU:.0f} PCU/h/lane", flush=True)
-    jobs = [(p, l, s) for l in LEVELS for s in SEEDS for p in POLICIES]
+    sat = sb.measure_saturation()
+    print(f"saturation {sat:.0f} PCU/h/lane", flush=True)
+    jobs = [(p, l, s, sat) for l in LEVELS for s in SEEDS for p in POLICIES]
     rows = []
     with Pool(NPROC) as pool:
         for i, r in enumerate(pool.imap_unordered(one, jobs)):
@@ -292,7 +288,7 @@ def main():
     with open(os.path.join(OUT, "exp9_config.json"), "w") as fh:
         json.dump({"seconds": SECONDS, "warmup": WARMUP, "spacing_m": SPACING, "outer_m": OUTER, "detect_m": DETECT,
                    "couple": COUPLE, "levels": LEVELS, "seeds": SEEDS, "routes_veh_s": ROUTES,
-                   "timings": T_NET.__dict__, "saturation_pcu_h_lane": round(SAT_PCU, 1)}, fh, indent=2)
+                   "timings": T_NET.__dict__, "saturation_pcu_h_lane": round(sat, 1)}, fh, indent=2)
     print("wrote exp9_sumo_corridor_*.csv to", OUT)
 
 

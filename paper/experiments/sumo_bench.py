@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.join(REPO, "src"))
 sys.path.insert(0, HERE)
 from controller import Controller, Timings, PCU, four_way, junction_from_dirs   # noqa: E402
 from baselines import MaxPressure                                             # noqa: E402
+from relay_bench import _critical_sum                                         # noqa: E402
 
 ARM_LEN = 300.0          # metres of approach road per arm
 DETECT_M = 80.0          # how far back from the stop line the camera counts
@@ -177,7 +178,7 @@ def webster_plan(pcu_h: dict, junction, sat_pcu_h_lane: float, yellow, all_red, 
     phases = list(junction.phases)
     L = len(phases) * (yellow + all_red)
     y = [max(pcu_h.get(a, 0.0) for a in junction.phases[p]) / (sat_pcu_h_lane * LANES) for p in phases]
-    Y = sum(y)
+    Y = _critical_sum(junction, dict(zip(phases, y)))
     C = c_max if Y >= 0.95 else min(max((1.5 * L + 5.0) / (1.0 - Y), c_min), c_max)
     total = max(C - L, len(phases) * min_green)
     greens = [max(min_green, total * (yi / Y if Y > 0 else 1.0 / len(y))) for yi in y]
@@ -216,11 +217,11 @@ def _as_state(out, junction):
 
 
 def run(policy: str, lam: dict, seed: int, *, seconds=1800.0, warmup=300.0, timings=None,
-        sat_pcu_h_lane=1800.0, arms=("N", "S", "E", "W"), keep=None) -> dict:
+        sat_pcu_h_lane=1800.0, arms=("N", "S", "E", "W")) -> dict:
     """One simulation. Returns delay statistics over vehicles departing after warm-up."""
     T = timings or Timings(min_green=5, max_green=45, yellow=3, all_red=1.5, max_wait=60)
     junction = four_way() if set(arms) == {"N", "S", "E", "W"} else junction_from_dirs(list(arms))
-    work = keep or tempfile.mkdtemp(prefix="relay_sumo_")
+    work = tempfile.mkdtemp(prefix="relay_sumo_")
     net = build_network(work, arms)
     rou = os.path.join(work, "j.rou.xml")
     pcu_h = write_routes(rou, lam, seconds, seed, arms)
@@ -267,44 +268,24 @@ def run(policy: str, lam: dict, seed: int, *, seconds=1800.0, warmup=300.0, timi
 
 
 def _write_actuated(path, junction, T):
-    """SUMO's built-in gap-actuated program with the same bounds as the controller."""
-    phases = list(junction.phases)
-    arms = junction.approaches
-    links = None
-    lines = ['<additional>', f'  <tlLogic id="C" type="actuated" programID="act" offset="0">',
-             '    <param key="max-gap" value="3.0"/>', '    <param key="detector-gap" value="2.0"/>']
-    # link order is only known once the net is loaded; we write per-phase states by arm using
-    # the canonical netconvert ordering (links sorted by incoming edge id, then lane, then dest)
-    lines.append('    <param key="show-detectors" value="false"/>')
-    for p in phases:
-        served = set(junction.phases[p])
-        lines.append(f'    <phase duration="{T.max_green}" minDur="{T.min_green}" maxDur="{T.max_green}" '
-                     f'state="__{p}__"/>')
-        lines.append(f'    <phase duration="{T.yellow}" state="__y{p}__"/>')
-        lines.append(f'    <phase duration="{T.all_red}" state="__r__"/>')
+    """SUMO's built-in gap-actuated program with the same bounds as the controller. Link order
+    comes from the net netconvert wrote, so the phase states are built directly."""
+    tree = ET.parse(os.path.join(os.path.dirname(path), "j.net.xml"))
+    conns = sorted((c for c in tree.getroot().iter("connection") if c.get("tl") == "C"),
+                   key=lambda c: int(c.get("linkIndex")))
+    order = [(c.get("from").split("_")[0], _dest(c.get("from").split("_")[0], "right") == c.get("to").split("_")[0])
+             for c in conns]
+    lines = ['<additional>', '  <tlLogic id="C" type="actuated" programID="act" offset="0">',
+             '    <param key="max-gap" value="3.0"/>', '    <param key="detector-gap" value="2.0"/>',
+             '    <param key="show-detectors" value="false"/>']
+    for p, served in junction.phases.items():
+        green = "".join(("g" if across else "G") if arm in served else "r" for arm, across in order)
+        yellow = "".join("y" if arm in served else "r" for arm, _ in order)
+        lines.append(f'    <phase duration="{T.max_green}" minDur="{T.min_green}" maxDur="{T.max_green}" state="{green}"/>')
+        lines.append(f'    <phase duration="{T.yellow}" state="{yellow}"/>')
+        lines.append(f'    <phase duration="{T.all_red}" state="{"r" * len(order)}"/>')
     lines += ['  </tlLogic>', '</additional>']
     open(path, "w").write("\n".join(lines))
-    _fill_actuated_states(path, junction)
-
-
-def _fill_actuated_states(path, junction):
-    """Replace the placeholder state strings using the link order netconvert produced."""
-    net_path = os.path.join(os.path.dirname(path), "j.net.xml")
-    tree = ET.parse(net_path)
-    conns = [c for c in tree.getroot().iter("connection") if c.get("tl") == "C"]
-    conns.sort(key=lambda c: int(c.get("linkIndex")))
-    order = []
-    for c in conns:
-        arm = c.get("from").split("_")[0]
-        dest = c.get("to").split("_")[0]
-        order.append((arm, _dest(arm, "right") == dest))
-    txt = open(path).read()
-    for p, served in junction.phases.items():
-        g = "".join(("g" if across else "G") if arm in served else "r" for arm, across in order)
-        y = "".join("y" if arm in served else "r" for arm, across in order)
-        txt = txt.replace(f"__{p}__", g).replace(f"__y{p}__", y)
-    txt = txt.replace("__r__", "r" * len(order))
-    open(path, "w").write(txt)
 
 
 def _tripinfo_stats(path, warmup, seconds, pcu_h):

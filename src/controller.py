@@ -287,7 +287,9 @@ class Controller:
             covered |= arms
             cycle_phases.append(p)
             Y += ratio[p]
-        if Y <= 0.0:
+        if Y <= 0.0 or self.phase not in cycle_phases:
+            # a split-arm phase whose arms a paired phase already covers has no share of this cycle;
+            # sizing it from a ratio the cover excluded inflated its green past max_green (measured)
             return self.t.min_green
         L = max(2, len(cycle_phases)) * (self.t.yellow + self.t.all_red)
         # C = (1.5L + 5) / (1 - Y) diverges as Y -> 1 and does not exist past it. The cycle is

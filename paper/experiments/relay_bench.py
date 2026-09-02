@@ -37,6 +37,20 @@ def pct(xs, p):
     return xs[min(len(xs) - 1, round(p / 100 * (len(xs) - 1)))]
 
 
+def _critical_sum(junction, ratio):
+    """Webster's Y over one cycle: phases taken heaviest first over disjoint approach sets, so
+    a junction whose phases overlap (split-arm phases on a movement junction) does not have
+    its saturation counted twice. Same rule as the controller's _service_floor."""
+    covered, Y = set(), 0.0
+    for p in sorted(ratio, key=lambda n: -ratio[n]):
+        arms = set(junction.phases[p])
+        if arms & covered:
+            continue
+        covered |= arms
+        Y += ratio[p]
+    return Y
+
+
 class WebsterTimer:
     """Fixed-time plan from Webster (1958), given the true mean demand.
 
@@ -55,10 +69,8 @@ class WebsterTimer:
         self.j = junction
         self.phases = list(junction.phases)
         L = len(self.phases) * (yellow + all_red)
-        y = []
-        for p in self.phases:
-            y.append(max(lam.get(a, 0.0) for a in junction.phases[p]) / sat)
-        Y = sum(y)
+        y = [max(lam.get(a, 0.0) for a in junction.phases[p]) / sat for p in self.phases]
+        Y = _critical_sum(junction, dict(zip(self.phases, y)))
         if Y >= 0.95:                      # oversaturated (or nearly): Webster's C diverges
             C = c_max
         else:

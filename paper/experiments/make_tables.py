@@ -89,14 +89,17 @@ write("exp3.tex", L)
 # experiment 6b -----------------------------------------------------------------------------
 e6b = rows("exp6b_biased_counts.csv")
 labels6b = {"saturating_q8": r"Saturating, $q_{1/2}=8$", "saturating_q4": r"Saturating, $q_{1/2}=4$",
-            "scale_0.8": "Scale 0.8", "scale_0.6": "Scale 0.6", "scale_0.4": "Scale 0.4",
+            "scale_0.8": "Scale 0.8", "scale_0.6": "Scale 0.6", "scale_0.4": "Scale 0.4 (lone vehicle rounds to 0)",
+            "scale_0.4_keep1": "Scale 0.4, presence floor 1",
             "floor_0.8": "Scale 0.8, lone vehicle reads 0", "floor_0.6": "Scale 0.6, lone vehicle reads 0",
             "floor_0.8_keep1": "Scale 0.8, presence floor 1", "floor_0.6_keep1": "Scale 0.6, presence floor 1"}
 L = [r"\begin{tabular}{lccc}", r"\toprule", r"Count model & Cells won & Worst vs Webster (\%) & Mean vs Webster (\%) \\", r"\midrule"]
+models6b = [r["model"] for r in e6b]
+missing = [m for m in dict.fromkeys(models6b) if m not in labels6b]
+if missing:
+    raise SystemExit(f"exp6b models without a table label: {missing}")
 for model in labels6b:
     sub = [r for r in e6b if r["model"] == model]
-    if not sub:
-        continue
     wins = sum(1 for r in sub if min(r["red_vs_fixed_equal"], r["red_vs_fixed_webster"]) > 0)
     worst = min(r["red_vs_fixed_webster"] for r in sub)
     mean = statistics.fmean(r["red_vs_fixed_webster"] for r in sub)

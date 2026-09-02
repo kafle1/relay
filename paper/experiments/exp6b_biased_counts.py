@@ -8,8 +8,9 @@ controller sees, while the queues it manages stay exact:
 
   saturating   reported = q / (1 + q / q_half): the fraction seen falls as the queue grows,
                matching a detector that loses occluded two-wheelers in a dense queue
-  scale        reported = round(f q): a flat multiplicative loss
-  floor        as scale, but a queue of one vehicle rounds to zero: the approach reads empty
+  scale        reported = round(f q): a flat multiplicative loss; at 0.4 a lone vehicle rounds to zero
+  floor        as scale, but a queue of one vehicle always reads zero: the approach reads empty
+  keep1        as scale or floor, with an occupied approach never reading below one
 
 Usage:  RELAY_REPO=/path/to/relay .venv/bin/python paper/experiments/exp6b_biased_counts.py
 """
@@ -79,10 +80,7 @@ def run_all(junction, lam, seed, model):
 
 def main():
     rows = []
-    only = os.environ.get("MODELS")
     for model_name, model in MODELS.items():
-        if only and model_name not in only.split(","):
-            continue
         for group, junction, topo in ((FOUR_WAY, four_way(), "4-way"),
                                       (TEE, junction_from_dirs(["N", "E", "W"]), "T")):
             for shape, base in group.items():
@@ -105,8 +103,7 @@ def main():
               f"{min(r['red_vs_fixed_webster'] for r in sub):+.1f}%  mean vs webster "
               f"{statistics.fmean(r['red_vs_fixed_webster'] for r in sub):+.1f}%", flush=True)
 
-    out_name = "exp6b_biased_counts.csv" if not only else f"exp6b_{only.replace(',', '_')}.csv"
-    with open(os.path.join(OUT, out_name), "w", newline="") as fh:
+    with open(os.path.join(OUT, "exp6b_biased_counts.csv"), "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         w.writeheader(); w.writerows(rows)
     with open(os.path.join(OUT, "exp6b_config.json"), "w") as fh:

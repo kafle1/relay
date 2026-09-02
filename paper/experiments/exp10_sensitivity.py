@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Experiment 10: the two parameters the paper says it is most sensitive to.
 
-  R      the vehicle maximum-wait bound. Section 6 shows it, not the pressure rule, decides
-         the one cell a fixed plan wins. This traces the delay-versus-worst-wait frontier it
-         sets, on the single-dominant shape where it binds hardest.
-  w_moto the motorcycle PCU weight. With a 60% two-wheeler mix the weight scales most of
-         the pressure; this checks whether mis-setting it moves the delay.
+  R      the vehicle maximum-wait bound, from 30 s to unbounded, on the single-dominant shape
+         at the two highest loads. An earlier version of the paper blamed this bound for the
+         one cell a fixed plan won; this sweep is what showed that explanation was wrong.
+  w_moto the motorcycle PCU weight, with a class-mixed queue whose two-wheeler share differs
+         by axis (80% on N-S, 30% on E-W), so the weight changes which phase looks heavier.
 
 Both on the point-queue harness, identical arrivals, 25 seeds.
 
