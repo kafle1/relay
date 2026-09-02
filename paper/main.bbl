@@ -42,11 +42,6 @@ P.~B. Hunt, D.~I. Robertson, R.~D. Bretherton, and R.~I. Winton, ``{SCOOT}: A
   Research Laboratory, Crowthorne, Berkshire, UK, TRRL Laboratory Report LR
   1014, 1981.
 
-\bibitem{Robertson1991SCOOTMethod}
-D.~I. Robertson and R.~D. Bretherton, ``Optimizing networks of traffic signals
-  in real time: the {SCOOT} method,'' \emph{IEEE Transactions on Vehicular
-  Technology}, vol.~40, no.~1, pp. 11--15, 1991.
-
 \bibitem{Sims1980SCATS}
 A.~G. Sims and K.~W. Dobinson, ``The {S}ydney coordinated adaptive traffic
   ({SCAT}) system philosophy and benefits,'' \emph{IEEE Transactions on
@@ -75,18 +70,6 @@ M.~Umair, M.~U. Farooq, R.~H. Raza, Q.~Chen, and B.~Abdulhai, ``Efficient
   video-based vehicle queue length estimation using computer vision and deep
   learning for an urban traffic scenario,'' \emph{Processes}, vol.~9, no.~10,
   p. 1786, 2021.
-
-\bibitem{harilakshmi2023deep}
-V.~S. Harilakshmi and P.~A. Jansi~Rani, ``Deep learning based artificial
-  intelligent systems in road traffic density estimation and congestion
-  classification,'' \emph{Indian Journal of Science and Technology}, vol.~16,
-  no.~24, pp. 1768--1776, 2023.
-
-\bibitem{abewickrema2025ensemble}
-W.~Abewickrema, M.~Yildirimoglu, and J.~Kim, ``An ensemble deep learning
-  framework for real-time queue length estimation at signalized
-  intersections,'' \emph{Data Science for Transportation}, vol.~7, no.~2,
-  p.~15, 2025.
 
 \bibitem{papanashi2024adaptive}
 S.~Papanashi, M.~Chadaga, K.~R, S.~S. Huddar, K.~Sreelakshmi, and R.~Kumar~P,
@@ -119,13 +102,6 @@ P.~Varaiya, ``Max pressure control of a network of signalized intersections,''
   \emph{Transportation Research Part C: Emerging Technologies}, vol.~36, pp.
   177--195, 2013.
 
-\bibitem{Varaiya2013MaxPressureChapter}
-------, ``The max-pressure controller for arbitrary networks of signalized
-  intersections,'' in \emph{Advances in Dynamic Network Modeling in Complex
-  Transportation Systems}, ser. Complex Networks and Dynamic Systems, S.~V.
-  Ukkusuri and K.~Ozbay, Eds.\hskip 1em plus 0.5em minus 0.4em\relax New York,
-  NY, USA: Springer, 2013, vol.~2, pp. 27--66.
-
 \bibitem{koonce2008timing}
 P.~Koonce, L.~Rodegerdts, K.~Lee, S.~Quayle, S.~Beaird, C.~Braud, J.~Bonneson,
   P.~Tarnoff, and T.~Urbanik, ``Traffic signal timing manual,'' Federal Highway
@@ -136,18 +112,6 @@ L.~Tassiulas and A.~Ephremides, ``Stability properties of constrained queueing
   systems and scheduling policies for maximum throughput in multihop radio
   networks,'' \emph{IEEE Transactions on Automatic Control}, vol.~37, no.~12,
   pp. 1936--1948, 1992.
-
-\bibitem{Wongpiromsarn2012Distributed}
-T.~Wongpiromsarn, T.~Uthaicharoenpong, Y.~Wang, E.~Frazzoli, and D.~Wang,
-  ``Distributed traffic signal control for maximum network throughput,'' in
-  \emph{2012 15th International IEEE Conference on Intelligent Transportation
-  Systems (ITSC)}, 2012, pp. 588--595.
-
-\bibitem{Le2015Decentralized}
-T.~Le, P.~Kov{\'a}cs, N.~Walton, H.~L. Vu, L.~L.~H. Andrew, and S.~S.~P.
-  Hoogendoorn, ``Decentralized signal control for urban road networks,''
-  \emph{Transportation Research Part C: Emerging Technologies}, vol.~58, pp.
-  431--450, 2015.
 
 \bibitem{Levin2020CyclicalMaxPressure}
 M.~W. Levin, J.~Hu, and M.~Odell, ``Max-pressure signal control with cyclical
@@ -180,51 +144,12 @@ M.~Noaeen, A.~Naik, L.~Goodman, J.~Crebo, T.~Abrar, Z.~S.~H. Abad, A.~L.~C.
   control: A systematic literature review,'' \emph{Expert Systems with
   Applications}, vol. 199, p. 116830, 2022.
 
-\bibitem{wei2018intellilight}
-H.~Wei, G.~Zheng, H.~Yao, and Z.~Li, ``{IntelliLight}: A reinforcement learning
-  approach for intelligent traffic light control,'' in \emph{Proceedings of the
-  24th ACM SIGKDD International Conference on Knowledge Discovery and Data
-  Mining}, 2018, pp. 2496--2505.
-
-\bibitem{chen2020thousand}
-C.~Chen, H.~Wei, N.~Xu, G.~Zheng, M.~Yang, Y.~Xiong, K.~Xu, and Z.~Li, ``Toward
-  a thousand lights: Decentralized deep reinforcement learning for large-scale
-  traffic signal control,'' in \emph{Proceedings of the AAAI Conference on
-  Artificial Intelligence}, vol.~34, 2020, pp. 3414--3421.
-
 \bibitem{wei2019presslight}
 H.~Wei, C.~Chen, G.~Zheng, K.~Wu, V.~V. Gayah, K.~Xu, and Z.~Li,
   ``{PressLight}: Learning max pressure control to coordinate traffic signals
   in arterial network,'' in \emph{Proceedings of the 25th ACM SIGKDD
   International Conference on Knowledge Discovery and Data Mining}, 2019, pp.
   1290--1298.
-
-\bibitem{genders2016using}
-W.~Genders and S.~Razavi, ``Using a deep reinforcement learning agent for
-  traffic signal control,'' 2016, preprint, arXiv:1611.01142.
-
-\bibitem{terven2023comprehensive}
-J.~Terven, D.-M. Cordova-Esparza, and J.-A. Romero-Gonzalez, ``A comprehensive
-  review of {YOLO} architectures in computer vision: From {YOLOv1} to {YOLOv8}
-  and {YOLO-NAS},'' \emph{Machine Learning and Knowledge Extraction}, vol.~5,
-  no.~4, pp. 1680--1716, 2023.
-
-\bibitem{lin2014microsoft}
-T.-Y. Lin, M.~Maire, S.~Belongie, J.~Hays, P.~Perona, D.~Ramanan,
-  P.~Doll{\'a}r, and C.~L. Zitnick, ``{Microsoft COCO}: Common objects in
-  context,'' in \emph{Computer Vision -- ECCV 2014}, ser. Lecture Notes in
-  Computer Science, vol. 8693.\hskip 1em plus 0.5em minus 0.4em\relax Springer,
-  2014, pp. 740--755.
-
-\bibitem{bewley2016simple}
-A.~Bewley, Z.~Ge, L.~Ott, F.~Ramos, and B.~Upcroft, ``Simple online and
-  realtime tracking,'' in \emph{2016 IEEE International Conference on Image
-  Processing (ICIP)}, 2016, pp. 3464--3468.
-
-\bibitem{wojke2017simple}
-N.~Wojke, A.~Bewley, and D.~Paulus, ``Simple online and realtime tracking with
-  a deep association metric,'' in \emph{2017 IEEE International Conference on
-  Image Processing (ICIP)}, 2017, pp. 3645--3649.
 
 \bibitem{jocher2023yolov8}
 G.~Jocher, A.~Chaurasia, and J.~Qiu, ``Ultralytics {YOLO}, version 8.0.0,''
@@ -244,12 +169,6 @@ S.~Humagain, R.~Sinha, E.~Lai, and P.~Ranjitkar, ``A systematic review of route
   optimisation and pre-emption methods for emergency vehicles,''
   \emph{Transport Reviews}, vol.~40, no.~1, pp. 35--53, 2020.
 
-\bibitem{das2022traffic}
-D.~Das, N.~V. Altekar, K.~L. Head, and F.~Saleem, ``Traffic signal priority
-  control strategy for connected emergency vehicles with dilemma zone
-  protection for freight vehicles,'' \emph{Transportation Research Record},
-  vol. 2676, no.~1, pp. 499--517, 2022.
-
 \bibitem{chandra2003effect}
 S.~Chandra and U.~Kumar, ``Effect of lane width on capacity under mixed traffic
   conditions in {India},'' \emph{Journal of Transportation Engineering}, vol.
@@ -260,17 +179,6 @@ V.~T. Arasan and S.~S. Arkatkar, ``Microsimulation study of effect of volume
   and road width on {PCU} of vehicles under heterogeneous traffic,''
   \emph{Journal of Transportation Engineering}, vol. 136, no.~12, pp.
   1110--1119, 2010.
-
-\bibitem{kumar2018new}
-P.~Kumar, S.~Arkatkar, and G.~Joshi, ``New approach for estimating passenger
-  car units on multilane urban roads with heterogeneous traffic conditions,''
-  \emph{Journal of Transportation Engineering, Part A: Systems}, vol. 144,
-  no.~3, p. 04018002, 2018.
-
-\bibitem{daganzo1997fundamentals}
-C.~F. Daganzo, \emph{Fundamentals of Transportation and Traffic
-  Operations}.\hskip 1em plus 0.5em minus 0.4em\relax Oxford, UK: Pergamon,
-  1997.
 
 \bibitem{trb2022hcm}
 {Transportation Research Board}, \emph{Highway Capacity Manual, 7th Edition: A
