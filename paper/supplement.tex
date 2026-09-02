@@ -1,8 +1,9 @@
-\documentclass[journal]{IEEEtran}
+\documentclass[journal,onecolumn]{IEEEtran}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \renewcommand{\ttdefault}{cmtt}
@@ -31,7 +32,7 @@ is generated from the same raw result files by the same scripts.
 
 \section{Controller parameters}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Controller parameters. The single-junction column is used in Experiments 1, 3, 6, 7, 8 and 10, with
 $g_{\max} = 30$~s in Experiments 1 and 3 and 45~s in the others; the corridor column is the configuration of
@@ -63,7 +64,7 @@ $\gamma$ & downstream coupling & n/a & 0.4 \\
 
 \section{Single junction}
 
-\begin{table*}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 1. Mean delay per vehicle (s, standard deviation across \ExpOneSeeds{} seeds in
 parentheses) and the paired per-seed reduction achieved by \relay{} against each fixed-time baseline. All
@@ -72,19 +73,19 @@ differences are significant at $p < 0.05$ by the Wilcoxon signed-rank test (larg
 \footnotesize
 \setlength{\tabcolsep}{3.5pt}
 \input{tables/exp1}
-\end{table*}
+\end{table}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{exp1_tail.pdf}
+\includegraphics[width=0.62\textwidth]{exp1_tail.pdf}
 \caption{Experiment 1. Median, 95th-percentile and worst observed wait per vehicle at demand multiplier 1.0,
 logarithmic axis. The tail is where the anti-starvation bound shows.}
 \label{fig:exp1tail}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{exp1b_switching.pdf}
+\includegraphics[width=0.62\textwidth]{exp1b_switching.pdf}
 \caption{Experiment 1b. Left: phase changes per hour. Right: fraction of wall time with a green displayed;
 the complement is clearance. Dashed: the equal-split plan, whose behaviour is independent of demand.}
 \label{fig:exp1b}
@@ -92,7 +93,7 @@ the complement is clearance. Dashed: the equal-split plan, whose behaviour is in
 
 \section{Point-queue corridor}
 
-\begin{table*}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 2. Three-junction corridor, mean over 20 seeds (SD in parentheses). Delay is total
 queueing delay per vehicle across the junctions traversed; through travel time is for the two arterial
@@ -101,11 +102,11 @@ through routes (free-flow 21.6~s); emergency traversal is the single emergency v
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \input{tables/exp2}
-\end{table*}
+\end{table}
 
 \section{Preemption latency}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 3. Delay from first emergency detection to green on the emergency approach over
 \PreTrials{} trials. The equal-split baseline has no preemption path; its latency is set by cycle position and
@@ -116,9 +117,9 @@ is pooled.}
 \input{tables/exp3}
 \end{table}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{exp3_preemption.pdf}
+\includegraphics[width=0.62\textwidth]{exp3_preemption.pdf}
 \caption{Experiment 3. Left: time from first emergency detection to green, \PreTrials{} trials. Right:
 empirical cumulative distributions against the closed-form bound of 14.0~s.}
 \label{fig:exp3}
@@ -126,17 +127,17 @@ empirical cumulative distributions against the closed-form bound of 14.0~s.}
 
 \section{Perception}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{detector.pdf}
+\includegraphics[width=0.62\textwidth]{detector.pdf}
 \caption{Left: Experiment 4, per-class AP at IoU 0.5. Right: Experiment 5, sampled count against inference
 resolution, normalised to 640~px. Neither curve has flattened by 1600~px.}
 \label{fig:detector}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{frame_hcmc_18s.png}
+\includegraphics[width=0.62\textwidth]{frame_hcmc_18s.png}
 \caption{Experiment 5. The stack on dense motorcycle-dominated footage. The failure mode is visible: a few
 dozen vehicles are detected in a scene containing several hundred, so the reported \pcu{} demand is a severe
 underestimate. This is the error Experiment 6b models.}
@@ -145,7 +146,7 @@ underestimate. This is the error Experiment 6b models.}
 
 \section{Biased-count grid}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 6b. The \GridCells-cell grid under biased count models applied to what the controller
 sees. Won counts cells with a positive reduction against both fixed plans; worst and mean are the paired
@@ -158,7 +159,7 @@ reduction against Webster over the grid.}
 
 \section{SUMO single junction}
 
-\begin{table*}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 8. SUMO, mean time loss per vehicle (s, SD over \SumoSeeds{} seeds) and paired reduction of
 \relay{} against each baseline.}
@@ -166,11 +167,11 @@ reduction against Webster over the grid.}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \input{tables/exp8}
-\end{table*}
+\end{table}
 
 \section{SUMO corridor}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Experiment 9. SUMO corridor with \ScorrSpacing~m links, mean time loss per vehicle (s, SD over 10
 seeds) and arterial through travel time (s).}
@@ -182,9 +183,9 @@ seeds) and arterial through travel time (s).}
 
 \section{Adaptive baselines}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{exp7_policies.pdf}
+\includegraphics[width=0.62\textwidth]{exp7_policies.pdf}
 \caption{Experiment 7. Paired delay reduction of \relay{} against each baseline over the \GridCells{} cells,
 ordered by demand. Positive favours \relay.}
 \label{fig:exp7}
@@ -192,9 +193,9 @@ ordered by demand. Positive favours \relay.}
 
 \section{Sensitivity}
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=\columnwidth]{exp10_sensitivity.pdf}
+\includegraphics[width=0.62\textwidth]{exp10_sensitivity.pdf}
 \caption{Experiment 10. Left: mean and worst wait against the fairness bound $R$ on the single-dominant shape
 at \SensMidDemand{} and \SensHighDemand~veh/h. Right: reduction against Webster as a function of the
 motorcycle \pcu{} weight with a two-wheeler share of 80\% on one axis and 30\% on the other.}
