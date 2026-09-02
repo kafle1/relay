@@ -39,12 +39,12 @@ degree of saturation and to price a phase change at the discharge its clearance 
 against equal-split and demand-optimal Webster fixed plans, plain max-pressure, self-organising traffic
 lights and vehicle-actuated control in a seeded point-queue simulation, and against Webster, max-pressure
 and gap-actuated control in SUMO with a motorcycle-dominated fleet. In a point-queue grid of \GridCells{}
-cells spanning nine demand shapes on two topologies, mean delay falls against the Webster plan in every cell,
-by \GridWorstWebster\% in the weakest and by up to \ExpOneMaxWebster\% in the single-junction experiment,
-and against actuated control in \PolActuatedWins{} of \GridCells{} cells. In SUMO the controller reduces
+cells spanning nine demand shapes on two topologies, mean delay falls against the Webster plan in every cell, by \GridWorstWebster\% in the weakest; in the
+separate single-junction experiment the reduction reaches \ExpOneMaxWebster\%; and actuated control is
+beaten in \PolActuatedWins{} of the \GridCells{} grid cells. In SUMO the controller reduces
 delay in every one of \SumoWebsterRuns{} paired runs against each baseline, by \SumoWebsterMin\% to
-\SumoWebsterMax\% against Webster, although at the highest load its worst observed wait is longer than under
-either the Webster plan or actuated control. The controller is unaffected by the biased undercount the
+\SumoWebsterMax\% against Webster, although at the highest load its worst observed time loss is longer than under either the Webster plan
+or actuated control. The controller is unaffected by the biased undercount the
 detector actually exhibits, the corridor coupling term contributes at most \ScorrCoupleAbsMax\% of delay in
 either traffic model, and emergency preemption reaches green in \PreMeanRelay~s on average over \PreTrials{}
 trials with a worst case of \PreWorstRelay~s against a closed-form bound of 14.0~s. This is a simulation and
@@ -178,8 +178,8 @@ demand-optimal fixed-time and actuated baselines that reports where the adaptive
 Emergency preemption has a long operational history and a careful literature on its side effects, since a
 preemption interrupts the cycle and can create hazards at the transition~\cite{louisell2004simple}; Humagain et al.~\cite{humagain2020systematic} review route optimisation and preemption methods. Our
 detection channel differs: the emergency vehicle is recognised visually by the same detector that counts
-ordinary traffic and no vehicle-side equipment is required, cheaper and less reliable, which is why the
-ambulance class carries the highest confidence threshold and the hold is capped; what we add is a worst-case
+ordinary traffic and no vehicle-side equipment is required, which is cheaper and less reliable; that is why the ambulance
+class carries the highest confidence threshold and the hold is capped, and what we add is a worst-case
 latency bound with a measurement against it.
 
 \section{System Architecture}
@@ -254,7 +254,7 @@ r_a & \text{otherwise},
 \label{eq:wait}
 \end{equation}
 where $\delta_a$ is the fraction of the approach's demand that discharged during the step. On green the clock unwinds by the fraction of the
-queue that discharged and reaches zero only when the queue does; resetting it on the green would claim that
+queue that discharged and reaches zero only when the queue does; resetting it on green would claim that
 everything still behind the stop line had stopped waiting, which beyond capacity is false. The third case stops a
 long-vacant approach accumulating a clock that the first arriving vehicle inherits, and the debounce keeps a
 detection dropout from erasing a real queue's guarantee.
@@ -756,9 +756,8 @@ and \SensMidMeanMax~s at \SensMidDemand~veh/h and between \SensHighMeanMin{} and
 the higher load, and the worst wait is likewise flat, \SensMidMaxWaitMin{} to \SensMidMaxWaitMax~s, because
 at this shape the measured-cycle floor, not the starvation rule, determines when the minor approach is
 served; $R$ binds where the score would otherwise leave a small queue unserved, the light-load case of
-Section~\ref{sec:single}. The motorcycle weight, with two-wheeler shares that differ by axis, changes the
-reduction against Webster by at most \SensMotoSpread{} percentage points across the three shapes (asymmetric
-\SensMotoAsymmetricRedMin\% to \SensMotoAsymmetricRedMax\%); the controller degrades gracefully because it compares phases rather than reading absolute volumes and
+Section~\ref{sec:single}. The motorcycle weight, with two-wheeler shares that differ by axis, changes the reduction against Webster by at most \SensMotoSpread{} percentage points on any of the three
+shapes (on the asymmetric shape from \SensMotoAsymmetricRedMin\% to \SensMotoAsymmetricRedMax\%); the controller degrades gracefully because it compares phases rather than reading absolute volumes and
 the measured-cycle floor is a ratio in which a per-class weight partly cancels.
 
 \section{Limitations}
@@ -775,7 +774,7 @@ stated to an authority as a condition on camera placement rather than hidden in 
 \textbf{Perception was not validated against human ground truth.} The held-out split mixes synthetic frames
 with pseudo-labelled real frames, so mAP measures agreement with the labelling process; Experiment 6b bounds
 the consequence for control, but the magnitude of the undercount on the target city's junctions is unknown
-and a human-annotated set is required before any absolute demand claim.
+and a human-annotated set is required before any absolute demand claim can be made.
 
 \textbf{Narrower gaps.} The microsimulation uses SUMO defaults and a fleet plausible for the region rather
 than one fitted to a Kathmandu junction, so it establishes that the advantage survives car-following, lane
@@ -799,9 +798,8 @@ primary grid and in every one of the \GridCells{} cells of the robustness grid, 
 parity beyond capacity; it beats plain max-pressure and self-organising control everywhere, and vehicle-actuated
 control in \PolActuatedWins{} of \GridCells{} cells with a markedly shorter tail. In SUMO it reduces time loss
 in every paired run against Webster, max-pressure and actuated control, by \SumoWebsterMin\% to
-\SumoWebsterMax\% against the Webster plan, while its worst-case wait at saturation is longer than under
-either that plan or actuated control, because the fairness bound reaches only as far as the camera sees. Two negative results are reported:
-the corridor coupling term contributes nothing in either traffic model, and an explanation we first offered for
+\SumoWebsterMax\% against the Webster plan, while its worst-case time loss at saturation is longer than under either that plan or actuated control, because the fairness bound reaches only as far as the camera sees. Two negative results are reported: the corridor coupling term changes delay by at most
+\ScorrCoupleAbsMax\% in either traffic model, and an explanation we first offered for
 the one weak cell was wrong and is replaced by a measured one. The next steps follow from the limitations: a
 human-annotated perception set from the target city, a comparison against a learned policy on identical
 arrivals, and a field trial.
