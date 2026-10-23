@@ -99,7 +99,7 @@ drift apart.
 | **vs a properly timed fixed plan** - Webster cycle + splits from the true mean demand, 30 seeds/cell (`exp1_single_junction.py`) | **28-44% less delay, every cell** | the honest headline. Webster is given perfect knowledge of average demand, which no real installation has |
 | **vs an equal-split timer** (same runs) | 27-96% less delay | the baseline most camera-based papers use; easy to beat, so it isn't the headline |
 | **Per-vehicle waits** (asymmetric, 1278 veh/h) | p95 and worst wait roughly halved against both fixed plans | fairness, not just throughput - the tail numbers means-only benchmarks never report |
-| **Every demand shape and topology** - 72 cells, 7 shapes, 4-way + T, 432 to 2462 veh/h (`exp6_robustness.py`) | **beats both fixed plans in all 72 cells**; the closest is parity (+1.4%) at one approach demanding 82% of all green | an earlier version lost that cell by 27%; the cause was a discontinuity in the measured-cycle floor near capacity, not the fairness bound, and the paper reports the correction |
+| **Every demand shape and topology** - 72 cells, 9 demand shapes (7 on the 4-way, 2 on the T), 432 to 2462 veh/h (`exp6_robustness.py`) | **beats both fixed plans in all 72 cells**; the closest is parity (+1.4%) at one approach demanding 82% of all green | an earlier version lost that cell by 27%; the cause was a discontinuity in the measured-cycle floor near capacity, not the fairness bound, and the paper reports the correction |
 | **Adaptive baselines on the same 72 cells** (`exp7_policies.py`) | beats plain max-pressure and SOTL in all 72, vehicle-actuated control in 64, never by less than -1.3% | actuated control is the serious competitor; the difference is in the tails (p95 wait 20 s vs 24 s) |
 | **With the detector's actual error** (`exp6b_biased_counts.py`) | unaffected by a saturating undercount or a 20-40% flat undercount; collapses only when a lone vehicle rounds to zero | the requirement this yields: an unbiased presence signal at short queues, not accurate counts |
 | **SUMO microsimulation**, motorcycle-dominated fleet, sublane model, turning conflicts (`exp8_sumo.py`) | less delay in every one of 90 paired runs vs Webster (23-56%), max-pressure (22-36%) and SUMO's actuated program (18-57%) | at the highest load the worst-case wait is longer than the fixed plans', because the fairness bound reaches only as far as the camera sees |
@@ -155,6 +155,9 @@ docs/               research synthesis · design spec · 96-case edge-case regis
 The paper is [`paper/main.pdf`](paper/main.pdf). Every figure and table in it comes from
 [`paper/experiments/`](paper/experiments/) run against a clone of this repo - nothing in it is
 estimated or copied from this README.
+
+The paper is under review at IEEE Transactions on Intelligent Transportation Systems. Until it
+is published, cite this repository: https://github.com/kafle1/relay
 
 ## Auto-calibration: lanes and approaches
 
